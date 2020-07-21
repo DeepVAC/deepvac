@@ -9,6 +9,10 @@ class AttrDict(dict):
             self[key] = value
 
 config = AttrDict()
+config.synthesis = AttrDict()
 config.aug = AttrDict()
 config.loader = AttrDict()
 config.text = AttrDict()
+config.detect = AttrDict()
+config.face = AttrDict()
+config.dumpimg = AttrDict()

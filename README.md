@@ -14,8 +14,14 @@
 
 
 ## 工厂
-- loader工厂
-- aug工厂
-- synthesis工厂
+- loader,aug,synthesis
+- 工厂返回的实例，其构造函数的入参均为deepvac_config；
+- 所有用户的配置均在deepvac_config中；
+- 所有开发的配置均在auditConfig中；
+
+
+## 项目依赖
+- 支持Python3。不支持Python2，其已被废弃；
+- 依赖包：scipy, numpy, cv2, Pillow；
 
 

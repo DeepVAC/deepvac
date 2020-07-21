@@ -17,7 +17,6 @@ class AugFactory(SyszuxFactory):
 
     def addProducts(self):
         for sym in self.getProducts():
-            print(sym)
             self.addProduct(sym, eval('{}.{}'.format('syszux_aug',sym)) )
         
         self.addTVProducts()
@@ -37,7 +36,6 @@ class AugFactory(SyszuxFactory):
             return
 
         for sym in self.getProducts():
-            print(sym)
             self.addProduct(sym, eval('{}.{}'.format('trans',sym)) )
         
 if __name__ == "__main__":

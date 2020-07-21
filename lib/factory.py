@@ -1,3 +1,5 @@
+import sys
+
 class SyszuxFactory(object):
     def __init__(self):
         self.factory_dict = dict()
@@ -38,3 +40,11 @@ class SyszuxFactory(object):
 
     def addProducts(self):
         raise Exception('Not implemented.')
+
+    def get(self, ins_name):
+        try:
+            x = self.factory_dict[ins_name]
+        except:
+            print("ERROR! {} not found in factory.".format(ins_name))
+            sys.exit(0)
+        return x

@@ -12,7 +12,6 @@ class SynthesisFactory(SyszuxFactory):
 
     def addProducts(self):
         for sym in self.getProducts():
-            print(sym)
             self.addProduct(sym, eval('{}.{}'.format('syszux_synthesis',sym)) )
         
 if __name__ == "__main__":

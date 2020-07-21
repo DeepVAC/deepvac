@@ -13,7 +13,6 @@ class LoaderFactory(SyszuxFactory):
 
     def addProducts(self):
         for sym in self.getProducts():
-            print(sym)
             self.addProduct(sym, eval('{}.{}'.format('syszux_loader',sym)) )
         
 if __name__ == "__main__":
