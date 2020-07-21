@@ -1,7 +1,7 @@
 from PIL import Image,ImageDraw,ImageFont
 import cv2
 import numpy as np
-import os.path
+import os
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
@@ -28,7 +28,7 @@ class SynthesisBase(object):
 
 class SynthesisText(SynthesisBase):
     def __init__(self, deepvac_config):
-        super(SynthesisText, self).__init__()
+        super(SynthesisText, self).__init__(deepvac_config)
         self.deepvac_config = deepvac_config
         self.lex = []
         self.pil_img = None
@@ -36,7 +36,7 @@ class SynthesisText(SynthesisBase):
         self.auditConfig()
 
     def auditConfig(self):
-        super(SynthesisText, self).auditConfig(self)
+        super(SynthesisText, self).auditConfig()
         self.txt_file = self.deepvac_config.txt_file
         assert os.path.isfile(self.txt_file), "txt file {} not exist.".format(self.txt_file)
 
@@ -45,7 +45,8 @@ class SynthesisText(SynthesisBase):
                 line = line.rstrip()
                 self.lex.append(line)
 
-        self.fonts = ['锐字云字库锐宋粗体GBK.TTF','song.TTF','hei.ttf']
+        self.fonts_dir = 'fonts'
+        self.fonts = os.listdir(self.fonts_dir)
         self.fonts_len = len(self.fonts)
         self.font_size = 50
 
@@ -61,7 +62,7 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
-    def __call__():
+    def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
             self.buildTextWithScene(i)
@@ -69,14 +70,15 @@ class SynthesisText(SynthesisBase):
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
-        super(SysthesisTextPure, self).__init__(deepvac_config)
+        super(SynthesisTextPure, self).__init__(deepvac_config)
     
     def auditConfig(self):
-        super(SysthesisTextPure, self).auditConfig(self)
+        super(SynthesisTextPure, self).auditConfig()
         self.bg_color = [(255,255,255),(10,10,200),(200,10,10),(10,10,200),(10,10,10)]
         self.bg_color_len = len(self.bg_color)
         self.scene_hw = (1080, 1920)
         self.font_offset = (1000,800)
+        self.is_border = self.deepvac_config.is_border
 
     def buildScene(self, i):
         r_channel = np.ones(self.scene_hw, dtype=np.uint8) * self.bg_color[i%self.bg_color_len][0]
@@ -87,54 +89,61 @@ class SynthesisTextPure(SynthesisText):
         self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        font = ImageFont.truetype(self.fonts[i%self.fonts_len], self.font_size,encoding='utf-8')
+        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i]
-        self.draw.text(self.font_offset,s,self.fg_color[i%self.fg_color_len],font=font)
+        fillcolor = self.fg_color[i%self.fg_color_len]
+        if self.is_border:
+            shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
+            for x in [self.font_offset[0]-1,self.font_offset[0]+1,self.font_offset[0]]:
+                for y in [self.font_offset[1]-1,self.font_offset[1]+1,self.font_offset[1]]:
+                    self.draw.text((x, y), s, font=font, fill=shadowcolor)
+        self.draw.text(self.font_offset,s,fillcolor,font=font)
 
     def dumpTextImg(self, i):
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(s)]
+        img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(self.lex[i])]
         self.dumpImgToPath('pure_{}.jpg'.format(str(i).zfill(6)),img_crop)
 
             
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
-        super(SysthesisTextFromVideo, self).__init__(deepvac_config)
+        super(SynthesisTextFromVideo, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        super(SysthesisTextPure, self).auditConfig(self)
+        super(SynthesisTextFromVideo, self).auditConfig()
         self.video_file = self.deepvac_config.video_file
 
         self.video_capture = cv2.VideoCapture(self.video_file)
         self.frames_num = self.video_capture.get(7)
         assert self.frames_num > 10, "invalid video file {}".format(self.video_file)
         self.sample_rate = self.deepvac_config.sample_rate
+        self.font_offset = (1000,800)
+        self.is_border = self.deepvac_config.is_border
 
     def buildScene(self, i):
-        read_num = 0
-        while True:
-            for _ in range(self.sample_rate):
-                success,frame = self.video_capture.read()
-                read_num += 1
+        for _ in range(self.sample_rate):
+            success,frame = self.video_capture.read()
 
-                if read_num >= self.frames_num:
-                    return
-
-                if not success:
-                    continue
+            if not success:
+                return 
             
-            self.pil_img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
-            self.draw = ImageDraw.Draw(pil_img)
-            yield
+        self.pil_img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
+        self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        pass
+        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
+        s = self.lex[i]
+        fillcolor = self.fg_color[i%self.fg_color_len]
+        if self.is_border:
+            shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
+            for x in [self.font_offset[0]-1,self.font_offset[0]+1,self.font_offset[0]]:
+                for y in [self.font_offset[1]-1,self.font_offset[1]+1,self.font_offset[1]]:
+                    self.draw.text((x, y), s, font=font, fill=shadowcolor)
+        self.draw.text(self.font_offset,s,self.fg_color[i%self.fg_color_len],font=font)
 
     def dumpTextImg(self, i):
-        pass
-
-
-
-
+        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
+        img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(self.lex[i])]
+        self.dumpImgToPath('scene_{}.jpg'.format(str(i).zfill(6)),img_crop)
 
 
