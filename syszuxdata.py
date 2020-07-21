@@ -1,4 +1,4 @@
-from lib.executor import AugChain
+from lib.syszux_executor import AugChain
 import conf as deepvac_config
 
 if __name__ == "__main__":

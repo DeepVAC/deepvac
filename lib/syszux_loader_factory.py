@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset,ConcatDataset,DataLoader
 
-from factory import SyszuxFactory
+from syszux_factory import SyszuxFactory
 import syszux_loader
 
 class LoaderFactory(SyszuxFactory):

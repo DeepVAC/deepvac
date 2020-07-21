@@ -1,4 +1,4 @@
-from factory import SyszuxFactory
+from syszux_factory import SyszuxFactory
 import syszux_synthesis
 
 class SynthesisFactory(SyszuxFactory):

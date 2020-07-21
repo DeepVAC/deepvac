@@ -3,7 +3,7 @@ try:
 except:
     print("torchvision not found, some augmentors cannot be used.")
 
-from factory import SyszuxFactory
+from syszux_factory import SyszuxFactory
 import syszux_aug
 
 class AugFactory(SyszuxFactory):
