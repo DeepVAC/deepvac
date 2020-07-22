@@ -62,6 +62,13 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
+    def text_border(self, draw, x, y, font, shadowcolor, fillcolor,text):
+        shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
+        for i in [x-1,x+1,x]:
+            for j in [y-1,y+1,y]:
+                draw.text((i, j), text, font=font, fill=shadowcolor)
+        draw.text((x,y),text,fillcolor,font=font)
+
     def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
@@ -93,12 +100,10 @@ class SynthesisTextPure(SynthesisText):
         s = self.lex[i]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
-            shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
-            for x in [self.font_offset[0]-1,self.font_offset[0]+1,self.font_offset[0]]:
-                for y in [self.font_offset[1]-1,self.font_offset[1]+1,self.font_offset[1]]:
-                    self.draw.text((x, y), s, font=font, fill=shadowcolor)
-        self.draw.text(self.font_offset,s,fillcolor,font=font)
-
+            self.text_border(self.draw,self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+        else:
+            self.draw.text(self.font_offset,s,fillcolor,font=font)
+    
     def dumpTextImg(self, i):
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(self.lex[i])]
@@ -135,11 +140,9 @@ class SynthesisTextFromVideo(SynthesisText):
         s = self.lex[i]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
-            shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
-            for x in [self.font_offset[0]-1,self.font_offset[0]+1,self.font_offset[0]]:
-                for y in [self.font_offset[1]-1,self.font_offset[1]+1,self.font_offset[1]]:
-                    self.draw.text((x, y), s, font=font, fill=shadowcolor)
-        self.draw.text(self.font_offset,s,self.fg_color[i%self.fg_color_len],font=font)
+            self.text_border(self.draw,self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+        else:
+            self.draw.text(self.font_offset,s,fillcolor,font=font)
 
     def dumpTextImg(self, i):
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
