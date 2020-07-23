@@ -86,6 +86,7 @@ class SynthesisTextPure(SynthesisText):
         self.scene_hw = (1080, 1920)
         self.font_offset = (1000,800)
         self.is_border = self.deepvac_config.is_border
+        self.crop_offset = 5
 
     def buildScene(self, i):
         r_channel = np.ones(self.scene_hw, dtype=np.uint8) * self.bg_color[i%self.bg_color_len][0]
@@ -105,8 +106,9 @@ class SynthesisTextPure(SynthesisText):
             self.draw.text(self.font_offset,s,fillcolor,font=font)
     
     def dumpTextImg(self, i):
+        crop_list = [np.random.randint(-self.crop_offset, self.crop_offset) for x in range(4)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(self.lex[i])]
+        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1] + self.font_size+crop_list[1], self.font_offset[0]+crop_list[2]:self.font_offset[0] + self.font_size*len(self.lex[i])+crop_list[3]]
         self.dumpImgToPath('pure_{}.jpg'.format(str(i).zfill(6)),img_crop)
 
             
@@ -124,6 +126,7 @@ class SynthesisTextFromVideo(SynthesisText):
         self.sample_rate = self.deepvac_config.sample_rate
         self.font_offset = (1000,800)
         self.is_border = self.deepvac_config.is_border
+        self.crop_offset = 5
 
     def buildScene(self, i):
         for _ in range(self.sample_rate):
@@ -145,8 +148,9 @@ class SynthesisTextFromVideo(SynthesisText):
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
     def dumpTextImg(self, i):
+        crop_list = [np.random.randint(-self.crop_offset, self.crop_offset) for x in range(4)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]:self.font_offset[1] + self.font_size, self.font_offset[0]:self.font_offset[0] + self.font_size*len(self.lex[i])]
+        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1] + self.font_size+crop_list[1], self.font_offset[0]+crop_list[2]:self.font_offset[0] + self.font_size*len(self.lex[i])+crop_list[3]]
         self.dumpImgToPath('scene_{}.jpg'.format(str(i).zfill(6)),img_crop)
 
 
