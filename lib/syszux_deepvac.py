@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.optim as optim
 import time
 from enum import Enum
 from syszux_log import LOG
@@ -18,8 +19,34 @@ class DeepVAC(object):
         self.state_dict = {'RELOAD_DB':DeepVAC.STATE.RELOAD_DB}
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.dataset = None
+        self.train_dataset = None
+        self.val_dataset = None
+        self.loader = None
+        self.train_loader = None
+        self.val_loader = None
+        self.batch_size = None
+        self.phase = 'None'
         #init self.net
         self.initNet()
+
+    def setTrainContext(self):
+        self.is_train = True
+        self.is_val = False
+        self.phase = 'TRAIN'
+        self.dataset = self.train_dataset
+        self.loader = self.train_loader
+        self.batch_size = self.conf.train_batch_size
+        self.net.train()
+
+    def setValContext(self):
+        self.is_train = False
+        self.is_val = True
+        self.phase = 'VAL'
+        self.dataset = self.val_dataset
+        self.loader = self.val_loader
+        self.batch_size = self.conf.val_batch_size
+        self.net.eval()
 
     def getConf(self):
         return self.conf
@@ -50,16 +77,45 @@ class DeepVAC(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        self.initCriterion()
+        self.initOptimizer()
+        self.initCheckpoint()
+        self.initScheduler()
+        self.initTrainLoader()
+        self.initValLoader()
+        self.initOutputDir()
+        self.initDDP()
+
+    def initOutputDir(self):
+        pass
 
     def initDevice(self):
         #to determine CUDA device
-        self.device = torch.device("cuda")
+        self.device = torch.device(self.conf.device)
 
     def initNetWithCode(self):
         raise Exception("You should reimplement this func to initialize self.net")
 
     def initModelPath(self):
         raise Exception("You should reimplement this func to initialize self.model_path")
+
+    def initCriterion(self):
+        raise Exception("Not implemented.")
+
+    def initCheckpoint(self):
+        raise Exception("Not implemented.")
+
+    def initScheduler(self):
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
+
+    def initTrainLoader(self):
+        raise Exception("Not implemented.")
+
+    def initValLoader(self):
+        raise Exception("Not implemented.")
+
+    def initDDP(self):
+        raise Exception("Not implemented.")
 
     def initStateDict(self):
         LOG.log(LOG.S.I, 'Loading State Dict from {}'.format(self.model_path))
@@ -91,17 +147,115 @@ class DeepVAC(object):
         self.net.eval()
         self.net = self.net.to(self.device)
 
-    def process(self):
-        raise Exception("Not implemented!")
-
     def report(self):
         pass
+
+    def initOptimizer(self):
+        self.initSgdOptimizer()
+
+    def initSgdOptimizer(self):
+        self.optimizer = optim.SGD(self.net.parameters(),
+            lr=self.conf.lr,
+            momentum=self.conf.momentum,
+            weight_decay=self.conf.weight_decay,
+            nesterov=self.conf.nesterov
+        )
+
+    def initAdamOptimizer(self):
+        self.optimizer = optim.Adam(
+            self.net.parameters(),
+            lr=self.conf.lr,
+        )
+        for group in self.optimizer.param_groups:
+            group.setdefault('initial_lr', group['lr'])
+    
+    def initRmspropOptimizer(self):
+        self.optimizer = optim.RMSprop(
+            self.net.parameters(),
+            lr=self.conf.lr,
+            momentum=self.conf.momentum,
+            weight_decay=self.conf.weight_decay,
+            # alpha=self.conf.rmsprop_alpha,
+            # centered=self.conf.rmsprop_centered
+        )
+
+    def preEpoch(self, epoch=0):
+        pass
+
+    def preIter(self, img=None, idx=0, epoch=0):
+        pass
+
+    def postIter(self, img=None, idx=0, epoch=0):
+        pass
+
+    def postEpoch(self, epoch=0):
+        pass
+
+    def doForward(self):
+        raise Exception('Not implemented.')
+
+    def doLoss(self):
+        raise Exception('Not implemented.')
+
+    def doBackward(self):
+        raise Exception('Not implemented.')
+
+    def doOptimize(self):
+        raise Exception('Not implemented.')
+
+    def processTrain(self, epoch):
+        self.setTrainContext()
+        LOG.logI('Phase {} started...'.format(self.phase))
+        self.preEpoch(epoch)
+        for i, (img, idx) in enumerate(self.loader):
+            self.preIter(img, idx)
+            self.doForward(idx)
+            self.doLoss(idx)
+            self.doBackward(idx)
+            self.doOptimize(idx)
+            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, epoch, i, len(self.loader),self.loss.item(),self.optimizer.param_groups[0]['lr']))
+            self.postIter(img, idx)
+
+        self.lr_scheduler.step()
+        self.postEpoch(epoch)
+
+    def processVal(self, epoch):
+        self.setValContext()
+        LOG.logI('Phase {} started...'.format(self.phase))
+        with torch.no_grad():
+            self.preEpoch(epoch)
+            for i, (img, idx) in enumerate(self.loader):
+                self.preIter(img, idx)
+                self.doForward(idx)
+                self.doLoss(idx)
+                LOG.logI('{}: [{}][{}/{}]'.format(self.phase, epoch, i, len(self.loader)))
+                self.postIter(img, idx)
+
+            self.postEpoch(epoch)
+
+    def processAccept(self, epoch):
+        self.setValContext()
+
+    def process(self):
+        for epoch in range(self.conf.epoch_num):
+            LOG.logI('Epoch {} started...'.format(epoch))
+            self.processTrain(epoch)
+            self.processVal(epoch)
+            self.processAccept(epoch)
 
     def __call__(self,input):
         self.setInput(input)
         self.process()
         return self.getOutput()
-        
+
+    def exportNCNN(self):
+        pass
+
+    def exportCoreML(self):
+        pass
+
+    def exportONNX(self):
+        pass
 
 if __name__ == "__main__":
     from conf import config as deepvac_config
