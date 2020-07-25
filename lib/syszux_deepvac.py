@@ -1,52 +1,20 @@
 import os
+from datetime import datetime
+import argparse
 import torch
 import torch.optim as optim
+import torch.distributed as dist
 import time
 from enum import Enum
 from syszux_log import LOG
 
 #deepvac implemented based on PyTorch Framework
-class DeepVAC(object):
-    class STATE(Enum):
-        OK = 'OK'
-        ERROR = 'ERROR'
-        LOAD_NET = 'LOAD'
-        LOAD_DB = "LOAD_DB"
-        RELOAD_DB = "RELOAD_DB"
-
-    #net must be PyTorch Module.
+class Deepvac(object):
     def __init__(self, deepvac_config):
-        self.state_dict = {'RELOAD_DB':DeepVAC.STATE.RELOAD_DB}
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
-        self.dataset = None
-        self.train_dataset = None
-        self.val_dataset = None
-        self.loader = None
-        self.train_loader = None
-        self.val_loader = None
-        self.batch_size = None
-        self.phase = 'None'
         #init self.net
         self.initNet()
-
-    def setTrainContext(self):
-        self.is_train = True
-        self.is_val = False
-        self.phase = 'TRAIN'
-        self.dataset = self.train_dataset
-        self.loader = self.train_loader
-        self.batch_size = self.conf.train_batch_size
-        self.net.train()
-
-    def setValContext(self):
-        self.is_train = False
-        self.is_val = True
-        self.phase = 'VAL'
-        self.dataset = self.val_dataset
-        self.loader = self.val_loader
-        self.batch_size = self.conf.val_batch_size
-        self.net.eval()
 
     def getConf(self):
         return self.conf
@@ -67,6 +35,9 @@ class DeepVAC(object):
         self.input_output['input'].clear()
         return self.input_output['output']
 
+    def getTime(self):
+        return (str(datetime.now())[:-10]).replace(' ','-').replace(':','-')
+
     def initNet(self):
         #init self.device
         self.initDevice()
@@ -77,17 +48,6 @@ class DeepVAC(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
-        self.initCriterion()
-        self.initOptimizer()
-        self.initCheckpoint()
-        self.initScheduler()
-        self.initTrainLoader()
-        self.initValLoader()
-        self.initOutputDir()
-        self.initDDP()
-
-    def initOutputDir(self):
-        pass
 
     def initDevice(self):
         #to determine CUDA device
@@ -98,24 +58,6 @@ class DeepVAC(object):
 
     def initModelPath(self):
         raise Exception("You should reimplement this func to initialize self.model_path")
-
-    def initCriterion(self):
-        raise Exception("Not implemented.")
-
-    def initCheckpoint(self):
-        raise Exception("Not implemented.")
-
-    def initScheduler(self):
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
-
-    def initTrainLoader(self):
-        raise Exception("Not implemented.")
-
-    def initValLoader(self):
-        raise Exception("Not implemented.")
-
-    def initDDP(self):
-        raise Exception("Not implemented.")
 
     def initStateDict(self):
         LOG.log(LOG.S.I, 'Loading State Dict from {}'.format(self.model_path))
@@ -149,6 +91,74 @@ class DeepVAC(object):
 
     def report(self):
         pass
+
+    def __call__(self,input):
+        self.setInput(input)
+        self.process()
+        return self.getOutput()
+
+class DeepvacTrain(Deepvac):
+    #net must be PyTorch Module.
+    def __init__(self, deepvac_config):
+        self.dataset = None
+        self.train_dataset = None
+        self.val_dataset = None
+        self.loader = None
+        self.train_loader = None
+        self.val_loader = None
+        self.batch_size = None
+        self.phase = 'None'
+        self.epoch = 0
+        self.step = 0
+        self.iter = 0
+        super(DeepvacTrain,self).__init__(deepvac_config)
+
+    def setTrainContext(self):
+        self.is_train = True
+        self.is_val = False
+        self.phase = 'TRAIN'
+        self.dataset = self.train_dataset
+        self.loader = self.train_loader
+        self.batch_size = self.conf.train_batch_size
+        self.net.train()
+
+    def setValContext(self):
+        self.is_train = False
+        self.is_val = True
+        self.phase = 'VAL'
+        self.dataset = self.val_dataset
+        self.loader = self.val_loader
+        self.batch_size = self.conf.val_batch_size
+        self.net.eval()
+
+    def initNet(self):
+        super(DeepvacTrain,self).initNet()
+        self.initCriterion()
+        self.initOptimizer()
+        self.initCheckpoint()
+        self.initScheduler()
+        self.initTrainLoader()
+        self.initValLoader()
+        self.initOutputDir()
+
+    def initOutputDir(self):
+        if not os.path.exists(self.conf.output_dir):
+            os.makedirs(self.conf.output_dir)
+
+    def initCriterion(self):
+        raise Exception("Not implemented.")
+
+    def initCheckpoint(self):
+        raise Exception("Not implemented.")
+
+    def initScheduler(self):
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
+
+    def initTrainLoader(self):
+        raise Exception("Not implemented.")
+
+    def initValLoader(self):
+        raise Exception("Not implemented.")
 
     def initOptimizer(self):
         self.initSgdOptimizer()
@@ -203,50 +213,73 @@ class DeepVAC(object):
     def doOptimize(self):
         raise Exception('Not implemented.')
 
-    def processTrain(self, epoch):
+    def saveState(self):
+        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        torch.save(self.net.state_dict(), '{}/{}'.format(self.conf.output_dir, self.state_file))
+        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.conf.output_dir, self.checkpoint_file))
+
+    def processTrain(self):
         self.setTrainContext()
+        self.step = 0
         LOG.logI('Phase {} started...'.format(self.phase))
-        self.preEpoch(epoch)
+        self.preEpoch()
+        loader_len = len(self.loader)
+        save_every = loader_len//self.conf.save_num
+        save_list = list(range(0,loader_len + 1, save_every ))
+        self.save_list = save_list[1:-1]
+        LOG.logI('SAVE LIST: {}'.format(self.save_list))
+
         for i, (img, idx) in enumerate(self.loader):
-            self.preIter(img, idx)
-            self.doForward(idx)
-            self.doLoss(idx)
-            self.doBackward(idx)
-            self.doOptimize(idx)
-            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, epoch, i, len(self.loader),self.loss.item(),self.optimizer.param_groups[0]['lr']))
-            self.postIter(img, idx)
+            self.step = i
+            self.iter += 1
+            self.idx = idx
+            self.img = img
+            self.preIter()
+            self.doForward()
+            self.doLoss()
+            self.doBackward()
+            self.doOptimize()
+            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
+            self.postIter()
+            if self.step in self.save_list:
+                self.processVal()
 
-        self.lr_scheduler.step()
-        self.postEpoch(epoch)
+        self.scheduler.step()
+        self.postEpoch()
 
-    def processVal(self, epoch):
+    def processVal(self):
         self.setValContext()
         LOG.logI('Phase {} started...'.format(self.phase))
         with torch.no_grad():
-            self.preEpoch(epoch)
+            self.preEpoch()
             for i, (img, idx) in enumerate(self.loader):
-                self.preIter(img, idx)
-                self.doForward(idx)
-                self.doLoss(idx)
-                LOG.logI('{}: [{}][{}/{}]'.format(self.phase, epoch, i, len(self.loader)))
-                self.postIter(img, idx)
+                self.idx = idx
+                self.img = img
+                self.preIter()
+                self.doForward()
+                self.doLoss()
+                LOG.logI('{}: [{}][{}/{}]'.format(self.phase, self.epoch, i, len(self.loader)))
+                self.postIter()
 
-            self.postEpoch(epoch)
+            self.postEpoch()
+        self.saveState()
+        
 
-    def processAccept(self, epoch):
+    def processAccept(self):
         self.setValContext()
 
     def process(self):
+        self.iter = 0
         for epoch in range(self.conf.epoch_num):
-            LOG.logI('Epoch {} started...'.format(epoch))
-            self.processTrain(epoch)
-            self.processVal(epoch)
-            self.processAccept(epoch)
+            self.epoch = epoch
+            LOG.logI('Epoch {} started...'.format(self.epoch))
+            self.processTrain()
+            self.processVal()
+            self.processAccept()
 
     def __call__(self,input):
-        self.setInput(input)
         self.process()
-        return self.getOutput()
 
     def exportNCNN(self):
         pass
@@ -257,7 +290,37 @@ class DeepVAC(object):
     def exportONNX(self):
         pass
 
+class DeepvacDDP(DeepvacTrain):
+    def __init__(self, deepvac_config):
+        super(DeepvacDDP,self).__init__(deepvac_config)
+
+    def initDDP(self):
+        parser = argparse.ArgumentParser(description='DeepvacDDP')
+        parser.add_argument("--gpu", default=-1, type=int, help="gpu")
+        parser.add_argument('--rank', default=-1, type=int, help='node rank for distributed training')
+        self.args = parser.parse_args()
+        self.map_location = {'cuda:%d' % 0: 'cuda:%d' % self.args.rank}
+
+        LOG.logI("Start dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
+        dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
+        torch.cuda.set_device(self.args.gpu)
+        self.net = torch.nn.parallel.DistributedDataParallel(self.net, device_ids=[self.args.gpu])
+        LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
+
+    def initNet(self):
+        super(DeepvacDDP,self).initNet()
+        self.initDDP()
+
+    def saveState(self):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).saveState()
+
+    def loadState(self, suffix):
+        self.optimizer.load_state_dict(torch.load(self.conf.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
+        self.model.load_state_dict(torch.load(self.conf.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+
 if __name__ == "__main__":
     from conf import config as deepvac_config
-    vac = DeepVAC(deepvac_config)
+    vac = Deepvac(deepvac_config)
     vac()

@@ -14,13 +14,14 @@ deepvac提供了PyTorch项目的工程化规范。为了达到这一目标，dee
 - 数据集；
 
 #### 训练测试代码组成
-一般包含下面这些文件：
-- 训练和验证的入口文件：train.py，继承DeepVAC类（来自lib/syszux_deepvac.py）的扩展实现；
-- 测试的入口文件：test.py，继承DeepVAC类（来自lib/syszux_deepvac.py）的扩展实现；
+包含下面这些文件：
+- 训练和验证的入口文件：train.py，继承Deepvac类体系（来自lib/syszux_deepvac.py）的扩展实现；
+- 测试的入口文件：test.py，继承Deepvac类体系（来自lib/syszux_deepvac.py）的扩展实现；
 - 配置文件：config.py，syszux_config模块（来自lib/syszux_config）的扩展实现；
-- 模型定义文件：model.py，PyTorch Module类的扩展实现；
-- 工具类/方法文件：utils.py，helper函数和类的定义（可省略）；
-- 数据集清单文件：train.txt和val.txt;
+- 模型定义文件：modules/model.py，PyTorch Module类的扩展实现；
+- 工具类/方法文件：modules/utils.py，helper函数和类的定义（可省略）；
+- 数据集清单文件：data/train.txt和data/val.txt;
+- 输出的checkpoint文件和statedict文件：output/*
 
 然后在入口文件中添加：
 ```python
@@ -47,12 +48,12 @@ scene = DeepvacScene(deepvac_config.scene)
 
 
 ## deepvac lib库的使用
-lib库提供数据集合成、数据增强、数据装载、DeepVAC类体系、Report类体系、Chain类体系、syszux_config模块。
+lib库提供数据集合成、数据增强、数据装载、Deepvac类体系、Report类体系、Chain类体系、syszux_config模块。
 
 - 合成数据使用SynthesisFactory、SynthesisBase类体系，或者继承SynthesisBase类体系进行扩展；
 - 数据增强使用AugFactory、AugBase类体系，或者继承AugBase类体系进行扩展；
 - 数据装载使用LoaderFactory、torch.utils.data.Dataset类体系，或者继承torch.utils.data.Dataset类体系进行扩展；
-- 模型的train和val使用syszux_deepvac模块，继承DeepVAC进行扩展；
+- 模型的train和val使用syszux_deepvac模块，继承Deepvac类体系进行扩展；
 - 性能报告使用syszux_report模块；
 - 逻辑流控制使用syszux_executor模块；
 
