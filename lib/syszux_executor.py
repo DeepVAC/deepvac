@@ -78,7 +78,6 @@ class AugExecutor(Executor):
         super(AugExecutor, self).__init__(deepvac_config)
         self.loader = LoaderFactory().get('OsWalkerLoader')(deepvac_config)
         self.aug_list = ['SpeckleAug','AffineAug','PerspectAug','GaussianAug','HorlineAug','VerlineAug','LRmotionAug','UDmotionAug','NoisyAug']
-        self.aug_list = ['SpeckleAug']
         aug_factory = AugFactory()
         for a in self.aug_list:
             self.addAugChain(a, AugChain(a,deepvac_config))
