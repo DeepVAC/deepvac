@@ -64,5 +64,6 @@ lib库提供数据集合成、数据增强、数据装载、Deepvac类体系、R
 ## 项目依赖
 - 支持Python3。不支持Python2，其已被废弃；
 - 依赖包：torch, torchvision, scipy, numpy, cv2, Pillow；
+- 字体文件：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
 
 
