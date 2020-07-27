@@ -50,7 +50,7 @@ class SynthesisText(SynthesisBase):
             raise Exception("Dir {} not found!".format(self.fonts_dir))
         self.fonts = os.listdir(self.fonts_dir)
         self.fonts_len = len(self.fonts)
-        if self.fonts_len = 0:
+        if self.fonts_len == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
         self.font_size = 50
 

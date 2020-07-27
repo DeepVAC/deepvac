@@ -1,5 +1,5 @@
 import os
-from lib.syszux_config import *
+from syszux_config import *
 ##########text synthesis########
 config.text.total_num = 100
 config.text.output_path = '/gemfield/hostpv/dataset/deepvac-ocr/pure/'

@@ -1,11 +1,15 @@
 import sys
-sys.path.append("..")
-from syszux_synthesis import SynthesisTextPure
-from syszux_synthesis import SynthesisTextFromVideo
-from conf import *
+sys.path.append("lib")
+sys.path.append("../lib")
+sys.path.append("../../lib")
 
-pure = SynthesisTextPure(config.text)
+from config import config as deepvac_config
+from syszux_synthesis_factory import SynthesisFactory
+
+synthesis = SynthesisFactory()
+
+pure = synthesis.get('SynthesisTextPure')(deepvac_config.text)
 pure()
 
-synthesis = SynthesisTextFromVideo(config.text)
-synthesis()
+from_video = synthesis.get('SynthesisTextFromVideo')(deepvac_config.text)
+from_video()
