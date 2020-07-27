@@ -5,157 +5,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from scipy import ndimage
-
-
-class WarpMLS:
-    def __init__(self, src, src_pts, dst_pts, dst_w, dst_h, trans_ratio=1.):
-        self.src = src
-        self.src_pts = src_pts
-        self.dst_pts = dst_pts
-        self.pt_count = len(self.dst_pts)
-        self.dst_w = dst_w
-        self.dst_h = dst_h
-        self.trans_ratio = trans_ratio
-        self.grid_size = 100
-        self.rdx = np.zeros((self.dst_h, self.dst_w))
-        self.rdy = np.zeros((self.dst_h, self.dst_w))
-
-    @staticmethod
-    def __bilinear_interp(x, y, v11, v12, v21, v22):
-        return (v11 * (1 - y) + v12 * y) * (1 - x) + (v21 * (1 - y) + v22 * y) * x
-
-    def generate(self):
-        self.calc_delta()
-        return self.gen_img()
-
-    def calc_delta(self):
-        w = np.zeros(self.pt_count, dtype=np.float32)
-
-        if self.pt_count < 2:
-            return
-
-        i = 0
-        while 1:
-            if self.dst_w <= i < self.dst_w + self.grid_size - 1:
-                i = self.dst_w - 1
-            elif i >= self.dst_w:
-                break
-
-            j = 0
-            while 1:
-                if self.dst_h <= j < self.dst_h + self.grid_size - 1:
-                    j = self.dst_h - 1
-                elif j >= self.dst_h:
-                    break
-
-                sw = 0
-                swp = np.zeros(2, dtype=np.float32)
-                swq = np.zeros(2, dtype=np.float32)
-                new_pt = np.zeros(2, dtype=np.float32)
-                cur_pt = np.array([i, j], dtype=np.float32)
-
-                k = 0
-                for k in range(self.pt_count):
-                    if i == self.dst_pts[k][0] and j == self.dst_pts[k][1]:
-                        break
-
-                    w[k] = 1. / ((i - self.dst_pts[k][0]) * (i - self.dst_pts[k][0]) +
-                                 (j - self.dst_pts[k][1]) * (j - self.dst_pts[k][1]))
-
-                    sw += w[k]
-                    swp = swp + w[k] * np.array(self.dst_pts[k])
-                    swq = swq + w[k] * np.array(self.src_pts[k])
-
-                if k == self.pt_count - 1:
-                    pstar = 1 / sw * swp
-                    qstar = 1 / sw * swq
-
-                    miu_s = 0
-                    for k in range(self.pt_count):
-                        if i == self.dst_pts[k][0] and j == self.dst_pts[k][1]:
-                            continue
-                        pt_i = self.dst_pts[k] - pstar
-                        miu_s += w[k] * np.sum(pt_i * pt_i)
-
-                    cur_pt -= pstar
-                    cur_pt_j = np.array([-cur_pt[1], cur_pt[0]])
-
-                    for k in range(self.pt_count):
-                        if i == self.dst_pts[k][0] and j == self.dst_pts[k][1]:
-                            continue
-
-                        pt_i = self.dst_pts[k] - pstar
-                        pt_j = np.array([-pt_i[1], pt_i[0]])
-
-                        tmp_pt = np.zeros(2, dtype=np.float32)
-                        tmp_pt[0] = np.sum(pt_i * cur_pt) * self.src_pts[k][0] - \
-                                    np.sum(pt_j * cur_pt) * self.src_pts[k][1]
-                        tmp_pt[1] = -np.sum(pt_i * cur_pt_j) * self.src_pts[k][0] + \
-                                    np.sum(pt_j * cur_pt_j) * self.src_pts[k][1]
-                        tmp_pt *= (w[k] / miu_s)
-                        new_pt += tmp_pt
-
-                    new_pt += qstar
-                else:
-                    new_pt = self.src_pts[k]
-
-                self.rdx[j, i] = new_pt[0] - i
-                self.rdy[j, i] = new_pt[1] - j
-
-                j += self.grid_size
-            i += self.grid_size
-
-    def gen_img(self):
-        src_h, src_w = self.src.shape[:2]
-        dst = np.zeros_like(self.src, dtype=np.float32)
-
-        for i in np.arange(0, self.dst_h, self.grid_size):
-            for j in np.arange(0, self.dst_w, self.grid_size):
-                ni = i + self.grid_size
-                nj = j + self.grid_size
-                w = h = self.grid_size
-                if ni >= self.dst_h:
-                    ni = self.dst_h - 1
-                    h = ni - i + 1
-                if nj >= self.dst_w:
-                    nj = self.dst_w - 1
-                    w = nj - j + 1
-
-                di = np.reshape(np.arange(h), (-1, 1))
-                dj = np.reshape(np.arange(w), (1, -1))
-                delta_x = self.__bilinear_interp(di / h, dj / w,
-                                                 self.rdx[i, j], self.rdx[i, nj],
-                                                 self.rdx[ni, j], self.rdx[ni, nj])
-                delta_y = self.__bilinear_interp(di / h, dj / w,
-                                                 self.rdy[i, j], self.rdy[i, nj],
-                                                 self.rdy[ni, j], self.rdy[ni, nj])
-                nx = j + dj + delta_x * self.trans_ratio
-                ny = i + di + delta_y * self.trans_ratio
-                nx = np.clip(nx, 0, src_w - 1)
-                ny = np.clip(ny, 0, src_h - 1)
-                nxi = np.array(np.floor(nx), dtype=np.int32)
-                nyi = np.array(np.floor(ny), dtype=np.int32)
-                nxi1 = np.array(np.ceil(nx), dtype=np.int32)
-                nyi1 = np.array(np.ceil(ny), dtype=np.int32)
-
-                if len(self.src.shape) == 3:
-                    x = np.tile(np.expand_dims(ny - nyi, axis=-1), (1, 1, 3))
-                    y = np.tile(np.expand_dims(nx - nxi, axis=-1), (1, 1, 3))
-                else:
-                    x = ny - nyi
-                    y = nx - nxi
-                dst[i:i + h, j:j + w] = self.__bilinear_interp(x,
-                                                               y,
-                                                               self.src[nyi, nxi],
-                                                               self.src[nyi, nxi1],
-                                                               self.src[nyi1, nxi],
-                                                               self.src[nyi1, nxi1]
-                                                               )
-
-        dst = np.clip(dst, 0, 255)
-        dst = np.array(dst, dtype=np.uint8)
-
-        return dst
+from syszux_helper import WarpMLS
 
 class AugBase(object):
     def __init__(self, deepvac_config):
@@ -178,6 +28,7 @@ class AugBase(object):
             cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_img)
 
+# 图像添加随机斑点
 class SpeckleAug(AugBase):
     def __init__(self, deepvac_config):
         super(SpeckleAug,self).__init__(deepvac_config)
@@ -192,29 +43,38 @@ class SpeckleAug(AugBase):
         img_speck[img_speck <= 0] = 0
         return img_speck
 
+# 仿射变换
 class AffineAug(AugBase):
     def __init__(self, deepvac_config):
         super(AffineAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
+        # 空白填充色
         self.borderValue = (255,255,255)
+        # x方向和y方向的伸缩率
+        self.shear_x = 30
+        self.shear_y = 3
 
     def __call__(self, img):
         rows,cols=img.shape[:2]
-        shear_x = float(np.random.randint(-30,31))/100
-        shear_y = float(np.random.randint(-3,4))/100
+        shear_x = float(np.random.randint(-self.shear_x,self.shear_x+1))/100
+        shear_y = float(np.random.randint(-self.shear_y,self.shear_y+1))/100
         M = np.float32([[1.0, shear_x ,0.0],[shear_y, 1.0,0.0]])
         img_affine = cv2.warpAffine(img,M,(cols,rows),borderValue=self.borderValue)
         return img_affine
 
+# 透视变换
 class PerspectAug(AugBase):
     def __init__(self, deepvac_config):
         super(PerspectAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
+        # b空白填充色
         self.borderValue = (255,255,255)
+        # 高h方向伸缩范围
         self.sh_lower = 6
         self.sh_upper = 11
+        # 宽w方向伸缩范围
         self.sw_lower = 20
         self.sw_upper = 31
 
@@ -234,6 +94,7 @@ class PerspectAug(AugBase):
         img_perspect = cv2.warpPerspective(img,M,(w,h),borderValue=self.borderValue)
         return img_perspect
 
+# 高斯模糊
 class GaussianAug(AugBase):
     def __init__(self, deepvac_config):
         super(GaussianAug,self).__init__(deepvac_config)
@@ -245,13 +106,17 @@ class GaussianAug(AugBase):
         img_gaussian = cv2.GaussianBlur(img,(self.ks, self.ks), 0)
         return img_gaussian
 
+# 添加横线增强
 class HorlineAug(AugBase):
     def __init__(self, deepvac_config):
         super(HorlineAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
+        # 线条间隔
         self.space = 4
+        # 线条颜色
         self.color = 0
+        # 线宽
         self.thickness = 1
 
     def __call__(self, img):
@@ -261,13 +126,17 @@ class HorlineAug(AugBase):
             cv2.line(img_horline, (0, i), (img_w, i), self.color, self.thickness)
         return img_horline
 
+# 添加竖线增强
 class VerlineAug(AugBase):
     def __init__(self, deepvac_config):
         super(VerlineAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
+        # 线条间隔
         self.space = 4
+        # 线条颜色
         self.color = 0
+        # 线宽
         self.thickness = 1
 
     def __call__(self, img):
@@ -277,6 +146,7 @@ class VerlineAug(AugBase):
             cv2.line(img_verline, (i, 0), (i, img_h), self.color, self.thickness)
         return img_verline
 
+# 左右运动模糊
 class LRmotionAug(AugBase):
     def __init__(self, deepvac_config):
         super(LRmotionAug,self).__init__(deepvac_config)
@@ -291,6 +161,7 @@ class LRmotionAug(AugBase):
         img_lrmotion = cv2.filter2D(img, -1, kernel_motion_blur)
         return img_lrmotion
 
+# 上下运动模糊
 class UDmotionAug(AugBase):
     def __init__(self, deepvac_config):
         super(UDmotionAug,self).__init__(deepvac_config)
@@ -305,6 +176,7 @@ class UDmotionAug(AugBase):
         img_udmotion = cv2.filter2D(img, -1, kernel_motion_blur)
         return img_udmotion
 
+# 添加噪声
 class NoisyAug(AugBase):
     def __init__(self, deepvac_config):
         super(NoisyAug,self).__init__(deepvac_config)
@@ -321,6 +193,7 @@ class NoisyAug(AugBase):
         img_noisy= noisy.astype(np.uint8)
         return img_noisy
 
+# 扭曲变换
 class DistortAug(AugBase):
     def __init__(self, deepvac_config):
         super(DistortAug,self).__init__(deepvac_config)
@@ -359,6 +232,7 @@ class DistortAug(AugBase):
         img_distort = trans.generate()
         return img_distort
 
+# 随机伸缩变换
 class StretchAug(AugBase):
     def __init__(self, deepvac_config):
         super(StretchAug,self).__init__(deepvac_config)
@@ -398,6 +272,7 @@ class StretchAug(AugBase):
         img_stretch = trans.generate()
         return img_stretch
 
+# 透视变换
 class PerspectiveAug(AugBase):
     def __init__(self, deepvac_config):
         super(PerspectiveAug,self).__init__(deepvac_config)

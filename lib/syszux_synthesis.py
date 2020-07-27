@@ -46,8 +46,12 @@ class SynthesisText(SynthesisBase):
                 self.lex.append(line)
 
         self.fonts_dir = 'fonts'
+        if os.path.exists(self.fonts_dir)==False:
+            raise Exception("Dir {} not found!".format(self.fonts_dir))
         self.fonts = os.listdir(self.fonts_dir)
         self.fonts_len = len(self.fonts)
+        if self.fonts_len = 0:
+            raise Exception("No font was found in {}!".format(self.fonts_dir))
         self.font_size = 50
 
         self.fg_color = [(10,10,10),(200,10,10),(10,10,200),(200,200,10),(255,255,255)]
@@ -62,12 +66,12 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
-    def text_border(self, draw, x, y, font, shadowcolor, fillcolor,text):
+    def text_border(self, x, y, font, shadowcolor, fillcolor,text):
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
         for i in [x-1,x+1,x]:
             for j in [y-1,y+1,y]:
-                draw.text((i, j), text, font=font, fill=shadowcolor)
-        draw.text((x,y),text,fillcolor,font=font)
+                self.draw.text((i, j), text, font=font, fill=shadowcolor)
+        self.draw.text((x,y),text,fillcolor,font=font)
 
     def __call__(self):
         for i in range(self.total_num):
@@ -101,7 +105,7 @@ class SynthesisTextPure(SynthesisText):
         s = self.lex[i]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
-            self.text_border(self.draw,self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
     
@@ -143,7 +147,7 @@ class SynthesisTextFromVideo(SynthesisText):
         s = self.lex[i]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
-            self.text_border(self.draw,self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
