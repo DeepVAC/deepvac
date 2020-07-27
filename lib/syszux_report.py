@@ -19,25 +19,24 @@ class FaceReport(object):
     def initNumeratorKeys(self):
         self.denominator_keys = dict()
         self.numerator_keys = dict()
-        self.denominator_keys['accuracy'] = self.denominator_keys['error'] = ['tp','fn_err', 'fn_none','fp','tn']
+        self.denominator_keys['accuracy'] = self.denominator_keys['miss'] = self.denominator_keys['error'] = ['tp','fp','tn','fn']
         self.denominator_keys['precision'] = ['tp','fp']
-        self.denominator_keys['recall'] = self.denominator_keys['miss'] = ['tp', 'fn_err', 'fn_none']
+        self.denominator_keys['recall'] =  ['tp','fn']
         self.numerator_keys['accuracy'] = ['tp','tn']
         self.numerator_keys['precision'] = self.numerator_keys['recall'] = ['tp']
-        self.numerator_keys['miss'] = ['fn_none']
-        self.numerator_keys['error'] = ['fn_err','fn_none','fp']
+        self.numerator_keys['miss'] = ['fn']
+        self.numerator_keys['error'] = ['fp','fn']
     
     def initFuncDict(self):
         self.func_dict = dict()
-        #TN,false -> false = 将负类预测为负类数；也即没注册db的ds 没有匹配 任何db；
-        self.func_dict[(False,False)] = lambda gt,result : self.metrics.update({'tn':self.metrics['tn'] + 1})
-        #FN,true -> false = 将正类预测为负类数；也即已注册db的ds 没有匹配 对应的db；
-        self.func_dict[(True,False)] = lambda gt,result : self.metrics.update({'fn_none':self.metrics['fn_none'] + 1})
-        #FP, false -> true = 将负类预测为正类数；也即没注册db的ds 匹配到了 某个db；
+        #预测结果大于阈值，且正确的是TP，且错误的是FP；
+        self.func_dict[(True,True)] = lambda gt,result : self.metrics.update({'tp':self.metrics['tp'] + 1}) if gt == result else self.metrics.update({'fp':self.metrics['fp'] + 1})
+        #FP,预测结果大于阈值，且错误；
         self.func_dict[(False,True)] = lambda gt,result : self.metrics.update({'fp':self.metrics['fp'] + 1})
-        #TP: true -> true = 将正类预测为正类数，也即已注册db的ds 匹配到了 对应的db；
-        #或者 true -> true = 将正类预测为负类数；也即已注册db的ds 匹配到了 错误的db；
-        self.func_dict[(True,True)] = lambda gt,result : self.metrics.update({'tp':self.metrics['tp'] + 1}) if gt == result else self.metrics.update({'fn_err':self.metrics['fn_err'] + 1})
+        #TN,预测结果小于阈值，且正确；也即没注册db的ds 没有匹配 任何db；
+        self.func_dict[(False,False)] = lambda gt,result : self.metrics.update({'tn':self.metrics['tn'] + 1})
+        #FN,预测结果小于阈值，且错误；也即已注册db的ds 没有匹配 任何db；
+        self.func_dict[(True,False)] = lambda gt,result : self.metrics.update({'fn':self.metrics['fn'] + 1})
 
     def initReportDict(self):
         self.report_dict = OrderedDict()
@@ -51,7 +50,7 @@ class FaceReport(object):
         self.report_dict['error'] = 0
 
     def initMetricsDict(self):
-        self.metric_keys = ['tp','fn_none','fp','tn','fn_err']
+        self.metric_keys = ['tp','tn','fp','fn']
         self.metrics = dict.fromkeys(self.metric_keys)
         for k in self.metrics:
             self.metrics[k] = 0
@@ -95,8 +94,8 @@ class FaceReport(object):
         assert self.process_num == self.total_num, "total num error"
 
 if __name__ == "__main__":
-    report = Report('gemfield',5)
-    report.add("","2").add("1","1").add("1","1").add("1","1").add("1","1")
+    report = FaceReport('gemfield',5)
+    report.add("2","").add("1","1").add("1","1").add("1","1").add("1","1")
     report()
 
 
