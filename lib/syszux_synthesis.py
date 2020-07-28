@@ -86,7 +86,7 @@ class SynthesisText(SynthesisBase):
         for i in range(self.total_num):
             self.buildScene(i)
             self.buildTextWithScene(i)
-            #self.dumpTextImg(i)
+            self.dumpTextImg(i)
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
@@ -118,15 +118,6 @@ class SynthesisTextPure(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-        self.dumpTextImg(i)
-    '''
-    def dumpTextImg(self, i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
-        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('pure_{}.jpg'.format(str(i).zfill(6)),img_crop)
-    '''
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
@@ -166,16 +157,6 @@ class SynthesisTextFromVideo(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-        self.dumpTextImg(i)
-    '''
-    def dumpTextImg(self, i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
-        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('scene_{}.jpg'.format(str(i).zfill(6)),img_crop)
-    '''
-
 
 class SynthesisTextFromImage(SynthesisText):
     def __init__(self, deepvac_config):
@@ -212,12 +193,3 @@ class SynthesisTextFromImage(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-        self.dumpTextImg(i)
-    '''
-    def dumpTextImg(self, i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
-        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('image_{}.jpg'.format(str(i).zfill(6)),img_crop)
-    '''
