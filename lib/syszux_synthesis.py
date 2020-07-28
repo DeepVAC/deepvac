@@ -2,6 +2,7 @@ from PIL import Image,ImageDraw,ImageFont
 import cv2
 import numpy as np
 import os
+import random
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
@@ -43,6 +44,7 @@ class SynthesisText(SynthesisBase):
             for line in f:
                 line = line.rstrip()
                 self.lex.append(line)
+        random.shuffle(self.lex)
 
         self.fonts_dir = self.conf.fonts_dir
         if os.path.exists(self.fonts_dir)==False:
@@ -80,13 +82,16 @@ class SynthesisText(SynthesisBase):
         crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6)),img_crop)
+        image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
+        self.dumpImgToPath(image_name,img_crop)
+        self.fw.write(image_name+' '+self.lex[i]+'\n')
 
     def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
             self.buildTextWithScene(i)
             self.dumpTextImg(i)
+        self.fw.close()
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
@@ -99,6 +104,7 @@ class SynthesisTextPure(SynthesisText):
         self.scene_hw = (1080, 1920)
         self.font_offset = (1000,800)
         self.is_border = self.conf.is_border
+        self.fw = open(os.path.join(self.conf.output_dir,'pure.txt'),'w')
 
     def buildScene(self, i):
         r_channel = np.ones(self.scene_hw, dtype=np.uint8) * self.bg_color[i%self.bg_color_len][0]
@@ -137,6 +143,7 @@ class SynthesisTextFromVideo(SynthesisText):
         self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height-2*self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'scene'
+        self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
 
     def buildScene(self, i):
         for _ in range(self.sample_rate):
@@ -175,6 +182,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.font_offset = (1000, 800)
         self.is_border = self.conf.is_border
         self.dump_prefix = 'image'
+        self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
 
     def buildScene(self, i):
         if self.images_num<=i:
