@@ -91,11 +91,13 @@ class SynthesisText(SynthesisBase):
             self.buildScene(i)
             self.buildTextWithScene(i)
             self.dumpTextImg(i)
-        self.fw.close()
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
         super(SynthesisTextPure, self).__init__(deepvac_config)
+
+    def __exit__(self):
+        self.fw.close()
     
     def auditConfig(self):
         super(SynthesisTextPure, self).auditConfig()
@@ -128,6 +130,9 @@ class SynthesisTextPure(SynthesisText):
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
         super(SynthesisTextFromVideo, self).__init__(deepvac_config)
+
+    def __exit__(self):
+        self.fw.close()
 
     def auditConfig(self):
         super(SynthesisTextFromVideo, self).auditConfig()
@@ -168,6 +173,9 @@ class SynthesisTextFromVideo(SynthesisText):
 class SynthesisTextFromImage(SynthesisText):
     def __init__(self, deepvac_config):
         super(SynthesisTextFromImage, self).__init__(deepvac_config)
+
+    def __exit__(self):
+        self.fw.close()
 
     def auditConfig(self):
         super(SynthesisTextFromImage, self).auditConfig()
