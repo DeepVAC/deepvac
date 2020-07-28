@@ -53,7 +53,7 @@ class AffineAug(AugBase):
         self.borderValue = (255,255,255)
         # x方向和y方向的伸缩率
         self.shear_x = 30
-        self.shear_y = 3
+        self.shear_y = 1
 
     def __call__(self, img):
         rows,cols=img.shape[:2]
