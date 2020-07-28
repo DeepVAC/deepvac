@@ -13,3 +13,6 @@ pure()
 
 from_video = synthesis.get('SynthesisTextFromVideo')(deepvac_config.text)
 from_video()
+
+from_images = synthesis.get('SynthesisTextFromImage')(deepvac_config.text)
+from_images()

@@ -2,6 +2,7 @@ from PIL import Image,ImageDraw,ImageFont
 import cv2
 import numpy as np
 import os
+import random
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
@@ -43,6 +44,7 @@ class SynthesisText(SynthesisBase):
             for line in f:
                 line = line.rstrip()
                 self.lex.append(line)
+        random.shuffle(self.lex)
 
         self.fonts_dir = self.conf.fonts_dir
         if os.path.exists(self.fonts_dir)==False:
@@ -75,6 +77,15 @@ class SynthesisText(SynthesisBase):
                 self.draw.text((i, j), text, font=font, fill=shadowcolor)
         self.draw.text((x,y),text,fillcolor,font=font)
 
+    def dumpTextImg(self,i):
+        crop_offset = int(self.font_size / self.crop_scale)
+        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
+        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
+        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
+        image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
+        self.dumpImgToPath(image_name,img_crop)
+        self.fw.write(image_name+' '+self.lex[i]+'\n')
+
     def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
@@ -84,6 +95,9 @@ class SynthesisText(SynthesisBase):
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
         super(SynthesisTextPure, self).__init__(deepvac_config)
+
+    def __exit__(self):
+        self.fw.close()
     
     def auditConfig(self):
         super(SynthesisTextPure, self).auditConfig()
@@ -92,6 +106,7 @@ class SynthesisTextPure(SynthesisText):
         self.scene_hw = (1080, 1920)
         self.font_offset = (1000,800)
         self.is_border = self.conf.is_border
+        self.fw = open(os.path.join(self.conf.output_dir,'pure.txt'),'w')
 
     def buildScene(self, i):
         r_channel = np.ones(self.scene_hw, dtype=np.uint8) * self.bg_color[i%self.bg_color_len][0]
@@ -100,6 +115,7 @@ class SynthesisTextPure(SynthesisText):
         frame = cv2.merge((b_channel, g_channel, r_channel))
         self.pil_img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
         self.draw = ImageDraw.Draw(self.pil_img)
+        self.dump_prefix = 'pure'
 
     def buildTextWithScene(self, i):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
@@ -110,28 +126,29 @@ class SynthesisTextPure(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-    
-    def dumpTextImg(self, i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
-        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('pure_{}.jpg'.format(str(i).zfill(6)),img_crop)
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
         super(SynthesisTextFromVideo, self).__init__(deepvac_config)
+
+    def __exit__(self):
+        self.fw.close()
 
     def auditConfig(self):
         super(SynthesisTextFromVideo, self).auditConfig()
         self.video_file = self.conf.video_file
 
         self.video_capture = cv2.VideoCapture(self.video_file)
-        self.frames_num = self.video_capture.get(7)
+        self.frames_num = self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
         assert self.frames_num > 10, "invalid video file {}".format(self.video_file)
         self.sample_rate = self.conf.sample_rate
-        self.font_offset = (1000,800)
+        self.frame_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        assert self.frame_height > 2 * self.max_font, "video height must exceed {} pixels".format(2*self.max_font)
+        self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height-2*self.max_font))
         self.is_border = self.conf.is_border
+        self.dump_prefix = 'scene'
+        self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
 
     def buildScene(self, i):
         for _ in range(self.sample_rate):
@@ -153,11 +170,42 @@ class SynthesisTextFromVideo(SynthesisText):
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
-    def dumpTextImg(self, i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
-        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
-        self.dumpImgToPath('scene_{}.jpg'.format(str(i).zfill(6)),img_crop)
+class SynthesisTextFromImage(SynthesisText):
+    def __init__(self, deepvac_config):
+        super(SynthesisTextFromImage, self).__init__(deepvac_config)
 
+    def __exit__(self):
+        self.fw.close()
 
+    def auditConfig(self):
+        super(SynthesisTextFromImage, self).auditConfig()
+        self.images_dir = self.conf.images_dir
+        if os.path.exists(self.images_dir) == False:
+            raise Exception("Dir {}not found!".format(self.images_dir))
+        self.images = os.listdir(self.images_dir)
+        self.images_num = len(self.images)
+        if self.images_num==0:
+            raise Exception("No image was found in {}!".format(self.images))
+        self.scene_hw = (1080,1920)
+        self.font_offset = (1000, 800)
+        self.is_border = self.conf.is_border
+        self.dump_prefix = 'image'
+        self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
+
+    def buildScene(self, i):
+        if self.images_num<=i:
+            raise Exception("Total_num {} exceeds the image numbers {}, build exit!".format(self.total_num, self.images_num))
+        image = cv2.imread(os.path.join(self.images_dir, self.images[i]))
+        image = cv2.resize(image,(self.scene_hw[1],self.scene_hw[0]))
+        self.pil_img = Image.fromarray(cv2.cvtColor(image,cv2.COLOR_BGR2RGB))
+        self.draw = ImageDraw.Draw(self.pil_img)
+
+    def buildTextWithScene(self, i):
+        self.font_size = np.random.randint(self.min_font,self.max_font+1)
+        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
+        s = self.lex[i]
+        fillcolor = self.fg_color[i%self.fg_color_len]
+        if self.is_border:
+            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+        else:
+            self.draw.text(self.font_offset,s,fillcolor,font=font)
