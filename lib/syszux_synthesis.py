@@ -75,11 +75,18 @@ class SynthesisText(SynthesisBase):
                 self.draw.text((i, j), text, font=font, fill=shadowcolor)
         self.draw.text((x,y),text,fillcolor,font=font)
 
+    def dumpTextImg(self,i):
+        crop_offset = int(self.font_size / self.crop_scale)
+        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
+        cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
+        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
+        self.dumpImgToPath('{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6)),img_crop)
+
     def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
             self.buildTextWithScene(i)
-            self.dumpTextImg(i)
+            #self.dumpTextImg(i)
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
@@ -100,6 +107,7 @@ class SynthesisTextPure(SynthesisText):
         frame = cv2.merge((b_channel, g_channel, r_channel))
         self.pil_img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
         self.draw = ImageDraw.Draw(self.pil_img)
+        self.dump_prefix = 'pure'
 
     def buildTextWithScene(self, i):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
@@ -110,13 +118,15 @@ class SynthesisTextPure(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-    
+        self.dumpTextImg(i)
+    '''
     def dumpTextImg(self, i):
         crop_offset = int(self.font_size / self.crop_scale)
         crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
         self.dumpImgToPath('pure_{}.jpg'.format(str(i).zfill(6)),img_crop)
+    '''
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
@@ -135,6 +145,7 @@ class SynthesisTextFromVideo(SynthesisText):
         self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height-2*self.max_font))
         self.is_border = self.conf.is_border
+        self.dump_prefix = 'scene'
 
     def buildScene(self, i):
         for _ in range(self.sample_rate):
@@ -155,13 +166,15 @@ class SynthesisTextFromVideo(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-
+        self.dumpTextImg(i)
+    '''
     def dumpTextImg(self, i):
         crop_offset = int(self.font_size / self.crop_scale)
         crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
         self.dumpImgToPath('scene_{}.jpg'.format(str(i).zfill(6)),img_crop)
+    '''
 
 
 class SynthesisTextFromImage(SynthesisText):
@@ -180,6 +193,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.scene_hw = (1080,1920)
         self.font_offset = (1000, 800)
         self.is_border = self.conf.is_border
+        self.dump_prefix = 'image'
 
     def buildScene(self, i):
         if self.images_num<=i:
@@ -198,10 +212,12 @@ class SynthesisTextFromImage(SynthesisText):
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
-
+        self.dumpTextImg(i)
+    '''
     def dumpTextImg(self, i):
         crop_offset = int(self.font_size / self.crop_scale)
         crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
         self.dumpImgToPath('image_{}.jpg'.format(str(i).zfill(6)),img_crop)
+    '''
