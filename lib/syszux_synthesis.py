@@ -145,6 +145,8 @@ class SynthesisTextFromVideo(SynthesisText):
         self.frames_num = self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
         assert self.frames_num > 10, "invalid video file {}".format(self.video_file)
         self.sample_rate = self.conf.sample_rate
+        if self.frames_num/self.sample_rate<self.total_num:
+            raise Exception("Total_num {} exceeds frame_nums/sample_rate, build exit!".format(self.total_num))
         self.frame_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         assert self.frame_height > 2 * self.max_font, "video height must exceed {} pixels".format(2*self.max_font)
         self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -154,8 +156,6 @@ class SynthesisTextFromVideo(SynthesisText):
         self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
 
     def buildScene(self, i):
-        if self.frames_num/self.sample_rate<=i:
-            raise Exception("Total_num {} exceeds frame_nums/sample_rate".format(self.total_num))
         for _ in range(self.sample_rate):
             success,frame = self.video_capture.read()
 
@@ -191,6 +191,8 @@ class SynthesisTextFromImage(SynthesisText):
         self.images_num = len(self.images)
         if self.images_num==0:
             raise Exception("No image was found in {}!".format(self.images))
+        if self.images_num<self.total_num:
+            raise Exception("Total_num {} exceeds the image numbers {}, build exit!".format(self.total_num, self.images_num))
         self.scene_hw = (1080,1920)
         self.font_offset = (1000, 800)
         self.is_border = self.conf.is_border
@@ -198,8 +200,6 @@ class SynthesisTextFromImage(SynthesisText):
         self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
 
     def buildScene(self, i):
-        if self.images_num<=i:
-            raise Exception("Total_num {} exceeds the image numbers {}, build exit!".format(self.total_num, self.images_num))
         image = cv2.imread(os.path.join(self.images_dir, self.images[i]))
         image = cv2.resize(image,(self.scene_hw[1],self.scene_hw[0]))
         self.pil_img = Image.fromarray(cv2.cvtColor(image,cv2.COLOR_BGR2RGB))
