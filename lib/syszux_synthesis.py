@@ -48,7 +48,7 @@ class SynthesisText(SynthesisBase):
         self.lex_len = len(self.lex)
 
         self.fonts_dir = self.conf.fonts_dir
-        if os.path.exists(self.fonts_dir)==False:
+        if not os.path.exists(self.fonts_dir):
             raise Exception("Dir {} not found!".format(self.fonts_dir))
         self.fonts = os.listdir(self.fonts_dir)
         self.fonts_len = len(self.fonts)
@@ -185,7 +185,7 @@ class SynthesisTextFromImage(SynthesisText):
     def auditConfig(self):
         super(SynthesisTextFromImage, self).auditConfig()
         self.images_dir = self.conf.images_dir
-        if os.path.exists(self.images_dir) == False:
+        if not os.path.exists(self.images_dir):
             raise Exception("Dir {}not found!".format(self.images_dir))
         self.images = os.listdir(self.images_dir)
         self.images_num = len(self.images)
