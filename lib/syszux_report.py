@@ -161,14 +161,9 @@ if __name__ == "__main__":
     report()
 
     print("==========test OcrReport============")
-    report = OcrReport('gemfield',3)
+    report = OcrReport('gemfield',4)
     report.add('朝辞白帝彩云间', '朝辞白彩云间')
     report.add('君不见黄河之水天上来', '君不见黄河之水天上来')
-    report.add('gem fie,ld', 'gemfield')
+    report.add('非汝之为美，美人之贻', '非汝之为美，美人之遗')
+    report.add('gemfield', 'gem fie,ld')
     report()
-
-
-
-
-
-
