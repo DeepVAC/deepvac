@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import datetime
 import argparse
 import torch
@@ -11,10 +12,36 @@ from syszux_log import LOG
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
+        self._mandatory_member = dict()
+        self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
         #init self.net
         self.initNet()
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+        self.checkIn(name)
+
+    def __delattr__(self, name):
+        self.checkOut(name)
+        object.__delattr__(self, name)
+
+    def checkIn(self, name):
+        if name.startswith('_'):
+            return
+        self._mandatory_member[name] = None
+
+    def checkOut(self, name):
+        if name.startswith('_'):
+            return
+        del self._mandatory_member[name]
+
+    def auditConfig(self):
+        for name in self._mandatory_member_name:
+            if name not in self._mandatory_member:
+                LOG.logE("Error! self.{} must be definded in your subclass.".format(name))
+                sys.exit(1)
 
     def getConf(self):
         return self.conf
@@ -100,18 +127,13 @@ class Deepvac(object):
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
     def __init__(self, deepvac_config):
+        super(DeepvacTrain,self).__init__(deepvac_config)
         self.dataset = None
-        self.train_dataset = None
-        self.val_dataset = None
         self.loader = None
-        self.train_loader = None
-        self.val_loader = None
-        self.batch_size = None
-        self.phase = 'None'
         self.epoch = 0
         self.step = 0
         self.iter = 0
-        super(DeepvacTrain,self).__init__(deepvac_config)
+        self._mandatory_member_name = ['train_dataset','val_dataset','train_loader','val_loader','net','criterion','optimizer']
 
     def setTrainContext(self):
         self.is_train = True
@@ -142,6 +164,7 @@ class DeepvacTrain(Deepvac):
         self.initOutputDir()
 
     def initOutputDir(self):
+        print('debug output: ',self.conf.output_dir)
         if not os.path.exists(self.conf.output_dir):
             os.makedirs(self.conf.output_dir)
 
@@ -279,6 +302,7 @@ class DeepvacTrain(Deepvac):
             self.processAccept()
 
     def __call__(self,input):
+        self.auditConfig()
         self.process()
 
     def exportNCNN(self):
