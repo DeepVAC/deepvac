@@ -45,6 +45,7 @@ class SynthesisText(SynthesisBase):
                 line = line.rstrip()
                 self.lex.append(line)
         random.shuffle(self.lex)
+        self.lex_len = len(self.lex)
 
         self.fonts_dir = self.conf.fonts_dir
         if os.path.exists(self.fonts_dir)==False:
@@ -81,16 +82,18 @@ class SynthesisText(SynthesisBase):
         crop_offset = int(self.font_size / self.crop_scale)
         crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i])+crop_list[2]]
+        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i%self.lex_len])+crop_list[2]]
         image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
         self.dumpImgToPath(image_name,img_crop)
-        self.fw.write(image_name+' '+self.lex[i]+'\n')
+        self.fw.write(image_name+' '+self.lex[i%self.lex_len]+'\n')
 
     def __call__(self):
         for i in range(self.total_num):
             self.buildScene(i)
             self.buildTextWithScene(i)
             self.dumpTextImg(i)
+            if i%5000==0:
+                print('{}/{}'.format(i,self.total_num))
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
@@ -120,7 +123,7 @@ class SynthesisTextPure(SynthesisText):
     def buildTextWithScene(self, i):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]),self.font_size,encoding='utf-8')
-        s = self.lex[i]
+        s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -151,6 +154,8 @@ class SynthesisTextFromVideo(SynthesisText):
         self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
 
     def buildScene(self, i):
+        if self.frames_num/self.sample_rate<=i:
+            raise Exception("Total_num {} exceeds frame_nums/sample_rate".format(self.total_num))
         for _ in range(self.sample_rate):
             success,frame = self.video_capture.read()
 
@@ -163,7 +168,7 @@ class SynthesisTextFromVideo(SynthesisText):
     def buildTextWithScene(self, i):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
-        s = self.lex[i]
+        s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -203,7 +208,7 @@ class SynthesisTextFromImage(SynthesisText):
     def buildTextWithScene(self, i):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
-        s = self.lex[i]
+        s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
         if self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
