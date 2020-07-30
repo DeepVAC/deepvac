@@ -301,3 +301,50 @@ class PerspectiveAug(AugBase):
         trans = WarpMLS(img, src_pts, dst_pts, img_w, img_h)
         img_perspective = trans.generate()
         return img_perspective
+
+class MotionAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(MotionAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.degree = 12
+        self.angle = 45
+
+    def __call__(self. img):
+        # 这里生成任意角度的运动模糊kernel的矩阵， degree越大，模糊程度越高
+        m = cv2.getRotationMatrix2D((self.degree / 2, self.degree / 2), self.angle, 1)
+        motion_blur_kernel = np.diag(np.ones(self.degree))
+        motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.degree, self.degree))
+        motion_blur_kernel = motion_blur_kernel / self.degree
+        blurred = cv2.filter2D(image, -1, motion_blur_kernel)
+
+        # convert to uint8
+        cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
+        blurred = np.array(blurred, dtype=np.uint8)
+
+        return blurred
+
+class DarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(DarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 2
+
+    def __call__(self. img):
+        is_gray = img.ndim == 2 or img.shape[1] == 1
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum = np.power(illum, self.gamma)
+        v = illum * 255.
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        return img
+
