@@ -156,8 +156,6 @@ class SynthesisTextFromVideo(SynthesisText):
         self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
 
     def buildScene(self, i):
-        if self.frames_num/self.sample_rate<=i:
-            raise Exception("Total_num {} exceeds frame_nums/sample_rate".format(self.total_num))
         for _ in range(self.sample_rate):
             success,frame = self.video_capture.read()
 
