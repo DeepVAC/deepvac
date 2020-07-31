@@ -283,10 +283,12 @@ class DeepvacTrain(Deepvac):
             self.doLoss()
             self.doBackward()
             self.doOptimize()
-            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
+            if i % self.getConf().evaluate_every == 0:
+                LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
             if self.step in self.save_list:
                 self.processVal()
+                self.setTrainContext()
 
         self.scheduler.step()
         self.postEpoch()
