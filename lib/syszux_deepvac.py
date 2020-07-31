@@ -7,17 +7,34 @@ import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
-from syszux_log import LOG
+from syszux_log import LOG,getCurrentGitBranch
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
+        self.assertInGit()
         self._mandatory_member = dict()
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
         #init self.net
         self.initNet()
+
+    def assertInGit(self):
+        self.branch = getCurrentGitBranch()
+        if self.branch is None:
+            LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
+        
+        if len(self.branch) < 6:
+            LOG.logE('According to deepvac standard, your git branch name is too short: {}'.format(self.branch), exit=True)
+
+        if self.branch.startswith('LTS_'):
+            return
+        
+        if self.branch.startswith('PROTO_'):
+            return
+
+        LOG.logE('According to deepvac standard, git branch name should start from LTS_ or PROTO_: {}'.format(self.branch), exit=True)
 
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
@@ -40,8 +57,7 @@ class Deepvac(object):
     def auditConfig(self):
         for name in self._mandatory_member_name:
             if name not in self._mandatory_member:
-                LOG.logE("Error! self.{} must be definded in your subclass.".format(name))
-                sys.exit(1)
+                LOG.logE("Error! self.{} must be definded in your subclass.".format(name),exit=True)
 
     def getConf(self):
         return self.conf
@@ -164,9 +180,13 @@ class DeepvacTrain(Deepvac):
         self.initOutputDir()
 
     def initOutputDir(self):
-        print('debug output: ',self.conf.output_dir)
-        if not os.path.exists(self.conf.output_dir):
-            os.makedirs(self.conf.output_dir)
+        if self.conf.output_dir != 'output':
+            LOG.logW("According deepvac standard, you should save model files to output directory.")
+
+        self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
+        LOG.logI('model save dir: {}'.format(self.output_dir))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def initCriterion(self):
         raise Exception("Not implemented.")
@@ -343,10 +363,10 @@ class DeepvacDDP(DeepvacTrain):
         super(DeepvacDDP, self).saveState(self.getTime())
 
     def loadState(self, suffix):
-        self.optimizer.load_state_dict(torch.load(self.conf.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
-        self.model.load_state_dict(torch.load(self.conf.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+        self.optimizer.load_state_dict(torch.load(self.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
+        self.model.load_state_dict(torch.load(self.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
 
 if __name__ == "__main__":
-    from conf import config as deepvac_config
+    from config import config as deepvac_config
     vac = Deepvac(deepvac_config)
     vac()

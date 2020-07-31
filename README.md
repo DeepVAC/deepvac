@@ -86,7 +86,7 @@ lib库对使用层面提供以下模块：
 |AugFactory          | lib/syszux_aug_factory.py       | 用于数据增强|
 |LoaderFactory       | lib/syszux_loader_factory.py   | 用于数据装载|
 |Deepvac{,Train,TrainDDP}|lib/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
-|FaceReport,OcrReport | lib/syszux_report.py       | Report类体系，用于打印测试报告|
+|{,Face,Ocr}Report   | lib/syszux_report.py       | Report类体系，用于打印测试报告|
 |{,Aug}Executor      | lib/syszux_executor.py       |Executor类体系，用于代码逻辑流的抽象封装|
 |LOG                 | lib/syszux_log.py            |日志模块|
 |AttrDict            | lib/syszux_config.py          |配置模块 |
