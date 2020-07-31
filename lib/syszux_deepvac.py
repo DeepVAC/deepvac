@@ -12,15 +12,18 @@ from syszux_log import LOG,getCurrentGitBranch
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
-        self.assertInGit()
         self._mandatory_member = dict()
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.assertInGit()
         #init self.net
         self.initNet()
 
     def assertInGit(self):
+        if os.environ.get("disable_git") or self.getConf().disable_git:
+            self.branch = "sevice"
+            return
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
