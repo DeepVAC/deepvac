@@ -73,5 +73,7 @@ class LOG(object):
         LOG.logfunc[LOG.S.W](str)
 
     @staticmethod
-    def logE(str):
+    def logE(str, exit=False):
         LOG.logfunc[LOG.S.E](str)
+        if exit:
+            sys.exit(1)
