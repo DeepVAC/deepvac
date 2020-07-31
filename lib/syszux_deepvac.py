@@ -259,8 +259,8 @@ class DeepvacTrain(Deepvac):
     def saveState(self, time):
         self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
         self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        torch.save(self.net.state_dict(), '{}/{}'.format(self.conf.output_dir, self.state_file))
-        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.conf.output_dir, self.checkpoint_file))
+        torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
+        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.output_dir, self.checkpoint_file))
 
     def processTrain(self):
         self.setTrainContext()
