@@ -12,15 +12,18 @@ from syszux_log import LOG,getCurrentGitBranch
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
-        self.assertInGit()
         self._mandatory_member = dict()
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.assertInGit()
         #init self.net
         self.initNet()
 
     def assertInGit(self):
+        if os.environ.get("disable_git") or self.getConf().disable_git:
+            self.branch = "sevice"
+            return
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
@@ -232,16 +235,16 @@ class DeepvacTrain(Deepvac):
             # centered=self.conf.rmsprop_centered
         )
 
-    def preEpoch(self, epoch=0):
+    def preEpoch(self):
         pass
 
-    def preIter(self, img=None, idx=0, epoch=0):
+    def preIter(self):
         pass
 
-    def postIter(self, img=None, idx=0, epoch=0):
+    def postIter(self):
         pass
 
-    def postEpoch(self, epoch=0):
+    def postEpoch(self):
         pass
 
     def doForward(self):
@@ -256,9 +259,9 @@ class DeepvacTrain(Deepvac):
     def doOptimize(self):
         raise Exception('Not implemented.')
 
-    def saveState(self):
-        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+    def saveState(self, time):
+        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
         torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
         torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.output_dir, self.checkpoint_file))
 
@@ -283,10 +286,12 @@ class DeepvacTrain(Deepvac):
             self.doLoss()
             self.doBackward()
             self.doOptimize()
-            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
+            if i % self.getConf().evaluate_every == 0:
+                LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
             if self.step in self.save_list:
                 self.processVal()
+                self.setTrainContext()
 
         self.scheduler.step()
         self.postEpoch()
@@ -306,7 +311,7 @@ class DeepvacTrain(Deepvac):
                 self.postIter()
 
             self.postEpoch()
-        self.saveState()
+        self.saveState(self.getTime())
         
 
     def processAccept(self):
@@ -355,10 +360,10 @@ class DeepvacDDP(DeepvacTrain):
         super(DeepvacDDP,self).initNet()
         self.initDDP()
 
-    def saveState(self):
+    def saveState(self, time):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).saveState()
+        super(DeepvacDDP, self).saveState(self.getTime())
 
     def loadState(self, suffix):
         self.optimizer.load_state_dict(torch.load(self.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
