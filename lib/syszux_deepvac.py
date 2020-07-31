@@ -21,20 +21,20 @@ class Deepvac(object):
         self.initNet()
 
     def assertInGit(self):
-        branch = getCurrentGitBranch()
-        if branch is None:
+        self.branch = getCurrentGitBranch()
+        if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
         
-        if len(branch) < 6:
-            LOG.logE('According to deepvac standard, your git branch name is too short: {}'.format(branch), exit=True)
+        if len(self.branch) < 6:
+            LOG.logE('According to deepvac standard, your git branch name is too short: {}'.format(self.branch), exit=True)
 
-        if branch.startswith('LTS_'):
+        if self.branch.startswith('LTS_'):
             return
         
-        if branch.startswith('PROTO_'):
+        if self.branch.startswith('PROTO_'):
             return
 
-        LOG.logE('According to deepvac standard, git branch name should start from LTS_ or PROTO_: {}'.format(branch), exit=True)
+        LOG.logE('According to deepvac standard, git branch name should start from LTS_ or PROTO_: {}'.format(self.branch), exit=True)
 
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
@@ -180,9 +180,13 @@ class DeepvacTrain(Deepvac):
         self.initOutputDir()
 
     def initOutputDir(self):
-        print('debug output: ',self.conf.output_dir)
-        if not os.path.exists(self.conf.output_dir):
-            os.makedirs(self.conf.output_dir)
+        if self.conf.output_dir != 'output':
+            LOG.logW("According deepvac standard, you should save model files to output directory.")
+
+        self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
+        LOG.logI('model save dir: {}'.format(self.output_dir))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def initCriterion(self):
         raise Exception("Not implemented.")
@@ -255,8 +259,8 @@ class DeepvacTrain(Deepvac):
     def saveState(self):
         self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
         self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        torch.save(self.net.state_dict(), '{}/{}'.format(self.conf.output_dir, self.state_file))
-        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.conf.output_dir, self.checkpoint_file))
+        torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
+        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.output_dir, self.checkpoint_file))
 
     def processTrain(self):
         self.setTrainContext()
@@ -357,8 +361,8 @@ class DeepvacDDP(DeepvacTrain):
         super(DeepvacDDP, self).saveState()
 
     def loadState(self, suffix):
-        self.optimizer.load_state_dict(torch.load(self.conf.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
-        self.model.load_state_dict(torch.load(self.conf.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+        self.optimizer.load_state_dict(torch.load(self.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
+        self.model.load_state_dict(torch.load(self.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
 
 if __name__ == "__main__":
     from config import config as deepvac_config
