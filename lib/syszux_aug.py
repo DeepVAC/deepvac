@@ -307,16 +307,16 @@ class MotionAug(AugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.degree = 12
+        self.degree = 20
         self.angle = 45
 
-    def __call__(self. img):
+    def __call__(self, img):
         # 这里生成任意角度的运动模糊kernel的矩阵， degree越大，模糊程度越高
         m = cv2.getRotationMatrix2D((self.degree / 2, self.degree / 2), self.angle, 1)
         motion_blur_kernel = np.diag(np.ones(self.degree))
         motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.degree, self.degree))
         motion_blur_kernel = motion_blur_kernel / self.degree
-        blurred = cv2.filter2D(image, -1, motion_blur_kernel)
+        blurred = cv2.filter2D(img, -1, motion_blur_kernel)
 
         # convert to uint8
         cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
@@ -329,9 +329,9 @@ class DarkAug(AugBase):
         super(DarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.gamma = 2
+        self.gamma = 3
 
-    def __call__(self. img):
+    def __call__(self, img):
         is_gray = img.ndim == 2 or img.shape[1] == 1
         if is_gray:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -346,5 +346,114 @@ class DarkAug(AugBase):
         if is_gray:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+        return img
+
+class HalfDarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(HalfDarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 1.5
+
+    def __call__(self, img):
+        h, w, _ = img.shape
+        is_gray = img.ndim == 2 or img.shape[1] == 1
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum[:, w//2:] = np.power(illum[:, w//2:], self.gamma)
+        #illum = np.power(illum, self.gamma)
+        v = illum * 255
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        return img
+
+class IPCFaceAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(IPCFaceAug, self).__init__(deepvac_config)
+        self.deepvac_config = deepvac_config
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        half_dark = HalfDarkAug(self.deepvac_config)
+        half_dark.auditConfig()
+        half_darked = half_dark(img)
+
+        motion = MotionAug(self.deepvac_config)
+        motion.auditConfig()
+        motioned = motion(half_darked)
+
+        return motioned
+
+'''
+class RandomBrightlessAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomBrightlessAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.delta = 32
+
+    def __call__(self, img):
+        img_h, img_w = img.shape[:2]
+
+        #d = np.zeros(img_h, img_w)
+        #print('img_ori:', img[:, :, 0])
+        d = self.delta * np.random.randint(-1, 1, size=[img_h, img_w])
+        img[:, :, 0] = img[:, :, 0] + d
+        img[:, :, 1] = img[:, :, 1] + d
+        img[:, :, 2] = img[:, :, 2] + d
+        #img += d
+        #print('d', d)
+        #np.add(img, d, out=img, casting="unsafe")
+        #print('img:', img[:, :, 0])
+
+        return img
+'''
+class RandomCropDarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomCropDarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 1.2
+
+    def __call__(self, img):
+        height, width, _ = img.shape
+        w = np.random.uniform(0.3 * width, width)
+        h = np.random.uniform(0.3 * height, height)
+        #if h / w < 0.5 or h / w > 2:
+        #    return img
+        left = np.random.uniform(width - w)
+        top = np.random.uniform(height - h)
+
+        rect = np.array([int(left), int(top), int(left+w), int(top+h)])
+        current_img = img[rect[1]:rect[3], rect[0]:rect[2], :]
+        hsv = cv2.cvtColor(current_img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum = np.power(illum, self.gamma)
+        v = illum * 255.
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        dark_img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        #print(img[rect[1]:rect[3], rect[0]:rect[2], 0]*0)
+        #img[rect[1]:rect[3], rect[0]:rect[2], 0] = img[rect[1]:rect[3], rect[0]:rect[2], 0] * 0 + current_img[:, :, 0]
+        #img[rect[1]:rect[3], rect[0]:rect[2], 1] = img[rect[1]:rect[3], rect[0]:rect[2], 1] * 0 + current_img[:, :, 1]
+        #img[rect[1]:rect[3], rect[0]:rect[2], 2] = img[rect[1]:rect[3], rect[0]:rect[2], 2] * 0 + current_img[:, :, 2]
+        for x in range(rect[1], rect[3]):
+            for y in range (rect[0], rect[2]):
+                img[x, y, 0] = dark_img[x-rect[1], y-rect[0], 0]
+                img[x, y, 1] = dark_img[x-rect[1], y-rect[0], 1]
+                img[x, y, 2] = dark_img[x-rect[1], y-rect[0], 2]
+
+        print('rect:', rect)
         return img
 
