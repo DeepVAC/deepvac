@@ -17,7 +17,7 @@ config.log_dir = "./log"
 config.log_every = 10
 
 ## ------------------ ddp --------------------
-config.dist_url = tcp://localhost:27030
+config.dist_url = "tcp://localhost:27030"
 config.world_size = 1
 
 ## ------------------ optimizer  ------------------

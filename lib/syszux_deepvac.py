@@ -85,6 +85,7 @@ class Deepvac(object):
         return (str(datetime.now())[:-10]).replace(' ','-').replace(':','-')
 
     def initNet(self):
+        self.initLog()
         #init self.device
         self.initDevice()
         #init self.net
@@ -106,7 +107,7 @@ class Deepvac(object):
         raise Exception("You should reimplement this func to initialize self.model_path")
 
     def initStateDict(self):
-        LOG.log(LOG.S.I, 'Loading State Dict from {}'.format(self.model_path))
+        LOG.logI('Loading State Dict from {}'.format(self.model_path))
         device = torch.cuda.current_device()
         self.state_dict = torch.load(self.model_path, map_location=lambda storage, loc: storage.cuda(device))
         #remove prefix begin
@@ -124,9 +125,9 @@ class Deepvac(object):
         used_keys = code_net_keys & state_dict_keys
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
-        LOG.log(LOG.S.I, 'Missing keys:{}'.format(len(missing_keys)))
-        LOG.log(LOG.S.I, 'Unused checkpoint keys:{}'.format(len(unused_keys)))
-        LOG.log(LOG.S.I, 'Used keys:{}'.format(len(used_keys)))
+        LOG.logI('Missing keys:{}'.format(len(missing_keys)))
+        LOG.logI('Unused checkpoint keys:{}'.format(len(unused_keys)))
+        LOG.logI('Used keys:{}'.format(len(used_keys)))
         assert len(used_keys) > 0, 'load NONE from pretrained model'
         assert len(missing_keys) == 0, 'Net mismatched with pretrained model'
 
@@ -134,6 +135,9 @@ class Deepvac(object):
         self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
         self.net = self.net.to(self.device)
+
+    def initLog(self):
+        pass
 
     def report(self):
         pass
