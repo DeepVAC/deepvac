@@ -348,7 +348,7 @@ class DarkAug(AugBase):
 
         return img
 
-# 降低z图片半边亮度
+# 降低图片半边亮度
 class HalfDarkAug(AugBase):
     def __init__(self, deepvac_config):
         super(HalfDarkAug, self).__init__(deepvac_config)
