@@ -249,7 +249,7 @@ class DeepvacTrain(Deepvac):
         pass
 
     def postEpoch(self):
-        pass
+        self.scheduler.step()
 
     def doForward(self):
         raise Exception('Not implemented.')
@@ -296,8 +296,6 @@ class DeepvacTrain(Deepvac):
             if self.step in self.save_list:
                 self.processVal()
                 self.setTrainContext()
-
-        self.scheduler.step()
         self.postEpoch()
 
     def processVal(self):
@@ -316,7 +314,6 @@ class DeepvacTrain(Deepvac):
 
             self.postEpoch()
         self.saveState(self.getTime())
-        
 
     def processAccept(self):
         self.setValContext()
@@ -346,6 +343,7 @@ class DeepvacTrain(Deepvac):
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):
         super(DeepvacDDP,self).__init__(deepvac_config)
+        assert self.train_sampler is not None, "You should define self.train_sampler in DDP mode."
 
     def initDDP(self):
         parser = argparse.ArgumentParser(description='DeepvacDDP')
@@ -357,12 +355,13 @@ class DeepvacDDP(DeepvacTrain):
         LOG.logI("Start dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
         dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
         torch.cuda.set_device(self.args.gpu)
-        self.net = torch.nn.parallel.DistributedDataParallel(self.net, device_ids=[self.args.gpu])
-        LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
 
     def initNet(self):
-        super(DeepvacDDP,self).initNet()
         self.initDDP()
+        super(DeepvacDDP,self).initNet()
+
+    def preEpoch(self):
+        self.train_sampler.set_epoch(self.epoch)
 
     def saveState(self, time):
         if self.args.rank != 0:
@@ -371,7 +370,36 @@ class DeepvacDDP(DeepvacTrain):
 
     def loadState(self, suffix):
         self.optimizer.load_state_dict(torch.load(self.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
-        self.model.load_state_dict(torch.load(self.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+        self.net.load_state_dict(torch.load(self.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+
+    def separateBN4OptimizerPG(self, modules):
+        paras_only_bn = []
+        paras_wo_bn = []
+        memo = set()
+        gemfield_set = set()
+        gemfield_set.update(set(modules.parameters()))
+        LOG.logI("separateBN4OptimizerPG set len: {}".format(len(gemfield_set)))
+        named_modules = modules.named_modules(prefix='')
+        for module_prefix, module in named_modules:
+            if "module" not in module_prefix:
+                LOG.logI("separateBN4OptimizerPG skip {}".format(module_prefix))
+                continue
+
+            members = module._parameters.items()
+            for k, v in members:
+                name = module_prefix + ('.' if module_prefix else '') + k
+                if v is None:
+                    continue
+                if v in memo:
+                    continue
+                memo.add(v)
+                if "batchnorm" in str(module.__class__):
+                    paras_only_bn.append(v)
+                else:
+                    paras_wo_bn.append(v)
+
+        LOG.logI("separateBN4OptimizerPG param len: {} - {}".format(len(paras_wo_bn),len(paras_only_bn)))
+        return paras_only_bn, paras_wo_bn
 
 if __name__ == "__main__":
     from config import config as deepvac_config
