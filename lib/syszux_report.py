@@ -158,23 +158,18 @@ class OcrReport(Report):
         print(self.char_report_str.format(*report_keys, *report_values))
 
 
-class NsfwReport(Report):
+# used in classifier
+class ClassifierReport(Report):
     def __init__(self, ds_name="Unknown", total_num=0, cls_num=0):
-        self.total_num = total_num
-        self.ds_name = ds_name
         self.cls_num = cls_num
-        self.confusion_matrix = np.zeros((cls_num, cls_num))
-
-        self.initReportDict()
-        self.initReportFormat()
-        self.reset()
+        Report.__init__(self, ds_name, total_num)
 
     def add(self, gt, pred):
         self.confusion_matrix[gt, pred] += 1
         return self
         
     def __call__(self):
-        self.initFuncDict()
+        self.calcReportDict()
         print(f"- dataset: {self.ds_name}")
         print(f"- duration: {time.time()-self.start_time :<.3f}")
         print(f"- accuracy: {self.accuracy:<.3f}")
@@ -194,7 +189,7 @@ class NsfwReport(Report):
             print(body)
 
     def initReportFormat(self):
-        self.fmt_head = ("| total_num " + "| cls{} " * self.cls_num).format(*range(self.cls_num))
+        self.fmt_head = (f"| {self.ds_name} " + "| cls{} " * self.cls_num).format(*range(self.cls_num))
         self.fmt_div = "|---" * (self.cls_num+1)
 
     def initMetricsDict(self):
@@ -203,6 +198,7 @@ class NsfwReport(Report):
     def reset(self):
         self.start_time = time.time()
         self.initReportDict()
+        self.confusion_matrix = np.zeros((self.cls_num, self.cls_num))
 
     def initNumeratorKeys(self):
         pass
@@ -214,6 +210,9 @@ class NsfwReport(Report):
         self.report_dict['f1-score'] = 0
 
     def initFuncDict(self):
+        pass
+
+    def calcReportDict(self):
         '''
         label -> left; pred -> top
 
@@ -245,7 +244,7 @@ if __name__ == "__main__":
     report.add('gemfield', 'gem fie,ld')
     report()
 
-    print("==========test NsfwReport============")
-    report = NsfwReport('gemfield',5, 3)
+    print("==========test ClassifierReport============")
+    report = ClassifierReport('gemfield',5, 3)
     report.add(1, 2).add(1, 1).add(0, 0).add(0, 2).add(2, 2)
     report()
