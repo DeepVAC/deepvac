@@ -1,5 +1,8 @@
-from collections import OrderedDict
 import time
+import numpy as np
+
+from collections import OrderedDict
+
 
 class Report(object):
     def __init__(self, ds_name = "Unknown", total_num = 0):
@@ -154,6 +157,80 @@ class OcrReport(Report):
         report_values = [v for k,v in self.char_report_dict.items() ]
         print(self.char_report_str.format(*report_keys, *report_values))
 
+
+class NsfwReport(Report):
+    def __init__(self, ds_name="Unknown", total_num=0, cls_num=0):
+        self.total_num = total_num
+        self.ds_name = ds_name
+        self.cls_num = cls_num
+        self.confusion_matrix = np.zeros((cls_num, cls_num))
+
+        self.initReportDict()
+        self.initReportFormat()
+        self.reset()
+
+    def add(self, gt, pred):
+        self.confusion_matrix[gt, pred] += 1
+        return self
+        
+    def __call__(self):
+        self.initFuncDict()
+        print(f"- dataset: {self.ds_name}")
+        print(f"- duration: {time.time()-self.start_time :<.3f}")
+        print(f"- accuracy: {self.accuracy:<.3f}")
+
+        print("- CONFUSION-MATRIX")
+        print(self.fmt_head)
+        print(self.fmt_div)
+        for i in range(self.cls_num):
+            body = f"| cls{i} " + ("| {:<.0f} "*self.cls_num).format(*(self.confusion_matrix[i]))
+            print(body)
+
+        print("- TEST NSFW REPORT")
+        print(self.fmt_head)
+        print(self.fmt_div)
+        for k, v in self.report_dict.items():
+            body = f"| {k} " + ("| {:<.3f} "*self.cls_num).format(*v)
+            print(body)
+
+    def initReportFormat(self):
+        self.fmt_head = ("| total_num " + "| cls{} " * self.cls_num).format(*range(self.cls_num))
+        self.fmt_div = "|---" * (self.cls_num+1)
+
+    def initMetricsDict(self):
+        pass
+
+    def reset(self):
+        self.start_time = time.time()
+        self.initReportDict()
+
+    def initNumeratorKeys(self):
+        pass
+
+    def initReportDict(self):
+        self.report_dict = OrderedDict()
+        self.report_dict['precision'] = 0
+        self.report_dict['recall'] = 0
+        self.report_dict['f1-score'] = 0
+
+    def initFuncDict(self):
+        '''
+        label -> left; pred -> top
+
+        TP | FN
+        ---|---
+        FP | TN
+
+        precision = TP / (TP+FP)
+        recall = TP / (TP+FN)
+        f1-score = 2TP/(2TP+FP+FN)
+        '''
+        self.report_dict['recall'] = [self.confusion_matrix[i, i] / self.confusion_matrix[i].sum() for i in range(self.cls_num)]
+        self.report_dict['precision'] = [self.confusion_matrix[i, i] / self.confusion_matrix[:, i].sum() for i in range(self.cls_num)]
+        self.report_dict['f1-score'] = [(2*self.confusion_matrix[i, i]) / (self.confusion_matrix[i].sum()+self.confusion_matrix[:, i].sum()) for i in range(self.cls_num)]
+        self.accuracy = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
+
+
 if __name__ == "__main__":
     print("==========test FaceReport============")
     report = FaceReport('gemfield',5)
@@ -166,4 +243,9 @@ if __name__ == "__main__":
     report.add('君不见黄河之水天上来', '君不见黄河之水天上来')
     report.add('非汝之为美，美人之贻', '非汝之为美，美人之遗')
     report.add('gemfield', 'gem fie,ld')
+    report()
+
+    print("==========test NsfwReport============")
+    report = NsfwReport('gemfield',5, 3)
+    report.add(1, 2).add(1, 1).add(0, 0).add(0, 2).add(2, 2)
     report()
