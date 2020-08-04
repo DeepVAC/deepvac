@@ -84,6 +84,7 @@ lib库对使用层面提供以下模块：
 |--------------------|------------------------------|---------|
 |SynthesisFactory    | lib/syszux_synthesis_factory.py | 用于数据合成或者清洗|
 |AugFactory          | lib/syszux_aug_factory.py       | 用于数据增强|
+|DatasetFactory       | lib/syszux_loader_factory.py   | Dataset的扩展实现，torch.utils.data.Dataset的子类们|
 |LoaderFactory       | lib/syszux_loader_factory.py   | 用于数据装载|
 |Deepvac{,Train,TrainDDP}|lib/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
 |{,Face,Ocr}Report   | lib/syszux_report.py       | Report类体系，用于打印测试报告|

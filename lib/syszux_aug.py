@@ -3,7 +3,8 @@
 import math
 import cv2
 import numpy as np
-from PIL import Image
+import random
+from PIL import Image, ImageEnhance
 from scipy import ndimage
 from syszux_helper import WarpMLS
 
@@ -301,3 +302,229 @@ class PerspectiveAug(AugBase):
         trans = WarpMLS(img, src_pts, dst_pts, img_w, img_h)
         img_perspective = trans.generate()
         return img_perspective
+
+# 运动模糊
+class MotionAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(MotionAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.degree = 20
+        self.angle = 45
+
+    def __call__(self, img):
+        m = cv2.getRotationMatrix2D((self.degree / 2, self.degree / 2), self.angle, 1)
+        motion_blur_kernel = np.diag(np.ones(self.degree))
+        motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.degree, self.degree))
+        motion_blur_kernel = motion_blur_kernel / self.degree
+        blurred = cv2.filter2D(img, -1, motion_blur_kernel)
+
+        cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
+        blurred = np.array(blurred, dtype=np.uint8)
+
+        return blurred
+
+# 降低图片亮度
+class DarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(DarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 3
+
+    def __call__(self, img):
+        is_gray = img.ndim == 2 or img.shape[1] == 1
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum = np.power(illum, self.gamma)
+        v = illum * 255.
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        return img
+
+# 降低图片半边亮度
+class HalfDarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(HalfDarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 1.5
+
+    def __call__(self, img):
+        h, w, _ = img.shape
+        is_gray = img.ndim == 2 or img.shape[1] == 1
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum[:, w//2:] = np.power(illum[:, w//2:], self.gamma)
+        v = illum * 255
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        if is_gray:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        return img
+
+# 模拟IPC场景增强
+class IPCFaceAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(IPCFaceAug, self).__init__(deepvac_config)
+        self.deepvac_config = deepvac_config
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        half_dark = HalfDarkAug(self.deepvac_config)
+        half_dark.auditConfig()
+        half_darked = half_dark(img)
+
+        motion = MotionAug(self.deepvac_config)
+        motion.auditConfig()
+        motioned = motion(half_darked)
+
+        return motioned
+
+# 随机crop框降低亮度
+class RandomCropDarkAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomCropDarkAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.gamma = 1.2
+
+    def __call__(self, img):
+        height, width, _ = img.shape
+        w = np.random.uniform(0.3 * width, width)
+        h = np.random.uniform(0.3 * height, height)
+        if h / w < 0.5 or h / w > 2:
+            return img
+        left = np.random.uniform(width - w)
+        top = np.random.uniform(height - h)
+
+        rect = np.array([int(left), int(top), int(left+w), int(top+h)])
+        current_img = img[rect[1]:rect[3], rect[0]:rect[2], :]
+        hsv = cv2.cvtColor(current_img, cv2.COLOR_BGR2HSV)
+        illum = hsv[..., 2] / 255.
+        illum = np.power(illum, self.gamma)
+        v = illum * 255.
+        v[v > 255] = 255
+        v[v < 0] = 0
+        hsv[..., 2] = v.astype(np.uint8)
+        dark_img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        for x in range(rect[1], rect[3]):
+            for y in range (rect[0], rect[2]):
+                img[x, y, 0] = dark_img[x-rect[1], y-rect[0], 0]
+                img[x, y, 1] = dark_img[x-rect[1], y-rect[0], 1]
+                img[x, y, 2] = dark_img[x-rect[1], y-rect[0], 2]
+
+        print('rect:', rect)
+        return img
+
+# 随机颜色扰动
+class RandomColorJitterAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomColorJitterAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        random.seed()
+        change_image = random.randint(0, 1)
+        if not change_image:
+            return img
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        if random.randint(0, 1):
+            img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
+        if random.randint(0, 1):
+            img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
+        if random.randint(0, 1):
+            img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
+
+        return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
+# 随机旋转（针对于人脸关键点任务）
+class RandomRotateFacialKpImage(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomRotateFacialKpImage, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
+        landmarks = img[1]
+        img = img[0]
+        h, w, _ = img.shape
+        M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+        dest_img = cv2.warpAffine(img, M, (w, h))
+        dest_landmarks = []
+        for i in range(len(landmarks)):
+            curlandmark_x = landmarks[i][0]
+            curlandmark_y = landmarks[i][1]
+            dst_x = curlandmark_x * M[0][0] + curlandmark_y * M[0][1] + M[0][2]
+            dst_y = curlandmark_x * M[1][0] + curlandmark_y * M[1][1] + M[1][2]
+            dest_landmarks.append([dst_x, dst_y])
+        return [dest_img, dest_landmarks]
+
+# 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
+class RandomFilpFacialKpImage(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomFilpFacialKpImage, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+    
+    def flipLandmark(self, dest_landmark, src_landmark, sequences):
+        for sequence in sequences:
+            for i in range(sequence[1], sequence[0] - 1, -1):
+                dest_landmark.append(src_landmark[i])
+        return dest_landmark
+
+    def copyLandmark(self, dest_landmark, src_landmark, sequences):
+        for sequence in sequences:
+            for i in range(sequence[0], sequence[1] + 1):
+                dest_landmark.append(src_landmark[i])
+        return dest_landmark
+
+    def __call__(self, img):
+        landmarks = img[1]
+        img = img[0]
+        h, w, _ = img.shape
+        random.seed()
+        
+        if random.randint(0, 1) == 0:
+            return [img, landmarks]
+
+        dest_img = cv2.flip(img, 1)
+        flip_landmarks = []
+        for i in range(len(landmarks)):
+            curlandmark_x = w - 1 - landmarks[i][0]
+            curlandmark_y = landmarks[i][1]
+            flip_landmarks.append([curlandmark_x, curlandmark_y])
+
+        dest_landmarks = []
+
+        # 重新排列关键点顺序
+        flip_landmarks_list = [[0, 32], [38, 42], [33, 37]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+        dest_landmarks = self.copyLandmark(dest_landmarks, flip_landmarks, [[43, 46]])
+        flip_landmarks_list = [[47, 51], [58, 61], [62, 63], [52, 55], [56, 57], [68, 71], [64, 67]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+        dest_landmarks = self.copyLandmark(dest_landmarks, flip_landmarks, [[75, 77], [72, 74]])
+        flip_landmarks_list = [[78, 79], [80, 81], [82, 83], [84, 90], [91, 95], [96, 100], [101, 103], [104, 105]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+
+        return [dest_img, dest_landmarks]
