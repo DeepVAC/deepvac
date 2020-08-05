@@ -463,20 +463,26 @@ class RandomRotateFacialKpImage(AugBase):
     def auditConfig(self):
         pass
 
-    def __call__(self, img):
+    # img_list: include 2 element
+    # img_list[0] -> img
+    # img_list[1] -> keypoint info (scale to 0-1)
+    def __call__(self, img_list):
+        assert isinstance(img_list, list), 'input must be a list'
+        assert len(img_list) == 2, 'img_list length must be two'
+
+        img = img_list[0]
+        landmarks = img_list[1]
         angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
-        landmarks = img[1]
-        img = img[0]
         h, w, _ = img.shape
         M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
         dest_img = cv2.warpAffine(img, M, (w, h))
         dest_landmarks = []
         for i in range(len(landmarks)):
-            curlandmark_x = landmarks[i][0]
-            curlandmark_y = landmarks[i][1]
+            curlandmark_x = landmarks[i][0] * w
+            curlandmark_y = landmarks[i][1] * h
             dst_x = curlandmark_x * M[0][0] + curlandmark_y * M[0][1] + M[0][2]
             dst_y = curlandmark_x * M[1][0] + curlandmark_y * M[1][1] + M[1][2]
-            dest_landmarks.append([dst_x, dst_y])
+            dest_landmarks.append([dst_x / w, dst_y / h])
         return [dest_img, dest_landmarks]
 
 # 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
@@ -499,9 +505,15 @@ class RandomFilpFacialKpImage(AugBase):
                 dest_landmark.append(src_landmark[i])
         return dest_landmark
 
-    def __call__(self, img):
-        landmarks = img[1]
-        img = img[0]
+    # img_list: include 2 element
+    # img_list[0] -> img
+    # img_list[1] -> keypoint info(scale to 0-1)
+    def __call__(self, img_list):
+        assert isinstance(img_list, list), 'input must be a list'
+        assert len(img_list) == 2, 'img_list length must be two'
+
+        img = img_list[0]
+        landmarks = img_list[1]
         h, w, _ = img.shape
         random.seed()
         
