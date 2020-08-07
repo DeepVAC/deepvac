@@ -455,6 +455,28 @@ class RandomColorJitterAug(AugBase):
 
         return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
 
+
+class MosaicAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(MosaicAug, self).__init__(deepvac_config)
+        self.neighbor = 2
+
+    def auditConfig(self):
+        pass
+    
+    def __call__(self, img):
+        neighbor = self.neighbor
+        h, w = img.shape[0], img.shape[1]
+        for i in range(0, h - neighbor -1, neighbor):
+            for j in range(0, w - neighbor - 1, neighbor):
+                rect = [j, i, neighbor, neighbor]
+                color = img[i][j].tolist()
+                left_up = (rect[0], rect[1])
+                right_down = (rect[0] + neighbor - 1, rect[1] + neighbor - 1)
+                cv2.rectangle(img, left_up, right_down, color, -1)
+        return img
+
+
 # 随机旋转（针对于人脸关键点任务）
 class RandomRotateFacialKpImage(AugBase):
     def __init__(self, deepvac_config):
@@ -540,3 +562,4 @@ class RandomFilpFacialKpImage(AugBase):
         dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
 
         return [dest_img, dest_landmarks]
+    
