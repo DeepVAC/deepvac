@@ -21,9 +21,12 @@ class Deepvac(object):
         self.initNet()
 
     def assertInGit(self):
-        if os.environ.get("disable_git") or self.getConf().disable_git:
-            self.branch = "sevice"
-            return
+        try:
+            if os.environ.get("disable_git") or self.getConf().disable_git:
+                self.branch = "sevice"
+                return
+        except KeyError:
+            pass
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
