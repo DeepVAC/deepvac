@@ -478,9 +478,9 @@ class MosaicAug(AugBase):
 
 
 # 随机旋转（针对于人脸关键点任务）
-class RandomRotateFacialKpImage(AugBase):
+class RandomRotateFacialKpListAug(AugBase):
     def __init__(self, deepvac_config):
-        super(RandomRotateFacialKpImage, self).__init__(deepvac_config)
+        super(RandomRotateFacialKpListAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
         pass
@@ -508,9 +508,9 @@ class RandomRotateFacialKpImage(AugBase):
         return [dest_img, dest_landmarks]
 
 # 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
-class RandomFilpFacialKpImage(AugBase):
+class RandomFilpFacialKpListAug(AugBase):
     def __init__(self, deepvac_config):
-        super(RandomFilpFacialKpImage, self).__init__(deepvac_config)
+        super(RandomFilpFacialKpListAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
         pass
