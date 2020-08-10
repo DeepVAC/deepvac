@@ -26,7 +26,7 @@ class Deepvac(object):
                 self.branch = "sevice"
                 return
         except KeyError:
-            return False
+            pass
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
@@ -182,8 +182,7 @@ class DeepvacTrain(Deepvac):
     def initNet(self):
         super(DeepvacTrain,self).initNet()
         self.initCriterion()
-        #self.initOptimizer()
-        self.initAdamOptimizer()
+        self.initOptimizer()
         self.initCheckpoint()
         self.initScheduler()
         self.initTrainLoader()
