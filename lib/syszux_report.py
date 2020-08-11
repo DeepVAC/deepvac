@@ -160,8 +160,9 @@ class OcrReport(Report):
 
 # used in classifier
 class ClassifierReport(Report):
-    def __init__(self, ds_name="Unknown", total_num=0, cls_num=0):
+    def __init__(self, ds_name="Unknown", total_num=0, cls_num=0, threshold=0):
         self.cls_num = cls_num
+        self.threshold = threshold
         Report.__init__(self, ds_name, total_num)
 
     def add(self, gt, pred):
@@ -187,6 +188,23 @@ class ClassifierReport(Report):
         for k, v in self.report_dict.items():
             body = f"| {k} " + ("| {:<.3f} "*self.cls_num).format(*v)
             print(body)
+
+        indices, correlation = self.calcCorrelation()
+        label, pred = indices
+        idx = np.argsort(correlation)[::-1]
+        correlation.sort()
+        correlation = correlation[::-1]
+        label, pred = label[idx], pred[idx]
+
+        res = {}
+        for i in range(label.size):
+            if label[i] not in res:
+                res[label[i]] = [] 
+            res[label[i]].append((label[i], pred[i], round(correlation[i], 3)))
+
+        print("- CORRELATION REPORT    ")
+        for k, v in res.items():
+            print(f"({k}: {v}    ")
 
     def initReportFormat(self):
         self.fmt_head = (f"| {self.ds_name} " + "| cls{} " * self.cls_num).format(*range(self.cls_num))
@@ -229,6 +247,16 @@ class ClassifierReport(Report):
         self.report_dict['f1-score'] = [(2*self.confusion_matrix[i, i]) / (self.confusion_matrix[i].sum()+self.confusion_matrix[:, i].sum()) for i in range(self.cls_num)]
         self.accuracy = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
 
+    def calcCorrelation(self):
+        cls_total_num = self.confusion_matrix.sum(axis=1).reshape((-1, 1))
+        i = list(range(self.cls_num))
+        self.confusion_matrix[i, i] = 0
+        self.confusion_matrix /= cls_total_num
+        self.confusion_matrix[self.confusion_matrix < self.threshold] = 0
+        indices = np.nonzero(self.confusion_matrix)
+        correlation = self.confusion_matrix[indices]
+        return indices, correlation
+
 
 if __name__ == "__main__":
     print("==========test FaceReport============")
@@ -245,6 +273,10 @@ if __name__ == "__main__":
     report()
 
     print("==========test ClassifierReport============")
-    report = ClassifierReport('gemfield',5, 3)
-    report.add(1, 2).add(1, 1).add(0, 0).add(0, 2).add(2, 2)
+    report = ClassifierReport('gemfield',5, 5)
+    report.add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 3).\
+            add(1, 0).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 2).\
+            add(2, 1).add(2, 2).add(2, 2).add(2, 2).add(2, 2).add(2, 2).add(2, 4).add(2, 4).\
+            add(3, 0).add(3, 3).add(3, 3).add(3, 3).add(3, 3).add(3, 3).add(3, 3).\
+            add(4, 4).add(4, 4).add(4, 4).add(4, 4).add(4, 4).add(4, 4)
     report()
