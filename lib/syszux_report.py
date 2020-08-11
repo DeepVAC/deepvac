@@ -107,15 +107,21 @@ class OcrReport(Report):
 
     def add(self, gt, predict):
         #per whole sequence
-        super(OcrReport, self).add(gt, predict)
-        #per character
-        gt_len = len(gt)
-        self.char_report_dict['total_per_char']  += gt_len
+        if not isinstance(gt, list):
+            gt = [gt]
+        if not isinstance(predict, list):
+            predict = [predict]
+        assert len(gt) == len(predict), 'len(gt)={} not equal to len(predict)={}'.format(len(gt),len(predict))
+        for i in range(len(gt)):
+            super(OcrReport, self).add(gt[i], predict[i])
+            #per character
+            gt_len = len(gt[i])
+            self.char_report_dict['total_per_char']  += gt_len
 
-        edit_distance = self.levenshteinDistance(gt, predict)
-        correct_len =  gt_len - edit_distance
-        if correct_len > 0:
-            self.char_report_dict['correct_per_char'] += correct_len
+            edit_distance = self.levenshteinDistance(gt[i], predict[i])
+            correct_len =  gt_len - edit_distance
+            if correct_len > 0:
+                self.char_report_dict['correct_per_char'] += correct_len
 
     def initReportFormat(self):
         super(OcrReport, self).initReportFormat()
