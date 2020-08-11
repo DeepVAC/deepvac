@@ -107,6 +107,10 @@ class OcrReport(Report):
 
     def add(self, gt, predict):
         #per whole sequence
+        if not isinstance(gt, list):
+            gt = [gt]
+        if not isinstance(predict, list):
+            predict = [predict]
         assert len(gt) == len(predict), 'len(gt)={} not equal to len(predict)={}'.format(len(gt),len(predict))
         for i in range(len(gt)):
             super(OcrReport, self).add(gt[i], predict[i])
