@@ -119,7 +119,7 @@ class OcrAugExecutor(Executor):
         self.loader = LoaderFactory().get('OsWalkerLoader')(deepvac_config)
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
-        self.addAugChain('ac', ac, 0.9)
+        self.addAugChain('ac', ac, self.conf.aug_rate)
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
