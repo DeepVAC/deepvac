@@ -113,15 +113,13 @@ class FaceAugExecutor(Executor):
         self.addAugChain('ac1', ac1, 1)
         self.addAugChain('ac2', ac2, 0.5)
         
-class AugExecutor(Executor):
+class OcrAugExecutor(Executor):
     def __init__(self, deepvac_config):
-        super(AugExecutor, self).__init__(deepvac_config)
+        super(OcrAugExecutor, self).__init__(deepvac_config)
         self.loader = LoaderFactory().get('OsWalkerLoader')(deepvac_config)
-        self.aug_list = ['SpeckleAug','AffineAug','PerspectAug','GaussianAug','HorlineAug','VerlineAug','LRmotionAug','UDmotionAug','NoisyAug']
-        aug_factory = AugFactory()
-        for a in self.aug_list:
-            self.addAugChain(a, AugChain(a,deepvac_config))
-            # self.addOp(a, aug_factory.get(a))
+        
+        ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
+        self.addAugChain('ac', ac, self.conf.aug_rate)
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
@@ -144,7 +142,6 @@ class AugExecutor(Executor):
             img = cv2.imread(f)
             for k in self._graph:
                 out = self._graph[k](img)
-                # print(k,f, type(out))
                 self.dumpImgToPath(k, f, out)
 
 if __name__ == "__main__":
