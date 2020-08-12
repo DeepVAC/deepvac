@@ -21,12 +21,14 @@ class Deepvac(object):
         self.initNet()
 
     def assertInGit(self):
-        try:
-            if os.environ.get("disable_git") or self.getConf().disable_git:
-                self.branch = "sevice"
-                return
-        except KeyError:
-            pass
+        if os.environ.get("disable_git"):
+            self.branch = "sevice"
+            return
+
+        if self.conf.disable_git:
+            self.branch = "disable_git"
+            return
+
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
@@ -98,6 +100,7 @@ class Deepvac(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        self.exportTorchViaScript()
 
     def initDevice(self):
         #to determine CUDA device
@@ -145,10 +148,30 @@ class Deepvac(object):
     def report(self):
         pass
 
+    def process(self):
+        pass
+
     def __call__(self,input):
         self.setInput(input)
         self.process()
+        #post process
+        if self.conf.script_model_dir:
+            sys.exit(0)
         return self.getOutput()
+
+    def exportTorchViaTrace(self, img):
+        if not self.conf.trace_model_dir:
+            return
+        ts = torch.jit.trace(self.net, img)
+        ts.save(self.conf.trace_model_dir)
+        sys.exit(0)
+
+    def exportTorchViaScript(self):
+        if not self.conf.script_model_dir:
+            return
+        ts = torch.jit.script(self.net)
+        ts.save(self.conf.script_model_dir)
+
 
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
@@ -342,6 +365,7 @@ class DeepvacTrain(Deepvac):
 
     def exportONNX(self):
         pass
+
 
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):

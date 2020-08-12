@@ -1,6 +1,6 @@
 class AttrDict(dict):
     def __getattr__(self, key):
-        return self[key]
+        return self.get(key)
 
     def __setattr__(self, key, value):
         if key in self.__dict__:
