@@ -2,11 +2,13 @@ import os
 import sys
 from datetime import datetime
 import argparse
+import onnx
 import torch
 import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
+from onnxsim import simplify
 from syszux_log import LOG,getCurrentGitBranch
 
 #deepvac implemented based on PyTorch Framework
@@ -21,12 +23,14 @@ class Deepvac(object):
         self.initNet()
 
     def assertInGit(self):
-        try:
-            if os.environ.get("disable_git") or self.getConf().disable_git:
-                self.branch = "sevice"
-                return
-        except KeyError:
-            pass
+        if os.environ.get("disable_git"):
+            self.branch = "sevice"
+            return
+
+        if self.conf.disable_git:
+            self.branch = "disable_git"
+            return
+
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
@@ -98,6 +102,7 @@ class Deepvac(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        self.exportTorchViaScript()
 
     def initDevice(self):
         #to determine CUDA device
@@ -144,11 +149,52 @@ class Deepvac(object):
 
     def report(self):
         pass
+        
+    def process(self):
+        pass
 
     def __call__(self,input):
         self.setInput(input)
         self.process()
+        #post process
+        if self.conf.script_model_dir:
+            sys.exit(0)
         return self.getOutput()
+
+    def exportTorchViaTrace(self, img):
+        if not self.conf.trace_model_dir:
+            return
+        ts = torch.jit.trace(self.net, img)
+        ts.save(self.conf.trace_model_dir)
+        sys.exit(0)
+
+    def exportTorchViaScript(self):
+        if not self.conf.script_model_dir:
+            return
+        ts = torch.jit.script(self.net)
+        ts.save(self.conf.script_model_dir)
+    
+    def exportNCNN(self):
+        conf = self.getConf()
+        self.exportONNX()
+        model_op, check_ok = simplify(conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
+        onnx.save(model_op, conf.onnx_output_model_path)
+        if not check_ok:
+            LOG.logI("Maybe something wrong when simplify the onnx model")
+        cmd = conf.onnx2ncnn + " " + conf.onnx_output_model_path + " " + conf.ncnn_param_output_path + " " + conf.ncnn_bin_output_path
+        os.system(cmd)
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(conf.ncnn_param_output_path, conf.ncnn_bin_output_path))
+
+    def exportCoreML(self):
+        pass
+
+    def exportONNX(self):
+        conf = self.getConf()
+        self.net.eval()
+        input = torch.rand(1, conf.input_shape['channel'], conf.input_shape['height'], conf.input_shape['width']).to(conf.device)
+        torch.onnx._export(self.net, input, conf.onnx_output_model_path, export_params=True)
+        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(conf.onnx_output_model_path))
+
 
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
@@ -333,15 +379,7 @@ class DeepvacTrain(Deepvac):
     def __call__(self,input):
         self.auditConfig()
         self.process()
-
-    def exportNCNN(self):
-        pass
-
-    def exportCoreML(self):
-        pass
-
-    def exportONNX(self):
-        pass
+        
 
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):
