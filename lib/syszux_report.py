@@ -1,5 +1,7 @@
 import time
+import warnings
 import numpy as np
+import scipy.sparse as ss
 
 from collections import OrderedDict
 
@@ -107,15 +109,21 @@ class OcrReport(Report):
 
     def add(self, gt, predict):
         #per whole sequence
-        super(OcrReport, self).add(gt, predict)
-        #per character
-        gt_len = len(gt)
-        self.char_report_dict['total_per_char']  += gt_len
+        if not isinstance(gt, list):
+            gt = [gt]
+        if not isinstance(predict, list):
+            predict = [predict]
+        assert len(gt) == len(predict), 'len(gt)={} not equal to len(predict)={}'.format(len(gt),len(predict))
+        for i in range(len(gt)):
+            super(OcrReport, self).add(gt[i], predict[i])
+            #per character
+            gt_len = len(gt[i])
+            self.char_report_dict['total_per_char']  += gt_len
 
-        edit_distance = self.levenshteinDistance(gt, predict)
-        correct_len =  gt_len - edit_distance
-        if correct_len > 0:
-            self.char_report_dict['correct_per_char'] += correct_len
+            edit_distance = self.levenshteinDistance(gt[i], predict[i])
+            correct_len =  gt_len - edit_distance
+            if correct_len > 0:
+                self.char_report_dict['correct_per_char'] += correct_len
 
     def initReportFormat(self):
         super(OcrReport, self).initReportFormat()
@@ -160,8 +168,13 @@ class OcrReport(Report):
 
 # used in classifier
 class ClassifierReport(Report):
-    def __init__(self, ds_name="Unknown", total_num=0, cls_num=0):
+    def __init__(self, ds_name="Unknown", total_num=0, cls_num=0, threshold=0):
         self.cls_num = cls_num
+        self.enable = True
+        if cls_num > 1000:
+            warnings.warn("cls too much, disable confusion matrix and report module", UserWarning) 
+            self.enable = False
+        self.threshold = threshold
         Report.__init__(self, ds_name, total_num)
 
     def add(self, gt, pred):
@@ -169,24 +182,43 @@ class ClassifierReport(Report):
         return self
         
     def __call__(self):
-        self.calcReportDict()
-        print(f"- dataset: {self.ds_name}")
-        print(f"- duration: {time.time()-self.start_time :<.3f}")
-        print(f"- accuracy: {self.accuracy:<.3f}")
+        print(f"- DATASET: {self.ds_name}")
+        if self.enable:
+            self.calcReportDict()
+            print(f"- ACCURACY: {self.accuracy:<.3f}")
 
-        print("- CONFUSION-MATRIX")
-        print(self.fmt_head)
-        print(self.fmt_div)
-        for i in range(self.cls_num):
-            body = f"| cls{i} " + ("| {:<.0f} "*self.cls_num).format(*(self.confusion_matrix[i]))
-            print(body)
+            print("- CONFUSION-MATRIX")
+            print(self.fmt_head)
+            print(self.fmt_div)
+            for i in range(self.cls_num):
+                body = f"| cls{i} " + ("| {:<.0f} "*self.cls_num).format(*(self.confusion_matrix[i].toarray().flatten()))
+                print(body)
 
-        print("- TEST NSFW REPORT")
-        print(self.fmt_head)
-        print(self.fmt_div)
-        for k, v in self.report_dict.items():
-            body = f"| {k} " + ("| {:<.3f} "*self.cls_num).format(*v)
-            print(body)
+            print("- TEST NSFW REPORT")
+            print(self.fmt_head)
+            print(self.fmt_div)
+            for k, v in self.report_dict.items():
+                body = f"| {k} " + ("| {:<.3f} "*self.cls_num).format(*v)
+                print(body)
+
+        indices, correlation = self.calcCorrelation()
+        label, pred = indices
+        idx = np.argsort(correlation)[::-1]
+        correlation.sort()
+        correlation = correlation[::-1]
+        label, pred = label[idx], pred[idx]
+
+        res = {}
+        for i in range(label.size):
+            if label[i] not in res:
+                res[label[i]] = [] 
+            res[label[i]].append((label[i], pred[i], round(correlation[i], 3)))
+
+        print("- CORRELATION REPORT    ")
+        for k, v in res.items():
+            print(f"({k}: {v}    ")
+
+        print(f"- DULATION: {time.time()-self.start_time :<.3f}s")
 
     def initReportFormat(self):
         self.fmt_head = (f"| {self.ds_name} " + "| cls{} " * self.cls_num).format(*range(self.cls_num))
@@ -198,7 +230,9 @@ class ClassifierReport(Report):
     def reset(self):
         self.start_time = time.time()
         self.initReportDict()
-        self.confusion_matrix = np.zeros((self.cls_num, self.cls_num))
+        # self.confusion_matrix = np.zeros((self.cls_num, self.cls_num))
+        # to save memory, init matrix use lil_matrix
+        self.confusion_matrix = ss.lil_matrix((self.cls_num, self.cls_num))
 
     def initNumeratorKeys(self):
         pass
@@ -224,10 +258,23 @@ class ClassifierReport(Report):
         recall = TP / (TP+FN)
         f1-score = 2TP/(2TP+FP+FN)
         '''
-        self.report_dict['recall'] = [self.confusion_matrix[i, i] / self.confusion_matrix[i].sum() for i in range(self.cls_num)]
-        self.report_dict['precision'] = [self.confusion_matrix[i, i] / self.confusion_matrix[:, i].sum() for i in range(self.cls_num)]
-        self.report_dict['f1-score'] = [(2*self.confusion_matrix[i, i]) / (self.confusion_matrix[i].sum()+self.confusion_matrix[:, i].sum()) for i in range(self.cls_num)]
-        self.accuracy = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
+        confusion_matrix = self.confusion_matrix.tocsc()
+        self.report_dict['recall'] = [confusion_matrix[i, i] / confusion_matrix[i].sum() for i in range(self.cls_num)]
+        self.report_dict['precision'] = [confusion_matrix[i, i] / confusion_matrix[:, i].sum() for i in range(self.cls_num)]
+        self.report_dict['f1-score'] = [(2*confusion_matrix[i, i]) / (confusion_matrix[i].sum()+confusion_matrix[:, i].sum()) for i in range(self.cls_num)]
+        self.accuracy = confusion_matrix.diagonal().sum() / confusion_matrix.sum()
+
+    def calcCorrelation(self):
+        cls_total_num = (1/self.confusion_matrix.sum(axis=1)).reshape((-1, 1))
+        i = list(range(self.cls_num))
+        self.confusion_matrix[i, i] = 0
+        # self.confusion_matrix /= cls_total_num
+        self.confusion_matrix = self.confusion_matrix.multiply(cls_total_num)
+        # self.confusion_matrix[self.confusion_matrix < self.threshold] = 0
+        # indices = np.nonzero(self.confusion_matrix)
+        indices = np.nonzero(self.confusion_matrix > self.threshold)
+        correlation = self.confusion_matrix.tolil()[indices]
+        return indices, correlation.toarray().flatten()
 
 
 if __name__ == "__main__":
@@ -245,6 +292,10 @@ if __name__ == "__main__":
     report()
 
     print("==========test ClassifierReport============")
-    report = ClassifierReport('gemfield',5, 3)
-    report.add(1, 2).add(1, 1).add(0, 0).add(0, 2).add(2, 2)
+    report = ClassifierReport('gemfield',5, 50000)
+    report.add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 0).add(0, 3).\
+            add(1, 0).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 1).add(1, 2).\
+            add(2, 1).add(2, 2).add(2, 2).add(2, 2).add(2, 2).add(2, 2).add(2, 3).add(2, 4).\
+            add(3, 0).add(3, 3).add(3, 3).add(3, 3).add(3, 3).add(3, 3).add(3, 3).\
+            add(4, 4).add(4, 4).add(4, 4).add(4, 4).add(4, 4).add(4, 4)
     report()

@@ -1,6 +1,6 @@
 class AttrDict(dict):
     def __getattr__(self, key):
-        return self[key]
+        return self.get(key)
 
     def __setattr__(self, key, value):
         if key in self.__dict__:
@@ -40,4 +40,15 @@ config.save_num = 5
 ## ------------------ val/test ------------------
 config.val_batch_size = None
 
+## ------------------ export ------------------
+config.input_shape = {
+    "channel": 3,
+    "height": 112,
+    "width": 112
+}
+#onnx2ncnn executable program path
+config.onnx2ncnn = ""
 
+config.onnx_output_model_path = ""
+config.ncnn_param_output_path = ""
+config.ncnn_bin_output_path = ""

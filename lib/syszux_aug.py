@@ -309,7 +309,7 @@ class MotionAug(AugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.degree = 20
+        self.degree = 18
         self.angle = 45
 
     def __call__(self, img):
