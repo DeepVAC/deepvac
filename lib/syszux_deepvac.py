@@ -192,7 +192,7 @@ class Deepvac(object):
         cmd = conf.onnx2ncnn + " " + conf.onnx_output_model_path + " " + conf.ncnn_param_output_path + " " + conf.ncnn_bin_output_path
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
-            LOG.logI(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
+            LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
             model_op, check_ok = simplify(conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
             onnx.save(model_op, conf.onnx_output_model_path)
             if not check_ok:
