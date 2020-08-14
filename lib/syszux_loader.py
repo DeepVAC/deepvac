@@ -5,6 +5,7 @@ from torchvision.datasets import ImageFolder
 import numpy as np
 from PIL import Image, ImageFile
 from syszux_log import LOG
+import cv2
 
 #Dataset -> VisionDataset -> DatasetFolder -> ImageFolder -> *Dataset
 
@@ -28,7 +29,6 @@ class ImageFolderWithPathsDataset(ImageFolderWithTransformDataset):
         #print("gemfieldimg: ", tuple_with_path[0],'\t',tuple_with_path[1],'\t',tuple_with_path[2])
         return tuple_with_path
 
-
 class FileLineDataset(Dataset):
     def __init__(self, deepvac_config):
         self.path_prefix = deepvac_config.dataset.fileline_data_path_prefix
@@ -39,8 +39,7 @@ class FileLineDataset(Dataset):
 
         with open(self.fileline_path) as f:
             for line in f:
-                line = line.strip().split(" ")
-                label = [line[0], int(line[1])]
+                label = self._buildLabelFromLine(line)
                 self.samples.append(label)
                 mark.append(label[1])
 
@@ -48,18 +47,36 @@ class FileLineDataset(Dataset):
         self.class_num = len(np.unique(mark))
         LOG.logI('FileLineDataset size: {} / {}'.format(self.len, self.class_num))
 
+    def _buildLabelFromLine(self, line):
+        line = line.strip().split(" ")
+        return [line[0], int(line[1])]
+
     def __getitem__(self, index):
         path, target = self.samples[index]
         abs_path = os.path.join(self.path_prefix, path)
+        return self._buildSampleFromPath(abs_path), target
+
+    def _buildSampleFromPath(self, abs_path):
         #we just set default loader with Pillow Image
         sample = Image.open(abs_path).convert('RGB')
         if self.transform is not None:
             sample = self.transform(sample)
-
-        return sample, target
+        return sample
 
     def __len__(self):
         return self.len
+
+class FileLineCvStrDataset(FileLineDataset):
+    def _buildLabelFromLine(self, line):
+        line = line.strip().split(" ")
+        return [line[0], line[1]]
+
+    def _buildSampleFromPath(self, abs_path):
+        #we just set default loader with Pillow Image
+        sample = cv2.imread(abs_path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        return sample
 
 class OsWalkerLoader(object):
     def __init__(self, deepvac_config):
