@@ -171,6 +171,49 @@ class Deepvac(object):
             return
         ts = torch.jit.script(self.net)
         ts.save(self.conf.script_model_dir)
+    
+    def exportNCNN(self, img):
+        conf = self.getConf()
+        if not conf.ncnn_param_output_path or not conf.ncnn_bin_output_path:
+            return
+        if not conf.onnx2ncnn:
+            LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
+
+        import onnx
+        import subprocess
+        import tempfile
+        from onnxsim import simplify
+        
+        if not conf.onnx_output_model_path:
+            f = tempfile.NamedTemporaryFile()
+            self.conf.onnx_output_model_path = f.name
+        self.exportONNX(img)
+        
+        cmd = conf.onnx2ncnn + " " + conf.onnx_output_model_path + " " + conf.ncnn_param_output_path + " " + conf.ncnn_bin_output_path
+        pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if pd.stderr.read() != b"":
+            LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
+            model_op, check_ok = simplify(conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
+            onnx.save(model_op, conf.onnx_output_model_path)
+            if not check_ok:
+                LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right")
+            else:
+                LOG.logI("Simplify model succeed")
+            subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if pd.stderr.read() != b"":
+                LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
+        
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(conf.ncnn_param_output_path, conf.ncnn_bin_output_path))
+
+    def exportCoreML(self):
+        pass
+
+    def exportONNX(self, img):
+        conf = self.getConf()
+        if not conf.onnx_output_model_path:
+            return
+        torch.onnx._export(self.net, img, conf.onnx_output_model_path, export_params=True)
+        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(conf.onnx_output_model_path))
 
 
 class DeepvacTrain(Deepvac):
@@ -361,15 +404,6 @@ class DeepvacTrain(Deepvac):
     def __call__(self,input):
         self.auditConfig()
         self.process()
-
-    def exportNCNN(self):
-        pass
-
-    def exportCoreML(self):
-        pass
-
-    def exportONNX(self):
-        pass
 
 
 class DeepvacDDP(DeepvacTrain):
