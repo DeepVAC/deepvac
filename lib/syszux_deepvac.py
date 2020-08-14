@@ -190,7 +190,7 @@ class DeepvacTrain(Deepvac):
         self.phase = 'TRAIN'
         self.dataset = self.train_dataset
         self.loader = self.train_loader
-        self.batch_size = self.conf.train_batch_size
+        self.batch_size = self.conf.train.batch_size
         self.net.train()
 
     def setValContext(self):
@@ -199,7 +199,7 @@ class DeepvacTrain(Deepvac):
         self.phase = 'VAL'
         self.dataset = self.val_dataset
         self.loader = self.val_loader
-        self.batch_size = self.conf.val_batch_size
+        self.batch_size = self.conf.val.batch_size
         self.net.eval()
 
     def initNet(self):
