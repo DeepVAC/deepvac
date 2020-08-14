@@ -9,6 +9,9 @@ class AttrDict(dict):
             self[key] = value
 
 config = AttrDict()
+config.train = AttrDict()
+config.val = AttrDict()
+config.test = AttrDict()
 
 ## ------------------ common ------------------
 config.device = "cuda"
@@ -32,12 +35,12 @@ config.weight_decay = None
 config.num_workers = 3
 
 ## ------------------- train ------------------
-config.train_batch_size = 128
+config.train.batch_size = 128
 config.epoch_num = 30
 #model save number duriong an epoch
 config.save_num = 5
 
-## ------------------ val/test ------------------
-config.val_batch_size = None
+## ------------------ val ------------------
+config.val.batch_size = None
 
 
