@@ -184,25 +184,26 @@ class Deepvac(object):
         import tempfile
         from onnxsim import simplify
         
-        f = tempfile.NamedTemporaryFile()
-        self.conf.onnx_output_model_path = f.name
+        if not conf.onnx_output_model_path:
+            f = tempfile.NamedTemporaryFile()
+            self.conf.onnx_output_model_path = f.name
         self.exportONNX(img)
         
         cmd = conf.onnx2ncnn + " " + conf.onnx_output_model_path + " " + conf.ncnn_param_output_path + " " + conf.ncnn_bin_output_path
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
+            LOG.logI(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
             model_op, check_ok = simplify(conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
             onnx.save(model_op, conf.onnx_output_model_path)
             if not check_ok:
-                LOG.logE("Maybe something wrong when simplify the onnx model, we can't guarantee generate model is right")
+                LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right")
+            else:
+                LOG.logI("Simplify model succeed")
             subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if pd.stderr.read() != b"":
                 LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
         
         LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(conf.ncnn_param_output_path, conf.ncnn_bin_output_path))
-
-        del self.conf["onnx_output_model_path"]
-        f.close()
 
     def exportCoreML(self):
         pass
