@@ -11,8 +11,8 @@ import cv2
 
 class ImageFolderWithTransformDataset(ImageFolder):
     def __init__(self, deepvac_config):
-        self.transform_op = deepvac_config.loader.transform_op
-        self.img_folder = deepvac_config.loader.img_folder
+        self.transform_op = deepvac_config.transform_op
+        self.img_folder = deepvac_config.img_folder
         super(ImageFolderWithTransformDataset,self).__init__(self.img_folder, self.transform_op)
 
 class ImageFolderWithPathsDataset(ImageFolderWithTransformDataset):
@@ -31,9 +31,9 @@ class ImageFolderWithPathsDataset(ImageFolderWithTransformDataset):
 
 class FileLineDataset(Dataset):
     def __init__(self, deepvac_config):
-        self.path_prefix = deepvac_config.dataset.fileline_data_path_prefix
-        self.fileline_path = deepvac_config.dataset.fileline_path
-        self.transform = deepvac_config.dataset.transform
+        self.path_prefix = deepvac_config.fileline_data_path_prefix
+        self.fileline_path = deepvac_config.fileline_path
+        self.transform = deepvac_config.transform
         self.samples = []
         mark = []
 
