@@ -246,13 +246,13 @@ class DeepvacTrain(Deepvac):
 
     def initNet(self):
         super(DeepvacTrain,self).initNet()
+        self.initOutputDir()
         self.initCriterion()
         self.initOptimizer()
-        self.initCheckpoint()
         self.initScheduler()
+        self.initCheckpoint()
         self.initTrainLoader()
         self.initValLoader()
-        self.initOutputDir()
 
     def initOutputDir(self):
         if self.conf.output_dir != 'output':
@@ -266,8 +266,13 @@ class DeepvacTrain(Deepvac):
     def initCriterion(self):
         raise Exception("Not implemented.")
 
-    def initCheckpoint(self):
-        raise Exception("Not implemented.")
+    def initCheckpoint(self, map_location=None):
+        if not self.conf.checkpoint_suffix or self.conf.checkpoint_suffix == "":
+            LOG.logI('Omit the checkpoint file since not specified...')
+            return
+        LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
+        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(conf.checkpoint_suffix), map_location=map_location))
+        self.optimizer.load_state_dict(torch.load(self.output_dir+'/optimizer:{}'.format(conf.checkpoint_suffix), map_location=map_location))
 
     def initScheduler(self):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
@@ -428,9 +433,8 @@ class DeepvacDDP(DeepvacTrain):
             return
         super(DeepvacDDP, self).saveState(self.getTime())
 
-    def loadState(self, suffix):
-        self.optimizer.load_state_dict(torch.load(self.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
-        self.net.load_state_dict(torch.load(self.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+    def initCheckpoint(self):
+        super(DeepvacDDP, self).initCheckpoint(self.map_location)
 
     def separateBN4OptimizerPG(self, modules):
         paras_only_bn = []

@@ -12,8 +12,8 @@ config = AttrDict()
 
 ## ------------------ common ------------------
 config.device = "cuda"
-config.output_dir = "./output"
-config.log_dir = "./log"
+config.output_dir = "output"
+config.log_dir = "log"
 config.log_every = 10
 
 ## ------------------ ddp --------------------
