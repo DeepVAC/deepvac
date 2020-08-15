@@ -61,11 +61,7 @@ deepvac采用的是git branch的解决方案。deepvac规定：
 - 内部开发定义的配置均在类的auditConfig方法中；
 - 所有临时调试的配置均在类的构造函数中，或者由argparse.ArgumentParser模块来传递；
 - DeepvacTrainDDP类的--rank和--gpu参数为进程级别，由argparse.ArgumentParser模块来传递；
-- 类的构造函数输入为config，如：
-```python
-from config import config as deepvac_config
-scene = DeepvacScene(deepvac_config.scene)
-```
+- 类的构造函数输入为config；
 
 ## 代码规范
 请访问: [代码规范](./code_standard.md)。
@@ -79,9 +75,9 @@ lib库对使用层面提供以下模块：
 |AugFactory          | lib/syszux_aug_factory.py       | 用于数据增强|
 |DatasetFactory       | lib/syszux_loader_factory.py   | Dataset的扩展实现，torch.utils.data.Dataset的子类们|
 |LoaderFactory       | lib/syszux_loader_factory.py   | 用于数据装载|
-|Deepvac{,Train,TrainDDP}|lib/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
+|Deepvac{,Train,DDP}|lib/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
 |{,Face,Ocr}Report   | lib/syszux_report.py       | Report类体系，用于打印测试报告|
-|{,Aug}Executor      | lib/syszux_executor.py       |Executor类体系，用于代码逻辑流的抽象封装|
+|{,*Aug}Executor      | lib/syszux_executor.py       |Executor类体系，用于数据增强逻辑的抽象封装|
 |LOG                 | lib/syszux_log.py            |日志模块|
 |AttrDict            | lib/syszux_config.py          |配置模块 |
 
@@ -157,12 +153,47 @@ print(self.conf.train.batch_size)
 
 ## 6. 编写aug/aug.py
 编写该文件，用于实现数据增强策略；
-继承syszux_executor模块中的Executor类体系
+继承syszux_executor模块中的Executor类体系，比如：
+```python
+class MyAugExecutor(Executor):
+    def __init__(self, deepvac_config):
+        super(MyAugExecutor, self).__init__(deepvac_config)
+
+        ac1 = AugChain('RandomColorJitterAug@0.5 => MosaicAug@0.5',deepvac_config)
+        ac2 = AugChain('MotionAug || GaussianAug',deepvac_config)
+
+        self.addAugChain('ac1', ac1, 1)
+        self.addAugChain('ac2', ac2, 0.5)
+```
 （待完善）
 
 ## 7. 编写Dataset类
-代码编写在train.py文件中。  
-继承syszux_loader模块中的Dataset类体系。
+代码编写在train.py文件中。  继承syszux_loader模块中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
+```bash
+#train.txt，第一列为图片路径，第二列为label
+img0/1.jpg 0
+img0/2.jpg 0
+...
+img1/0.jpg 1
+...
+img2/0.jpg 2
+...
+```
+有时第二列是字符串，并且想把FileLineDataset中使用Image读取图片对方式替换为cv2，那么可以通过如下的继承方式来重新实现：
+```python
+class FileLineCvStrDataset(FileLineDataset):
+    def _buildLabelFromLine(self, line):
+        line = line.strip().split(" ")
+        return [line[0], line[1]]
+
+    def _buildSampleFromPath(self, abs_path):
+        #we just set default loader with Pillow Image
+        sample = cv2.imread(abs_path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        return sample
+```
+哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
 （待完善）
 
 ## 8. 编写训练和验证脚本
@@ -174,3 +205,14 @@ print(self.conf.train.batch_size)
 代码写在test.py文件中。
 继承syszux_deepvac模块中的Deepvac类
 （待完善）
+
+## 10. 再谈配置文件
+基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。
+- 输出TorchScript；
+- 输出ONNX；
+- 输出NCNN；
+- 输出CoreML；
+- 启用自动混合精度训练；
+- 启用分布式训练；
+- 启用量化；  
+- （待完善）
