@@ -272,8 +272,12 @@ class DeepvacTrain(Deepvac):
             LOG.logI('Omit the checkpoint file since not specified...')
             return
         LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
-        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(conf.checkpoint_suffix), map_location=map_location))
-        self.optimizer.load_state_dict(torch.load(self.output_dir+'/optimizer:{}'.format(conf.checkpoint_suffix), map_location=map_location))
+        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=map_location))
+        state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=map_location)
+        self.optimizer.load_state_dict(state_dict['optimizer'])
+        self.scheduler.load_state_dict(state_dict['scheduler'])
+        self.epoch = state_dict['epoch']
+
 
     def initScheduler(self):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
@@ -341,9 +345,13 @@ class DeepvacTrain(Deepvac):
 
     def saveState(self, time):
         self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        self.checkpoint_file = 'checkpoint:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
         torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
-        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.output_dir, self.checkpoint_file))
+        torch.save({
+            'optimizer': self.optimizer.state_dict(), 
+            'epoch': self.epoch,
+            'schedule': self.scheduler.state_dict()
+        }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
 
     def processTrain(self):
         self.setTrainContext()
@@ -396,7 +404,7 @@ class DeepvacTrain(Deepvac):
 
     def process(self):
         self.iter = 0
-        for epoch in range(self.conf.epoch_num):
+        for epoch in range(self.epoch, self.conf.epoch_num):
             self.epoch = epoch
             LOG.logI('Epoch {} started...'.format(self.epoch))
             self.processTrain()
