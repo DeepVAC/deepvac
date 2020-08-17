@@ -317,7 +317,9 @@ class DeepvacTrain(Deepvac):
         pass
 
     def preIter(self):
-        pass
+        self.sample = self.img = self.img.to(self.device)
+        self.target = self.idx = self.idx.to(self.device)
+        self.optimizer.zero_grad()
 
     def postIter(self):
         pass
