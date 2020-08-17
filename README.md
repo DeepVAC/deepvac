@@ -197,117 +197,46 @@ class FileLineCvStrDataset(FileLineDataset):
 （待完善）
 
 ## 8. 编写训练和验证脚本
-代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）:            
-```python     
-class NSFWValDataset(ImageFolderWithTransformDataset):          
-    def __init__(self, nsfw_config):        
-        super(NSFWValDataset, self).__init__(nsfw_config)      
+代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。            
 
-class DeepvacNSFW(DeepvacTrain):
-    def __init__(self, nsfw_config):
-        super(DeepvacNSFW, self).__init__(nsfw_config)
+| 类/方法 | 描述 | 备注 |
+| ------- | ---- | ---- |
+| * NSFWTrainDataset/NSFWValDataset | 自定义数据集 | 继承自syszux_loader文件基类 |
+| * initTrainLoader/initValLoader | Dataloader产生批训练数据 | torch.utils.data.DataLoader |
 
-    def initNetWithCode(self):
-        self.net = model.to(self.conf.device)
+| 类/方法 | 描述 | 备注 |
+| ---- | ---- | ---- |
+| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
+| * initCriterion | 初始化损失函数 | 需要保持self.loss变量名不变 |
+| * initOptimizer | 初始化优化器函数 | 需要保持self.optimizer变量名不变，基类中已定义部分优化器函数，可以直接调用 |
+| initScheduler | 初始学习率衰减策略 | torch.optim.lr_scheduler |
+| preEpoch | 迭代前操作 | 初始化accuracy列表等操作 |
+| preIter | batch前操作，将数据加到到device | 包含zero_grad操作 |
+| postIter | batch后操作 | 打印指标等操作 |
+| postBatch | 迭代后操作 | lr衰减step等操作 |
+| * doForward | 网络前向推理过程 | 需要保持self.output变量名不变 |
+| * doBackward | 网络反向传播过程 | self.loss.backward() |
+| * doOptimize | 优化器优化过程 | self.optim.step操作 | 
+| processTrain/processVal | 训练验证代码 | 通用流程 |
+| saveState | 模型保持代码 | 模型参数保存 |
 
-    def initModelPath(self):
-        pass
-
-    def initCriterion(self):
-        self.criterion = nn.CrossEntropyLoss()
-
-    def initTrainLoader(self):
-        self.train_dataset = NSFWTrainDataset(self.conf.train)
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.conf.train.batch_size, num_workers=self.conf.num_workers, shuffle=self.conf.train.shuffle)
-
-    def initValLoader(self):
-        self.val_dataset = NSFWValDataset(self.conf.train)
-        self.val_loader = DataLoader(self.val_dataset, batch_size=self.conf.val.batch_size, shuffle=self.conf.val.shuffle)
-
-    def initOptimizer(self):
-        self.initAdamOptimizer()
-
-    def doForward(self):
-        self.output = self.net(self.img)
-
-    def doLoss(self):
-        self.loss = self.criterion(self.output, self.idx)
-
-    def doBackward(self):
-        self.loss.backward()
-```
-代码分为两部分：NSFWTrainDataset（NSFWValDataset）数据集类和DeepvacNSFW训练子类。       
-训练子类关键方法：        
-初始化数据集方法：initTrainLoader()和initValLoader()       
-初始化网络方法：initNetWithCode()      
-初始化优化器方法：initOptimizer()      
-初始化损失函数方法：initCriterion()和doLoss()           
-网络前向推理方法：doForward()      
-网络反向传播方法：doBackward()         
-```python
-def initNet(self):
-        super(DeepvacTrain,self).initNet()
-        self.initOutputDir()
-        self.initCriterion()
-        self.initOptimizer()
-        self.initScheduler()
-        self.initCheckpoint()
-        self.initTrainLoader()
-        self.initValLoader()
-```
-
-（DDP类待完善）
+带*号表示必需方法；   
+一个train.py的小例子 [train.py](./examples/projects/train.py);               
+（DDP类待完善）     
 
 ## 9. 编写测试脚本
 代码写在test.py文件中。继承syszux_deepvac模块中的Deepvac类：          
-```python
-class DeepvacNSFW(Deepvac):
-    def __init__(self, nsfw_config):
-        super(DeepvacNSFW, self).__init__(nsfw_config)
-        self.dataset = NSFWTestDataset(self.conf.test)
-        self.report = ClassifierReport(ds_name=self.conf.test.ds_name, cls_num=self.conf.cls_num)
 
-    def initNetWithCode(self):
-        self.net = model.to(self.conf.device)
+| 方法 | 描述 | 备注 |
+| ---- | ---- | ---- |
+| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
+| * initModelPath | 初始化参数 | 需要保持self.model_path变量名不变 |
+| * initStateDict | 检查参数 | 对分布式训练保持的参数模型具有兼容性 |
+| * loadStateDict | 模型加载参数 | 可同步到device上 |
+| process/report | 测试过程/报告生成 | 通过report.add(gt, pred)加载测试结果，生成报告 |
 
-    def initModelPath(self):
-        self.model_path = self.conf.test.model_path
-
-    def process(self):
-        self.initNet()
-        for filename in self.dataset():
-            # label
-            label = filename.split('/')[-2]
-            # img
-            img = cv2.imread(filename, cv2.IMREAD_COLOR)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = torch.Tensor(img).permute(2, 0, 1).unsqueeze(0).to(self.conf.device)
-            # forward
-            with torch.no_grad():
-                self.output = self.net(img)
-            # report
-            gt = self.conf.test.cls_to_idx.index(label)
-            pred = self.output.argmax(1).item()
-            self.report.add(gt, pred)
-```
-测试子类关键方法：    
-初始化网络方法：initNetWithCode()      
-初始化网络参数方法：initModelPath()           
-基类中读取参数方法：initStateDict()         
-```python
-def initNet(self):
-        self.initLog()
-        #init self.device
-        self.initDevice()
-        #init self.net
-        self.initNetWithCode()
-        self.initModelPath()
-        #init self.model_dict
-        self.initStateDict()
-        #just load model after audit
-        self.loadStateDict()
-        self.exportTorchViaScript()
-```
+带*号表示必需方法；   
+一个test.py的小例子 [test.py](./examples/projects/test.py);      
 
 ## 10. 再谈配置文件
 基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。
