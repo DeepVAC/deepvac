@@ -128,7 +128,7 @@ config.train.batch_size = 128
 config.val.batch_size = 32
 ......
 ```
-一个完整的config.py例子可以参考 [config.py例子](./examples/config/)
+一个完整的config.py例子可以参考 [config.py例子](./examples/projects/config.py)
 
 
 然后用下面的方式来使用 config.py文件: 
@@ -197,14 +197,117 @@ class FileLineCvStrDataset(FileLineDataset):
 （待完善）
 
 ## 8. 编写训练和验证脚本
-代码写在train.py文件中。
-继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）
-（待完善）
+代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）:            
+```python     
+class NSFWValDataset(ImageFolderWithTransformDataset):          
+    def __init__(self, nsfw_config):        
+        super(NSFWValDataset, self).__init__(nsfw_config)      
+
+class DeepvacNSFW(DeepvacTrain):
+    def __init__(self, nsfw_config):
+        super(DeepvacNSFW, self).__init__(nsfw_config)
+
+    def initNetWithCode(self):
+        self.net = model.to(self.conf.device)
+
+    def initModelPath(self):
+        pass
+
+    def initCriterion(self):
+        self.criterion = nn.CrossEntropyLoss()
+
+    def initTrainLoader(self):
+        self.train_dataset = NSFWTrainDataset(self.conf.train)
+        self.train_loader = DataLoader(self.train_dataset, batch_size=self.conf.train.batch_size, num_workers=self.conf.num_workers, shuffle=self.conf.train.shuffle)
+
+    def initValLoader(self):
+        self.val_dataset = NSFWValDataset(self.conf.train)
+        self.val_loader = DataLoader(self.val_dataset, batch_size=self.conf.val.batch_size, shuffle=self.conf.val.shuffle)
+
+    def initOptimizer(self):
+        self.initAdamOptimizer()
+
+    def doForward(self):
+        self.output = self.net(self.img)
+
+    def doLoss(self):
+        self.loss = self.criterion(self.output, self.idx)
+
+    def doBackward(self):
+        self.loss.backward()
+```
+代码分为两部分：NSFWTrainDataset（NSFWValDataset）数据集类和DeepvacNSFW训练子类。       
+训练子类关键方法：        
+初始化数据集方法：initTrainLoader()和initValLoader()       
+初始化网络方法：initNetWithCode()      
+初始化优化器方法：initOptimizer()      
+初始化损失函数方法：initCriterion()和doLoss()           
+网络前向推理方法：doForward()      
+网络反向传播方法：doBackward()         
+```python
+def initNet(self):
+        super(DeepvacTrain,self).initNet()
+        self.initOutputDir()
+        self.initCriterion()
+        self.initOptimizer()
+        self.initScheduler()
+        self.initCheckpoint()
+        self.initTrainLoader()
+        self.initValLoader()
+```
+
+（DDP类待完善）
 
 ## 9. 编写测试脚本
-代码写在test.py文件中。
-继承syszux_deepvac模块中的Deepvac类
-（待完善）
+代码写在test.py文件中。继承syszux_deepvac模块中的Deepvac类：          
+```python
+class DeepvacNSFW(Deepvac):
+    def __init__(self, nsfw_config):
+        super(DeepvacNSFW, self).__init__(nsfw_config)
+        self.dataset = NSFWTestDataset(self.conf.test)
+        self.report = ClassifierReport(ds_name=self.conf.test.ds_name, cls_num=self.conf.cls_num)
+
+    def initNetWithCode(self):
+        self.net = model.to(self.conf.device)
+
+    def initModelPath(self):
+        self.model_path = self.conf.test.model_path
+
+    def process(self):
+        self.initNet()
+        for filename in self.dataset():
+            # label
+            label = filename.split('/')[-2]
+            # img
+            img = cv2.imread(filename, cv2.IMREAD_COLOR)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = torch.Tensor(img).permute(2, 0, 1).unsqueeze(0).to(self.conf.device)
+            # forward
+            with torch.no_grad():
+                self.output = self.net(img)
+            # report
+            gt = self.conf.test.cls_to_idx.index(label)
+            pred = self.output.argmax(1).item()
+            self.report.add(gt, pred)
+```
+测试子类关键方法：    
+初始化网络方法：initNetWithCode()      
+初始化网络参数方法：initModelPath()           
+基类中读取参数方法：initStateDict()         
+```python
+def initNet(self):
+        self.initLog()
+        #init self.device
+        self.initDevice()
+        #init self.net
+        self.initNetWithCode()
+        self.initModelPath()
+        #init self.model_dict
+        self.initStateDict()
+        #just load model after audit
+        self.loadStateDict()
+        self.exportTorchViaScript()
+```
 
 ## 10. 再谈配置文件
 基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。
