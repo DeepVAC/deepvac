@@ -246,6 +246,7 @@ class DeepvacTrain(Deepvac):
 
     def initNet(self):
         super(DeepvacTrain,self).initNet()
+        self.scheduler = None
         self.initOutputDir()
         self.initCriterion()
         self.initOptimizer()
@@ -275,7 +276,8 @@ class DeepvacTrain(Deepvac):
         self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=map_location))
         state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=map_location)
         self.optimizer.load_state_dict(state_dict['optimizer'])
-        self.scheduler.load_state_dict(state_dict['scheduler'])
+        if self.scheduler:
+            self.scheduler.load_state_dict(state_dict['scheduler'])
         self.epoch = state_dict['epoch']
 
     def initScheduler(self):
@@ -332,6 +334,8 @@ class DeepvacTrain(Deepvac):
         pass
 
     def postEpoch(self):
+        if not self.scheduler:
+            return 
         self.scheduler.step()
 
     def doForward(self):
@@ -353,7 +357,7 @@ class DeepvacTrain(Deepvac):
         torch.save({
             'optimizer': self.optimizer.state_dict(), 
             'epoch': self.epoch,
-            'schedule': self.scheduler.state_dict()
+            'schedule': self.scheduler.state_dict() if self.scheduler else None
         }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
 
     def processTrain(self):
