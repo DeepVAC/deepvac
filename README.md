@@ -128,7 +128,7 @@ config.train.batch_size = 128
 config.val.batch_size = 32
 ......
 ```
-一个完整的config.py例子可以参考 [config.py例子](./examples/config/)
+一个完整的config.py例子可以参考 [config.py例子](./examples/projects/config.py)
 
 
 然后用下面的方式来使用 config.py文件: 
@@ -197,14 +197,46 @@ class FileLineCvStrDataset(FileLineDataset):
 （待完善）
 
 ## 8. 编写训练和验证脚本
-代码写在train.py文件中。
-继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）
-（待完善）
+代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。            
+
+| 类/方法 | 描述 | 备注 |
+| ------- | ---- | ---- |
+| * NSFWTrainDataset/NSFWValDataset | 自定义数据集 | 继承自syszux_loader文件基类 |
+| * initTrainLoader/initValLoader | Dataloader产生批训练数据 | torch.utils.data.DataLoader |
+
+| 类/方法 | 描述 | 备注 |
+| ---- | ---- | ---- |
+| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
+| * initCriterion | 初始化损失函数 | 需要保持self.loss变量名不变 |
+| * initOptimizer | 初始化优化器函数 | 需要保持self.optimizer变量名不变，基类中已定义部分优化器函数，可以直接调用 |
+| initScheduler | 初始学习率衰减策略 | torch.optim.lr_scheduler |
+| preEpoch | 迭代前操作 | 初始化accuracy列表等操作 |
+| preIter | batch前操作，将数据加到到device | 包含zero_grad操作 |
+| postIter | batch后操作 | 打印指标等操作 |
+| postBatch | 迭代后操作 | lr衰减step等操作 |
+| * doForward | 网络前向推理过程 | 需要保持self.output变量名不变 |
+| * doBackward | 网络反向传播过程 | self.loss.backward() |
+| * doOptimize | 优化器优化过程 | self.optim.step操作 | 
+| processTrain/processVal | 训练验证代码 | 通用流程 |
+| saveState | 模型保持代码 | 模型参数保存 |
+
+带*号表示必需方法；   
+一个train.py的小例子 [train.py](./examples/projects/train.py);               
+（DDP类待完善）     
 
 ## 9. 编写测试脚本
-代码写在test.py文件中。
-继承syszux_deepvac模块中的Deepvac类
-（待完善）
+代码写在test.py文件中。继承syszux_deepvac模块中的Deepvac类：          
+
+| 方法 | 描述 | 备注 |
+| ---- | ---- | ---- |
+| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
+| * initModelPath | 初始化参数 | 需要保持self.model_path变量名不变 |
+| * initStateDict | 检查参数 | 对分布式训练保持的参数模型具有兼容性 |
+| * loadStateDict | 模型加载参数 | 可同步到device上 |
+| process/report | 测试过程/报告生成 | 通过report.add(gt, pred)加载测试结果，生成报告 |
+
+带*号表示必需方法；   
+一个test.py的小例子 [test.py](./examples/projects/test.py);      
 
 ## 10. 再谈配置文件
 基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。
