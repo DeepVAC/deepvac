@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../deepvac/lib/')
+sys.path.append('../../lib/')
 
 import cv2
 import torch

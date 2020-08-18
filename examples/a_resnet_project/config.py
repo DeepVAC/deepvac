@@ -1,10 +1,8 @@
 import torch 
-
 from syszux_config import *
 from torchvision import transforms
 
-
-# global ************************************************************************************************************************************************************************************
+# global
 config.lr = 1e-3
 config.cls_num = 3
 config.epoch_num = 50
@@ -12,7 +10,7 @@ config.num_workers = 4
 config.input_size = (224, 224)
 config.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# train *************************************************************************************************************************************************************************************
+# train
 config.train.shuffle = True
 config.train.batch_size = 96
 config.train.img_folder = "/gemfield/hostpv/nsfw/porn_cls3/train/"
@@ -21,7 +19,7 @@ config.train.transform_op = transforms.Compose([transforms.Resize(config.input_s
                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                                                   ])
 
-# val ***************************************************************************************************************************************************************************************
+# val
 config.val.shuffle = True
 config.val.batch_size = 100
 config.val.img_folder = "/gemfield/hostpv/nsfw/porn_cls3/val/"
@@ -30,7 +28,7 @@ config.val.transform_op = transforms.Compose([transforms.Resize(config.input_siz
                                                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                                                 ])
 
-# test **************************************************************************************************************************************************************************************
+# test
 config.test.ds_name = "gemfield"
 config.test.cls_to_idx = ['neutral', 'porn', 'sexy']
 config.test.input_dir = "/gemfield/hostpv/nsfw/porn_cls3/test/"

@@ -95,7 +95,6 @@ class Deepvac(object):
         self.initDevice()
         #init self.net
         self.initNetWithCode()
-        self.initModelPath()
         #init self.model_dict
         self.initStateDict()
         #just load model after audit
@@ -107,15 +106,16 @@ class Deepvac(object):
         self.device = torch.device(self.conf.device)
 
     def initNetWithCode(self):
-        raise Exception("You should reimplement this func to initialize self.net")
-
-    def initModelPath(self):
-        raise Exception("You should reimplement this func to initialize self.model_path")
+        self.net = None
+        LOG.logE("You must reimplement initNetWithCode() to initialize self.net", exit=True)
 
     def initStateDict(self):
-        LOG.logI('Loading State Dict from {}'.format(self.model_path))
+        if not self.conf.model_path:
+            LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
+            return
+        LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
         device = torch.cuda.current_device()
-        self.state_dict = torch.load(self.model_path, map_location=lambda storage, loc: storage.cuda(device))
+        self.state_dict = torch.load(self.conf.model_path, map_location=lambda storage, loc: storage.cuda(device))
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
@@ -138,6 +138,9 @@ class Deepvac(object):
         assert len(missing_keys) == 0, 'Net mismatched with pretrained model'
 
     def loadStateDict(self):
+        if not self.state_dict:
+            LOG.logI("self.state_dict not initialized, omit loadStateDict()")
+            return
         self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
         self.net = self.net.to(self.device)
@@ -145,11 +148,8 @@ class Deepvac(object):
     def initLog(self):
         pass
 
-    def report(self):
-        pass
-
     def process(self):
-        pass
+        LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
     def __call__(self,input):
         self.setInput(input)
@@ -173,10 +173,9 @@ class Deepvac(object):
         ts.save(self.conf.script_model_dir)
     
     def exportNCNN(self, img):
-        conf = self.getConf()
-        if not conf.ncnn_param_output_path or not conf.ncnn_bin_output_path:
+        if not self.conf.ncnn_param_output_path or not self.conf.ncnn_bin_output_path:
             return
-        if not conf.onnx2ncnn:
+        if not self.conf.onnx2ncnn:
             LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
 
         import onnx
@@ -184,17 +183,17 @@ class Deepvac(object):
         import tempfile
         from onnxsim import simplify
         
-        if not conf.onnx_output_model_path:
+        if not self.conf.onnx_output_model_path:
             f = tempfile.NamedTemporaryFile()
             self.conf.onnx_output_model_path = f.name
         self.exportONNX(img)
         
-        cmd = conf.onnx2ncnn + " " + conf.onnx_output_model_path + " " + conf.ncnn_param_output_path + " " + conf.ncnn_bin_output_path
+        cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_output_model_path + " " + self.conf.ncnn_param_output_path + " " + self.conf.ncnn_bin_output_path
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
             LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
-            model_op, check_ok = simplify(conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
-            onnx.save(model_op, conf.onnx_output_model_path)
+            model_op, check_ok = simplify(self.conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
+            onnx.save(model_op, self.conf.onnx_output_model_path)
             if not check_ok:
                 LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right")
             else:
@@ -203,17 +202,16 @@ class Deepvac(object):
             if pd.stderr.read() != b"":
                 LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
         
-        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(conf.ncnn_param_output_path, conf.ncnn_bin_output_path))
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_param_output_path, self.conf.ncnn_bin_output_path))
 
     def exportCoreML(self):
         pass
 
     def exportONNX(self, img):
-        conf = self.getConf()
-        if not conf.onnx_output_model_path:
+        if not self.conf.onnx_output_model_path:
             return
-        torch.onnx._export(self.net, img, conf.onnx_output_model_path, export_params=True)
-        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(conf.onnx_output_model_path))
+        torch.onnx._export(self.net, img, self.conf.onnx_output_model_path, export_params=True)
+        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
 
 class DeepvacTrain(Deepvac):
@@ -257,7 +255,7 @@ class DeepvacTrain(Deepvac):
 
     def initOutputDir(self):
         if self.conf.output_dir != 'output':
-            LOG.logW("According deepvac standard, you should save model files to output directory.")
+            LOG.logW("According deepvac standard, you should save model files to [output] directory.")
 
         self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
         LOG.logI('model save dir: {}'.format(self.output_dir))
@@ -265,7 +263,8 @@ class DeepvacTrain(Deepvac):
             os.makedirs(self.output_dir)
 
     def initCriterion(self):
-        raise Exception("Not implemented.")
+        self.criterion = torch.nn.CrossEntropyLoss()
+        LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
 
     def initCheckpoint(self, map_location=None):
         if not self.conf.checkpoint_suffix or self.conf.checkpoint_suffix == "":
@@ -278,18 +277,21 @@ class DeepvacTrain(Deepvac):
         self.scheduler.load_state_dict(state_dict['scheduler'])
         self.epoch = state_dict['epoch']
 
-
     def initScheduler(self):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
+        LOG.logW("You should reimplement initScheduler() to initialize self.scheduler, unless lr_scheduler.StepLR() is exactly what you need")
 
     def initTrainLoader(self):
-        raise Exception("Not implemented.")
+        self.train_loader = None
+        LOG.logE("You must reimplement initTrainLoader() to initialize self.train_loader", exit=True)
 
     def initValLoader(self):
-        raise Exception("Not implemented.")
+        self.val_loader = None
+        LOG.logE("You must reimplement initTrainLoader() to initialize self.val_loader", exit=True)
 
     def initOptimizer(self):
         self.initSgdOptimizer()
+        LOG.logW("You should reimplement initOptimizer() to initialize self.optimizer, unless SGD is exactly what you need")
 
     def initSgdOptimizer(self):
         self.optimizer = optim.SGD(self.net.parameters(),
@@ -332,16 +334,16 @@ class DeepvacTrain(Deepvac):
         self.scheduler.step()
 
     def doForward(self):
-        raise Exception('Not implemented.')
+        self.output = self.net(self.sample)
 
     def doLoss(self):
-        raise Exception('Not implemented.')
+        self.loss = self.criterion(self.output, self.target)
 
     def doBackward(self):
-        raise Exception('Not implemented.')
+        self.loss.backward()
 
     def doOptimize(self):
-        raise Exception('Not implemented.')
+        self.optimizer.step()
 
     def saveState(self, time):
         self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])

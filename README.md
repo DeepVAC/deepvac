@@ -128,7 +128,7 @@ config.train.batch_size = 128
 config.val.batch_size = 32
 ......
 ```
-一个完整的config.py例子可以参考 [config.py例子](./examples/projects/config.py)
+一个完整的config.py例子可以参考 [config.py例子](./examples/a_resnet_project/config.py)
 
 
 然后用下面的方式来使用 config.py文件: 
@@ -194,49 +194,55 @@ class FileLineCvStrDataset(FileLineDataset):
         return sample
 ```
 哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
-（待完善）
+
+再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac/lib库中的ImageFolderWithTransformDataset类：
+
+```python
+class NSFWTrainDataset(ImageFolderWithTransformDataset):
+    def __init__(self, nsfw_config):
+        super(NSFWTrainDataset, self).__init__(nsfw_config)
+```
 
 ## 8. 编写训练和验证脚本
-代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。            
+代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
 
-| 类/方法 | 描述 | 备注 |
-| ------- | ---- | ---- |
-| * NSFWTrainDataset/NSFWValDataset | 自定义数据集 | 继承自syszux_loader文件基类 |
-| * initTrainLoader/initValLoader | Dataloader产生批训练数据 | torch.utils.data.DataLoader |
-
-| 类/方法 | 描述 | 备注 |
+| 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
-| * initCriterion | 初始化损失函数 | 需要保持self.loss变量名不变 |
-| * initOptimizer | 初始化优化器函数 | 需要保持self.optimizer变量名不变，基类中已定义部分优化器函数，可以直接调用 |
-| initScheduler | 初始学习率衰减策略 | torch.optim.lr_scheduler |
-| preEpoch | 迭代前操作 | 初始化accuracy列表等操作 |
-| preIter | batch前操作，将数据加到到device | 包含zero_grad操作 |
-| postIter | batch后操作 | 打印指标等操作 |
-| postBatch | 迭代后操作 | lr衰减step等操作 |
-| * doForward | 网络前向推理过程 | 需要保持self.output变量名不变 |
-| * doBackward | 网络反向传播过程 | self.loss.backward() |
-| * doOptimize | 优化器优化过程 | self.optim.step操作 | 
-| processTrain/processVal | 训练验证代码 | 通用流程 |
-| saveState | 模型保持代码 | 模型参数保存 |
+| * initNetWithCode | 初始化self.net成员 | 用于初始化网络，在此方法中手动将网络加载到device设备上 |
+| * initCriterion | 初始化self.criterion成员 | 用于初始化损失/评价函数 |
+| initOptimizer | 初始化self.optimizer成员 | 用于初始化优化器，默认初始化为SGD |
+| initScheduler | 初始化self.scheduler成员 | 默认初始化为torch.optim.lr_scheduler |
+| * initTrainLoader | 初始化self.train_loader成员 | 初始化用于训练的DataLoader | 
+| * initValLoader | 初始化self.val_loader成员  | 初始化用于验证的DataLoader |
+| preEpoch | 每轮Epoch之前的操作 | 默认啥也不做 |
+| preIter | 每个batch迭代之前的操作 | 默认会将数据加载到device上，并初始化self.sample、self.target，并对上一个迭代计算得到的梯度进行zero_grad操作 |
+| postIter | 每个batch迭代之后的操作 | 默认啥也不做 |
+| postEpoch | 每轮Epoch之后的操作 | 默认会调用self.scheduler.step() |
+| doForward | 网络前向推理过程 | 默认会将推理得到的值赋值给self.output成员 |
+| doLoss | 计算loss的过程| 默认会使用self.output和self.target进行计算得到此次迭代的loss|
+| doBackward | 网络反向传播过程 | 默认调用self.loss.backward() |
+| doOptimize | 网络权重更新的过程 | 默认调用self.optimizer.step() | 
 
-带*号表示必需方法；   
-一个train.py的小例子 [train.py](./examples/projects/train.py);               
+ 
+一个train.py的例子 [train.py](./examples/a_resnet_project/train.py)。            
 （DDP类待完善）     
 
 ## 9. 编写测试脚本
-代码写在test.py文件中。继承syszux_deepvac模块中的Deepvac类：          
+代码写在test.py文件中，继承syszux_deepvac模块中的Deepvac类。和train.py中的train/val的本质不同在于：
+- 舍弃train/val上下文；
+- 不再使用DataLoader装载数据，开始使用OpenCV等三方库来直接读取图片样本；
+- 网络不再使用autograd上下文；
+- 不再计算loss、acc等；取而代之的是使用Deepvac的*Report模块来进行准确度、速度方面的衡量；
+- 代码更便于生产环境的部署；    
 
-| 方法 | 描述 | 备注 |
+继承Deepvac类的子类必须（重新）实现以下方法才能够开始测试：
+
+| 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| * initNetWithCode | 初始化网络 | 需要保持self.net变量名不变，在此方法中手动将网络加载到device中 |
-| * initModelPath | 初始化参数 | 需要保持self.model_path变量名不变 |
-| * initStateDict | 检查参数 | 对分布式训练保持的参数模型具有兼容性 |
-| * loadStateDict | 模型加载参数 | 可同步到device上 |
-| process/report | 测试过程/报告生成 | 通过report.add(gt, pred)加载测试结果，生成报告 |
-
-带*号表示必需方法；   
-一个test.py的小例子 [test.py](./examples/projects/test.py);      
+| * initNetWithCode | 初始化self.net成员 | 用于初始化网络，在此方法中手动将网络转移到device设备中 |
+| * process | 网络的推理计算过程 | 在该过程中，通过report.add(gt, pred)添加测试结果，生成报告 |
+ 
+一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
 
 ## 10. 再谈配置文件
 基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。

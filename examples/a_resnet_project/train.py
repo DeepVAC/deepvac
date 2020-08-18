@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../deepvac/lib/')
+sys.path.append('../../lib/')
 
 import torch
 from torch import nn
@@ -27,18 +27,6 @@ class DeepvacNSFW(DeepvacTrain):
     def initNetWithCode(self):
         self.net = model.to(self.conf.device)
 
-    def initModelPath(self):
-        pass
-    
-    def initStateDict(self):
-        pass
-
-    def loadStateDict(self):
-        pass
-
-    def exportTorchViaScript(self):
-        pass
-
     def initScheduler(self):
         pass
 
@@ -55,18 +43,6 @@ class DeepvacNSFW(DeepvacTrain):
    
     def initOptimizer(self):
         self.initAdamOptimizer()
-
-    def doForward(self):
-        self.output = self.net(self.img)
-
-    def doLoss(self):
-        self.loss = self.criterion(self.output, self.idx)
-
-    def doBackward(self):
-        self.loss.backward()
-
-    def doOptimize(self):
-        self.optimizer.step()
  
     def preEpoch(self):
         if self.is_train:
