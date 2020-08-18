@@ -25,9 +25,6 @@ class DeepvacNSFW(Deepvac):
     def initNetWithCode(self):
         self.net = model.to(self.conf.device)
 
-    def initModelPath(self):
-        self.model_path = self.conf.test.model_path
-
     def process(self):
         self.initNet()
         for filename in self.dataset():

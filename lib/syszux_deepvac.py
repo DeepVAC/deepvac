@@ -111,6 +111,7 @@ class Deepvac(object):
 
     def initStateDict(self):
         if not self.conf.model_path:
+            self.state_dict = None
             LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
             return
         LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
