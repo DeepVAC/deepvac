@@ -91,8 +91,8 @@ class Deepvac(object):
 
     def _parametersInfo(self):
         param_info_list = [p.numel() for p in self.net.parameters() ]
-        LOG.logI("[PARAMETER INFO] Net has {} parameters.".format(sum(param_info_list)))
-        LOG.logI("[PARAMETER INFO] Detail: {}".format(param_info_list))
+        LOG.logI("self.net has {} parameters.".format(sum(param_info_list)))
+        LOG.logI("self.net parameters detail: {}".format(['{}: {}'.format(name, p.numel()) for name, p in self.net.named_parameters()]))
 
     def initNet(self):
         self.initLog()
