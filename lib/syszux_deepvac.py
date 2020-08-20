@@ -287,7 +287,7 @@ class DeepvacTrain(Deepvac):
     def initSummaryWriter(self):
         event_dir = "{}/{}".format(self.conf.log_dir, self.branch)
         self.writer = SummaryWriter(event_dir)
-        if not self.conf.port:
+        if not self.conf.tensorboard_port:
             return
         from tensorboard import program
         tensorboard = program.TensorBoard()

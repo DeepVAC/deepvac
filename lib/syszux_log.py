@@ -18,7 +18,7 @@ def getTime():
 def getArgv():
     argv = ''.join(sys.argv)
     argv = argv.replace(' ','').replace('/','').replace('-','_').replace('.py','')
-    return argv
+    return argv[:64]
 
 deepvac_branch_name = getCurrentGitBranch()
 if deepvac_branch_name is None:
