@@ -89,6 +89,11 @@ class Deepvac(object):
     def getTime(self):
         return (str(datetime.now())[:-10]).replace(' ','-').replace(':','-')
 
+    def _parametersInfo(self):
+        param_info_list = [p.numel() for p in self.net.parameters() ]
+        LOG.logI("[PARAMETER INFO] Net has {} parameters.".format(sum(param_info_list)))
+        LOG.logI("[PARAMETER INFO] Detail: {}".format(param_info_list))
+
     def initNet(self):
         self.initLog()
         #init self.device
@@ -99,6 +104,8 @@ class Deepvac(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        #just print model parameters info
+        self._parametersInfo()
         self.exportTorchViaScript()
 
     def initDevice(self):
@@ -153,16 +160,24 @@ class Deepvac(object):
         LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
     def __call__(self,input):
+        if not self.state_dict:
+            LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
         self.setInput(input)
-        self.process()
+        with torch.no_grad():
+            self.process()
         #post process
         if self.conf.script_model_dir:
             sys.exit(0)
         return self.getOutput()
 
+    def _noGrad(self):
+        for p in self.net.parameters():
+            p.requires_grad_(False)
+
     def exportTorchViaTrace(self, img):
         if not self.conf.trace_model_dir:
             return
+        self._noGrad()
         ts = torch.jit.trace(self.net, img)
         ts.save(self.conf.trace_model_dir)
         sys.exit(0)
@@ -170,6 +185,7 @@ class Deepvac(object):
     def exportTorchViaScript(self):
         if not self.conf.script_model_dir:
             return
+        self._noGrad()
         ts = torch.jit.script(self.net)
         ts.save(self.conf.script_model_dir)
     
