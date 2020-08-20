@@ -7,8 +7,10 @@ import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
+from syszux_annotation import *
 from syszux_log import LOG,getCurrentGitBranch
 from torch.utils.tensorboard import SummaryWriter
+
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
@@ -90,6 +92,11 @@ class Deepvac(object):
     def getTime(self):
         return (str(datetime.now())[:-10]).replace(' ','-').replace(':','-')
 
+    def _parametersInfo(self):
+        param_info_list = [p.numel() for p in self.net.parameters() ]
+        LOG.logI("self.net has {} parameters.".format(sum(param_info_list)))
+        LOG.logI("self.net parameters detail: {}".format(['{}: {}'.format(name, p.numel()) for name, p in self.net.named_parameters()]))
+
     def initNet(self):
         self.initLog()
         #init self.device
@@ -100,6 +107,8 @@ class Deepvac(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        #just print model parameters info
+        self._parametersInfo()
         self.exportTorchViaScript()
 
     def initDevice(self):
@@ -154,16 +163,24 @@ class Deepvac(object):
         LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
     def __call__(self,input):
+        if not self.state_dict:
+            LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
         self.setInput(input)
-        self.process()
+        with torch.no_grad():
+            self.process()
         #post process
         if self.conf.script_model_dir:
             sys.exit(0)
         return self.getOutput()
 
+    def _noGrad(self):
+        for p in self.net.parameters():
+            p.requires_grad_(False)
+
     def exportTorchViaTrace(self, img):
         if not self.conf.trace_model_dir:
             return
+        self._noGrad()
         ts = torch.jit.trace(self.net, img)
         ts.save(self.conf.trace_model_dir)
         sys.exit(0)
@@ -171,6 +188,7 @@ class Deepvac(object):
     def exportTorchViaScript(self):
         if not self.conf.script_model_dir:
             return
+        self._noGrad()
         ts = torch.jit.script(self.net)
         ts.save(self.conf.script_model_dir)
     
@@ -249,6 +267,7 @@ class DeepvacTrain(Deepvac):
         super(DeepvacTrain,self).initNet()
         self.scheduler = None
         self.initOutputDir()
+        self.initSummaryWriter()
         self.initCriterion()
         self.initOptimizer()
         self.initScheduler()
@@ -265,10 +284,20 @@ class DeepvacTrain(Deepvac):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def initTensorboard(self):
-        self.writer = SummaryWriter("{}/{}".format(self.conf.log_dir, self.branch))
-        self.writer.add_graph(self.net, torch.randn(1, self.conf.input["channel"], self.conf.input["height"], self.conf.input["width"]))
-
+    def initSummaryWriter(self):
+        event_dir = "{}/{}".format(self.conf.log_dir, self.branch)
+        self.writer = SummaryWriter(event_dir)
+        if not self.conf.port:
+            return
+        from tensorboard import program
+        tensorboard = program.TensorBoard()
+        tensorboard.configure(argv=[None, '--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
+        try:
+            url = tensorboard.launch()
+            LOG.logI('Tensorboard at {} '.format(url))
+        except Exception as e:
+            LOG.logE(e.msg)
+        
     def initCriterion(self):
         self.criterion = torch.nn.CrossEntropyLoss()
         LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
@@ -326,7 +355,17 @@ class DeepvacTrain(Deepvac):
             # alpha=self.conf.rmsprop_alpha,
             # centered=self.conf.rmsprop_centered
         )
-
+    
+    def addScalar(self, tag, value, step):
+        self.writer.add_scalar(tag, value, step)
+    
+    def addImage(self, tag, image, step):
+        self.writer.add_image(tag, image, step)
+    
+    @syszux_once
+    def addGraph(self, model, input):
+        self.writer.add_graph(model, input)
+        
     def preEpoch(self):
         pass
 
@@ -364,6 +403,7 @@ class DeepvacTrain(Deepvac):
             'epoch': self.epoch,
             'schedule': self.scheduler.state_dict() if self.scheduler else None
         }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
+        self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
     def processTrain(self):
         self.setTrainContext()
@@ -375,7 +415,7 @@ class DeepvacTrain(Deepvac):
         save_list = list(range(0,loader_len + 1, save_every ))
         self.save_list = save_list[1:-1]
         LOG.logI('SAVE LIST: {}'.format(self.save_list))
-        self.writer.add_scalar('LR/train', self.optimizer.param_groups[0]['lr'], self.epoch)
+        self.writer.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
 
         for i, (img, idx) in enumerate(self.loader):
             self.step = i
@@ -388,7 +428,8 @@ class DeepvacTrain(Deepvac):
             self.doBackward()
             self.doOptimize()
             if i % self.conf.log_every == 0:
-                self.writer.add_scalar('Loss/train', self.loss.item(), self.iter)
+                self.addGraph(self.net, self.img)
+                self.addScalar('{}/Loss'.format(self.phase), self.loss.item(), self.iter)
                 LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
             if self.step in self.save_list:
@@ -449,6 +490,11 @@ class DeepvacDDP(DeepvacTrain):
     def initNet(self):
         self.initDDP()
         super(DeepvacDDP,self).initNet()
+    
+    def initSummaryWriter(self):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).initSummaryWriter()
 
     def preEpoch(self):
         self.train_sampler.set_epoch(self.epoch)
@@ -460,6 +506,22 @@ class DeepvacDDP(DeepvacTrain):
 
     def initCheckpoint(self):
         super(DeepvacDDP, self).initCheckpoint(self.map_location)
+
+    def addScalar(self, tag, value, step):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addScalar(tag, value, step)
+    
+    def addImage(self, tag, image, step):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addImage(tag, image, step)
+        
+    @syszux_once
+    def addGraph(self, model, input):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addGraph(model, input)
 
     def separateBN4OptimizerPG(self, modules):
         paras_only_bn = []
