@@ -18,6 +18,11 @@ config.device = "cuda"
 config.output_dir = "output"
 config.log_dir = "log"
 config.log_every = 10
+config.input = {
+    "channel": 3,
+    "height": 224,
+    "width": 224
+}
 
 ## ------------------ ddp --------------------
 config.dist_url = "tcp://localhost:27030"

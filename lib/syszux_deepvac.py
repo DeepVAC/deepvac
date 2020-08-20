@@ -8,6 +8,7 @@ import torch.distributed as dist
 import time
 from enum import Enum
 from syszux_log import LOG,getCurrentGitBranch
+from torch.utils.tensorboard import SummaryWriter
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
@@ -264,6 +265,10 @@ class DeepvacTrain(Deepvac):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
+    def initTensorboard(self):
+        self.writer = SummaryWriter("{}/{}".format(self.conf.log_dir, self.branch))
+        self.writer.add_graph(self.net, torch.randn(1, self.conf.input["channel"], self.conf.input["height"], self.conf.input["width"]))
+
     def initCriterion(self):
         self.criterion = torch.nn.CrossEntropyLoss()
         LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
@@ -370,6 +375,7 @@ class DeepvacTrain(Deepvac):
         save_list = list(range(0,loader_len + 1, save_every ))
         self.save_list = save_list[1:-1]
         LOG.logI('SAVE LIST: {}'.format(self.save_list))
+        self.writer.add_scalar('LR/train', self.optimizer.param_groups[0]['lr'], self.epoch)
 
         for i, (img, idx) in enumerate(self.loader):
             self.step = i
@@ -382,6 +388,7 @@ class DeepvacTrain(Deepvac):
             self.doBackward()
             self.doOptimize()
             if i % self.conf.log_every == 0:
+                self.writer.add_scalar('Loss/train', self.loss.item(), self.iter)
                 LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
             if self.step in self.save_list:
