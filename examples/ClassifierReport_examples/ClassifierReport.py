@@ -78,13 +78,13 @@ def compareAndReport(feature_name, file_path, cls_num):
                 continue
             LOG.log(LOG.S.I, "continue time : {}".format(time.time()-start))
             min_distance = []
-            min_distance = self.getMinTup(min_distance, dbs[0], emb, names[0])
-            min_distance = self.getMinTup(min_distance, dbs[1], emb, names[1])
+            min_distance = getMinTup(min_distance, dbs[0], emb, names[0])
+            min_distance = getMinTup(min_distance, dbs[1], emb, names[1])
                 
             emb = emb.to('cuda:0')
 
-            min_distance = self.getMinTup(min_distance, dbs[2], emb, names[2])
-            min_distance = self.getMinTup(min_distance, dbs[3], emb, names[3])
+            min_distance = getMinTup(min_distance, dbs[2], emb, names[2])
+            min_distance = getMinTup(min_distance, dbs[3], emb, names[3])
 
             sorted_min_distance = sorted(min_distance, key=lambda t:t[1])
 
