@@ -12,9 +12,7 @@ from syszux_log import LOG,getCurrentGitBranch
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
-    LOG.logE("Deepvac module depend on tensorboard, you should be installed tensorboard, such as \"pip install tensorboard\"", exit=True)
-
-
+    LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
