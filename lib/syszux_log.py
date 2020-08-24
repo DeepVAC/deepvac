@@ -38,7 +38,7 @@ logging.basicConfig(level=logging.DEBUG,
                     datefmt='%m-%d %H:%M',
                     filename='log/{}:{}:{}:{}.log'.format(deepvac_pid, getArgv(),deepvac_time, deepvac_branch_name),
                     filemode='w')
-logger=logging.getLogger()
+logger=logging.getLogger("DEEPVAC")
 # add console output
 console_log_format = '%(asctime)s {}:{} %(levelname)-8s %(message)s'.format(deepvac_pid, deepvac_branch_name)
 console = logging.StreamHandler()

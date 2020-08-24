@@ -9,7 +9,11 @@ import time
 from enum import Enum
 from syszux_annotation import *
 from syszux_log import LOG,getCurrentGitBranch
-from torch.utils.tensorboard import SummaryWriter
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    LOG.logE("Deepvac module depend on tensorboard, you should be installed tensorboard, such as \"pip install tensorboard\"", exit=True)
+
 
 
 #deepvac implemented based on PyTorch Framework
@@ -373,6 +377,7 @@ class DeepvacTrain(Deepvac):
         self.sample = self.img = self.img.to(self.device)
         self.target = self.idx = self.idx.to(self.device)
         self.optimizer.zero_grad()
+        self.addGraph(self.net, self.img)
 
     def postIter(self):
         pass
@@ -415,7 +420,7 @@ class DeepvacTrain(Deepvac):
         save_list = list(range(0,loader_len + 1, save_every ))
         self.save_list = save_list[1:-1]
         LOG.logI('SAVE LIST: {}'.format(self.save_list))
-        self.writer.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
+        self.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
 
         for i, (img, idx) in enumerate(self.loader):
             self.step = i
@@ -428,7 +433,6 @@ class DeepvacTrain(Deepvac):
             self.doBackward()
             self.doOptimize()
             if i % self.conf.log_every == 0:
-                self.addGraph(self.net, self.img)
                 self.addScalar('{}/Loss'.format(self.phase), self.loss.item(), self.iter)
                 LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
@@ -521,7 +525,7 @@ class DeepvacDDP(DeepvacTrain):
     def addGraph(self, model, input):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).addGraph(model, input)
+        super(DeepvacDDP, self).addGraph(model.module, input)
 
     def separateBN4OptimizerPG(self, modules):
         paras_only_bn = []
