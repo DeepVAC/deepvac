@@ -1,10 +1,10 @@
 import os
 from syszux_config import *
 ##########text synthesis########
-config.text.total_num = 500000
-config.text.output_dir = '/gemfield/hostpv2/ocr_synthesis_output/parasite'
+config.text.total_num = 200000
+config.text.output_dir = '/gemfield/hostpv2/ocr_synthesis_output/RickandMorty'
 config.text.txt_file = '/opt/private/dataset_ocr/synthesis_from_text.txt'
-config.text.video_file = '/opt/private/dataset_ocr/synthesis_from_videos/PARASITE.mp4'
+config.text.video_file = '/opt/private/dataset_ocr/synthesis_from_videos/RickandMorty.mp4'
 config.text.images_dir = '/opt/private/dataset_ocr/synthesis_from_images'
 config.text.sample_rate = 1
 #config.text.fonts_dir = '/home/lihang/dataset/Ocr1/video/font/'

@@ -7,7 +7,12 @@ import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
-from syszux_log import LOG
+from syszux_annotation import *
+from syszux_log import LOG,getCurrentGitBranch
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
@@ -16,8 +21,33 @@ class Deepvac(object):
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.assertInGit()
         #init self.net
         self.initNet()
+
+    def assertInGit(self):
+        if os.environ.get("disable_git"):
+            self.branch = "sevice"
+            return
+
+        if self.conf.disable_git:
+            self.branch = "disable_git"
+            return
+
+        self.branch = getCurrentGitBranch()
+        if self.branch is None:
+            LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
+        
+        if len(self.branch) < 6:
+            LOG.logE('According to deepvac standard, your git branch name is too short: {}'.format(self.branch), exit=True)
+
+        if self.branch.startswith('LTS_'):
+            return
+        
+        if self.branch.startswith('PROTO_'):
+            return
+
+        LOG.logE('According to deepvac standard, git branch name should start from LTS_ or PROTO_: {}'.format(self.branch), exit=True)
 
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
@@ -40,8 +70,7 @@ class Deepvac(object):
     def auditConfig(self):
         for name in self._mandatory_member_name:
             if name not in self._mandatory_member:
-                LOG.logE("Error! self.{} must be definded in your subclass.".format(name))
-                sys.exit(1)
+                LOG.logE("Error! self.{} must be definded in your subclass.".format(name),exit=True)
 
     def getConf(self):
         return self.conf
@@ -65,31 +94,41 @@ class Deepvac(object):
     def getTime(self):
         return (str(datetime.now())[:-10]).replace(' ','-').replace(':','-')
 
+    def _parametersInfo(self):
+        param_info_list = [p.numel() for p in self.net.parameters() ]
+        LOG.logI("self.net has {} parameters.".format(sum(param_info_list)))
+        LOG.logI("self.net parameters detail: {}".format(['{}: {}'.format(name, p.numel()) for name, p in self.net.named_parameters()]))
+
     def initNet(self):
+        self.initLog()
         #init self.device
         self.initDevice()
         #init self.net
         self.initNetWithCode()
-        self.initModelPath()
         #init self.model_dict
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        #just print model parameters info
+        self._parametersInfo()
+        self.exportTorchViaScript()
 
     def initDevice(self):
         #to determine CUDA device
         self.device = torch.device(self.conf.device)
 
     def initNetWithCode(self):
-        raise Exception("You should reimplement this func to initialize self.net")
-
-    def initModelPath(self):
-        raise Exception("You should reimplement this func to initialize self.model_path")
+        self.net = None
+        LOG.logE("You must reimplement initNetWithCode() to initialize self.net", exit=True)
 
     def initStateDict(self):
-        LOG.log(LOG.S.I, 'Loading State Dict from {}'.format(self.model_path))
+        if not self.conf.model_path:
+            self.state_dict = None
+            LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
+            return
+        LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
         device = torch.cuda.current_device()
-        self.state_dict = torch.load(self.model_path, map_location=lambda storage, loc: storage.cuda(device))
+        self.state_dict = torch.load(self.conf.model_path, map_location=lambda storage, loc: storage.cuda(device))
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
@@ -105,24 +144,97 @@ class Deepvac(object):
         used_keys = code_net_keys & state_dict_keys
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
-        LOG.log(LOG.S.I, 'Missing keys:{}'.format(len(missing_keys)))
-        LOG.log(LOG.S.I, 'Unused checkpoint keys:{}'.format(len(unused_keys)))
-        LOG.log(LOG.S.I, 'Used keys:{}'.format(len(used_keys)))
+        LOG.logI('Missing keys:{}'.format(len(missing_keys)))
+        LOG.logI('Unused checkpoint keys:{}'.format(len(unused_keys)))
+        LOG.logI('Used keys:{}'.format(len(used_keys)))
         assert len(used_keys) > 0, 'load NONE from pretrained model'
         assert len(missing_keys) == 0, 'Net mismatched with pretrained model'
 
     def loadStateDict(self):
+        if not self.state_dict:
+            LOG.logI("self.state_dict not initialized, omit loadStateDict()")
+            return
         self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
         self.net = self.net.to(self.device)
 
-    def report(self):
+    def initLog(self):
         pass
 
+    def process(self):
+        LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
+
     def __call__(self,input):
+        if not self.state_dict:
+            LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
         self.setInput(input)
-        self.process()
+        with torch.no_grad():
+            self.process()
+        #post process
+        if self.conf.script_model_dir:
+            sys.exit(0)
         return self.getOutput()
+
+    def _noGrad(self):
+        for p in self.net.parameters():
+            p.requires_grad_(False)
+
+    def exportTorchViaTrace(self, img):
+        if not self.conf.trace_model_dir:
+            return
+        self._noGrad()
+        ts = torch.jit.trace(self.net, img)
+        ts.save(self.conf.trace_model_dir)
+        sys.exit(0)
+
+    def exportTorchViaScript(self):
+        if not self.conf.script_model_dir:
+            return
+        self._noGrad()
+        ts = torch.jit.script(self.net)
+        ts.save(self.conf.script_model_dir)
+    
+    def exportNCNN(self, img):
+        if not self.conf.ncnn_param_output_path or not self.conf.ncnn_bin_output_path:
+            return
+        if not self.conf.onnx2ncnn:
+            LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
+
+        import onnx
+        import subprocess
+        import tempfile
+        from onnxsim import simplify
+        
+        if not self.conf.onnx_output_model_path:
+            f = tempfile.NamedTemporaryFile()
+            self.conf.onnx_output_model_path = f.name
+        self.exportONNX(img)
+        
+        cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_output_model_path + " " + self.conf.ncnn_param_output_path + " " + self.conf.ncnn_bin_output_path
+        pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if pd.stderr.read() != b"":
+            LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
+            model_op, check_ok = simplify(self.conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
+            onnx.save(model_op, self.conf.onnx_output_model_path)
+            if not check_ok:
+                LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right")
+            else:
+                LOG.logI("Simplify model succeed")
+            subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if pd.stderr.read() != b"":
+                LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
+        
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_param_output_path, self.conf.ncnn_bin_output_path))
+
+    def exportCoreML(self):
+        pass
+
+    def exportONNX(self, img):
+        if not self.conf.onnx_output_model_path:
+            return
+        torch.onnx._export(self.net, img, self.conf.onnx_output_model_path, export_params=True)
+        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
+
 
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
@@ -141,7 +253,7 @@ class DeepvacTrain(Deepvac):
         self.phase = 'TRAIN'
         self.dataset = self.train_dataset
         self.loader = self.train_loader
-        self.batch_size = self.conf.train_batch_size
+        self.batch_size = self.conf.train.batch_size
         self.net.train()
 
     def setValContext(self):
@@ -150,41 +262,75 @@ class DeepvacTrain(Deepvac):
         self.phase = 'VAL'
         self.dataset = self.val_dataset
         self.loader = self.val_loader
-        self.batch_size = self.conf.val_batch_size
+        self.batch_size = self.conf.val.batch_size
         self.net.eval()
 
     def initNet(self):
         super(DeepvacTrain,self).initNet()
+        self.scheduler = None
+        self.initOutputDir()
+        self.initSummaryWriter()
         self.initCriterion()
         self.initOptimizer()
-        self.initCheckpoint()
         self.initScheduler()
+        self.initCheckpoint()
         self.initTrainLoader()
         self.initValLoader()
-        self.initOutputDir()
 
     def initOutputDir(self):
-        print('debug output: ',self.conf.output_dir)
-        if not os.path.exists(self.conf.output_dir):
-            os.makedirs(self.conf.output_dir)
+        if self.conf.output_dir != 'output':
+            LOG.logW("According deepvac standard, you should save model files to [output] directory.")
 
+        self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
+        LOG.logI('model save dir: {}'.format(self.output_dir))
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+    def initSummaryWriter(self):
+        event_dir = "{}/{}".format(self.conf.log_dir, self.branch)
+        self.writer = SummaryWriter(event_dir)
+        if not self.conf.tensorboard_port:
+            return
+        from tensorboard import program
+        tensorboard = program.TensorBoard()
+        tensorboard.configure(argv=[None, '--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
+        try:
+            url = tensorboard.launch()
+            LOG.logI('Tensorboard at {} '.format(url))
+        except Exception as e:
+            LOG.logE(e.msg)
+        
     def initCriterion(self):
-        raise Exception("Not implemented.")
+        self.criterion = torch.nn.CrossEntropyLoss()
+        LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
 
-    def initCheckpoint(self):
-        raise Exception("Not implemented.")
+    def initCheckpoint(self, map_location=None):
+        if not self.conf.checkpoint_suffix or self.conf.checkpoint_suffix == "":
+            LOG.logI('Omit the checkpoint file since not specified...')
+            return
+        LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
+        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=map_location))
+        state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=map_location)
+        self.optimizer.load_state_dict(state_dict['optimizer'])
+        if self.scheduler:
+            self.scheduler.load_state_dict(state_dict['scheduler'])
+        self.epoch = state_dict['epoch']
 
     def initScheduler(self):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
+        LOG.logW("You should reimplement initScheduler() to initialize self.scheduler, unless lr_scheduler.StepLR() is exactly what you need")
 
     def initTrainLoader(self):
-        raise Exception("Not implemented.")
+        self.train_loader = None
+        LOG.logE("You must reimplement initTrainLoader() to initialize self.train_loader", exit=True)
 
     def initValLoader(self):
-        raise Exception("Not implemented.")
+        self.val_loader = None
+        LOG.logE("You must reimplement initTrainLoader() to initialize self.val_loader", exit=True)
 
     def initOptimizer(self):
         self.initSgdOptimizer()
+        LOG.logW("You should reimplement initOptimizer() to initialize self.optimizer, unless SGD is exactly what you need")
 
     def initSgdOptimizer(self):
         self.optimizer = optim.SGD(self.net.parameters(),
@@ -211,36 +357,56 @@ class DeepvacTrain(Deepvac):
             # alpha=self.conf.rmsprop_alpha,
             # centered=self.conf.rmsprop_centered
         )
-
-    def preEpoch(self, epoch=0):
+    
+    def addScalar(self, tag, value, step):
+        self.writer.add_scalar(tag, value, step)
+    
+    def addImage(self, tag, image, step):
+        self.writer.add_image(tag, image, step)
+    
+    @syszux_once
+    def addGraph(self, model, input):
+        self.writer.add_graph(model, input)
+        
+    def preEpoch(self):
         pass
 
-    def preIter(self, img=None, idx=0, epoch=0):
+    def preIter(self):
+        self.sample = self.img = self.img.to(self.device)
+        self.target = self.idx = self.idx.to(self.device)
+        self.optimizer.zero_grad()
+        self.addGraph(self.net, self.img)
+
+    def postIter(self):
         pass
 
-    def postIter(self, img=None, idx=0, epoch=0):
-        pass
-
-    def postEpoch(self, epoch=0):
-        pass
+    def postEpoch(self):
+        if not self.scheduler:
+            return 
+        self.scheduler.step()
 
     def doForward(self):
-        raise Exception('Not implemented.')
+        self.output = self.net(self.sample)
 
     def doLoss(self):
-        raise Exception('Not implemented.')
+        self.loss = self.criterion(self.output, self.target)
 
     def doBackward(self):
-        raise Exception('Not implemented.')
+        self.loss.backward()
 
     def doOptimize(self):
-        raise Exception('Not implemented.')
+        self.optimizer.step()
 
-    def saveState(self):
-        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        self.checkpoint_file = 'optimizer:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(self.getTime(), self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        torch.save(self.net.state_dict(), '{}/{}'.format(self.conf.output_dir, self.state_file))
-        torch.save(self.optimizer.state_dict(), '{}/{}'.format(self.conf.output_dir, self.checkpoint_file))
+    def saveState(self, time):
+        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        self.checkpoint_file = 'checkpoint:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
+        torch.save({
+            'optimizer': self.optimizer.state_dict(), 
+            'epoch': self.epoch,
+            'schedule': self.scheduler.state_dict() if self.scheduler else None
+        }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
+        self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
     def processTrain(self):
         self.setTrainContext()
@@ -252,6 +418,7 @@ class DeepvacTrain(Deepvac):
         save_list = list(range(0,loader_len + 1, save_every ))
         self.save_list = save_list[1:-1]
         LOG.logI('SAVE LIST: {}'.format(self.save_list))
+        self.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
 
         for i, (img, idx) in enumerate(self.loader):
             self.step = i
@@ -263,12 +430,13 @@ class DeepvacTrain(Deepvac):
             self.doLoss()
             self.doBackward()
             self.doOptimize()
-            LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
+            if i % self.conf.log_every == 0:
+                self.addScalar('{}/Loss'.format(self.phase), self.loss.item(), self.iter)
+                LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
             self.postIter()
             if self.step in self.save_list:
                 self.processVal()
-
-        self.scheduler.step()
+                self.setTrainContext()
         self.postEpoch()
 
     def processVal(self):
@@ -286,15 +454,14 @@ class DeepvacTrain(Deepvac):
                 self.postIter()
 
             self.postEpoch()
-        self.saveState()
-        
+        self.saveState(self.getTime())
 
     def processAccept(self):
         self.setValContext()
 
     def process(self):
         self.iter = 0
-        for epoch in range(self.conf.epoch_num):
+        for epoch in range(self.epoch, self.conf.epoch_num):
             self.epoch = epoch
             LOG.logI('Epoch {} started...'.format(self.epoch))
             self.processTrain()
@@ -305,18 +472,11 @@ class DeepvacTrain(Deepvac):
         self.auditConfig()
         self.process()
 
-    def exportNCNN(self):
-        pass
-
-    def exportCoreML(self):
-        pass
-
-    def exportONNX(self):
-        pass
 
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):
         super(DeepvacDDP,self).__init__(deepvac_config)
+        assert self.train_sampler is not None, "You should define self.train_sampler in DDP mode."
 
     def initDDP(self):
         parser = argparse.ArgumentParser(description='DeepvacDDP')
@@ -328,23 +488,73 @@ class DeepvacDDP(DeepvacTrain):
         LOG.logI("Start dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
         dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
         torch.cuda.set_device(self.args.gpu)
-        self.net = torch.nn.parallel.DistributedDataParallel(self.net, device_ids=[self.args.gpu])
-        LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
 
     def initNet(self):
-        super(DeepvacDDP,self).initNet()
         self.initDDP()
-
-    def saveState(self):
+        super(DeepvacDDP,self).initNet()
+    
+    def initSummaryWriter(self):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).saveState()
+        super(DeepvacDDP, self).initSummaryWriter()
 
-    def loadState(self, suffix):
-        self.optimizer.load_state_dict(torch.load(self.conf.output_dir/'optimizer:{}'.format(suffix), map_location=self.map_location))
-        self.model.load_state_dict(torch.load(self.conf.output_dir/'model:{}'.format(suffix),map_location=self.map_location))
+    def preEpoch(self):
+        self.train_sampler.set_epoch(self.epoch)
+
+    def saveState(self, time):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).saveState(self.getTime())
+
+    def initCheckpoint(self):
+        super(DeepvacDDP, self).initCheckpoint(self.map_location)
+
+    def addScalar(self, tag, value, step):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addScalar(tag, value, step)
+    
+    def addImage(self, tag, image, step):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addImage(tag, image, step)
+        
+    @syszux_once
+    def addGraph(self, model, input):
+        if self.args.rank != 0:
+            return
+        super(DeepvacDDP, self).addGraph(model.module, input)
+
+    def separateBN4OptimizerPG(self, modules):
+        paras_only_bn = []
+        paras_wo_bn = []
+        memo = set()
+        gemfield_set = set()
+        gemfield_set.update(set(modules.parameters()))
+        LOG.logI("separateBN4OptimizerPG set len: {}".format(len(gemfield_set)))
+        named_modules = modules.named_modules(prefix='')
+        for module_prefix, module in named_modules:
+            if "module" not in module_prefix:
+                LOG.logI("separateBN4OptimizerPG skip {}".format(module_prefix))
+                continue
+
+            members = module._parameters.items()
+            for k, v in members:
+                name = module_prefix + ('.' if module_prefix else '') + k
+                if v is None:
+                    continue
+                if v in memo:
+                    continue
+                memo.add(v)
+                if "batchnorm" in str(module.__class__):
+                    paras_only_bn.append(v)
+                else:
+                    paras_wo_bn.append(v)
+
+        LOG.logI("separateBN4OptimizerPG param len: {} - {}".format(len(paras_wo_bn),len(paras_only_bn)))
+        return paras_only_bn, paras_wo_bn
 
 if __name__ == "__main__":
-    from conf import config as deepvac_config
+    from config import config as deepvac_config
     vac = Deepvac(deepvac_config)
     vac()

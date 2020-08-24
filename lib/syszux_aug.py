@@ -3,7 +3,8 @@
 import math
 import cv2
 import numpy as np
-from PIL import Image
+import random
+from PIL import Image, ImageEnhance
 from scipy import ndimage
 from syszux_helper import WarpMLS
 
@@ -308,7 +309,7 @@ class MotionAug(AugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.degree = 20
+        self.degree = 18
         self.angle = 45
 
     def __call__(self, img):
@@ -431,3 +432,134 @@ class RandomCropDarkAug(AugBase):
         print('rect:', rect)
         return img
 
+# 随机颜色扰动
+class RandomColorJitterAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomColorJitterAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        random.seed()
+        change_image = random.randint(0, 1)
+        if not change_image:
+            return img
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        if random.randint(0, 1):
+            img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
+        if random.randint(0, 1):
+            img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
+        if random.randint(0, 1):
+            img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
+
+        return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
+
+class MosaicAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(MosaicAug, self).__init__(deepvac_config)
+        self.neighbor = 2
+
+    def auditConfig(self):
+        pass
+    
+    def __call__(self, img):
+        neighbor = self.neighbor
+        h, w = img.shape[0], img.shape[1]
+        for i in range(0, h - neighbor -1, neighbor):
+            for j in range(0, w - neighbor - 1, neighbor):
+                rect = [j, i, neighbor, neighbor]
+                color = img[i][j].tolist()
+                left_up = (rect[0], rect[1])
+                right_down = (rect[0] + neighbor - 1, rect[1] + neighbor - 1)
+                cv2.rectangle(img, left_up, right_down, color, -1)
+        return img
+
+
+# 随机旋转（针对于人脸关键点任务）
+class RandomRotateFacialKpListAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomRotateFacialKpListAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    # img_list: include 2 element
+    # img_list[0] -> img
+    # img_list[1] -> keypoint info (scale to 0-1)
+    def __call__(self, img_list):
+        assert isinstance(img_list, list), 'input must be a list'
+        assert len(img_list) == 2, 'img_list length must be two'
+
+        img = img_list[0]
+        landmarks = img_list[1]
+        angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
+        h, w, _ = img.shape
+        M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+        dest_img = cv2.warpAffine(img, M, (w, h))
+        dest_landmarks = []
+        for i in range(len(landmarks)):
+            curlandmark_x = landmarks[i][0] * w
+            curlandmark_y = landmarks[i][1] * h
+            dst_x = curlandmark_x * M[0][0] + curlandmark_y * M[0][1] + M[0][2]
+            dst_y = curlandmark_x * M[1][0] + curlandmark_y * M[1][1] + M[1][2]
+            dest_landmarks.append([dst_x / w, dst_y / h])
+        return [dest_img, dest_landmarks]
+
+# 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
+class RandomFilpFacialKpListAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomFilpFacialKpListAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+    
+    def flipLandmark(self, dest_landmark, src_landmark, sequences):
+        for sequence in sequences:
+            for i in range(sequence[1], sequence[0] - 1, -1):
+                dest_landmark.append(src_landmark[i])
+        return dest_landmark
+
+    def copyLandmark(self, dest_landmark, src_landmark, sequences):
+        for sequence in sequences:
+            for i in range(sequence[0], sequence[1] + 1):
+                dest_landmark.append(src_landmark[i])
+        return dest_landmark
+
+    # img_list: include 2 element
+    # img_list[0] -> img
+    # img_list[1] -> keypoint info(scale to 0-1)
+    def __call__(self, img_list):
+        assert isinstance(img_list, list), 'input must be a list'
+        assert len(img_list) == 2, 'img_list length must be two'
+
+        img = img_list[0]
+        landmarks = img_list[1]
+        h, w, _ = img.shape
+        random.seed()
+        
+        if random.randint(0, 1) == 0:
+            return [img, landmarks]
+
+        dest_img = cv2.flip(img, 1)
+        flip_landmarks = []
+        for i in range(len(landmarks)):
+            curlandmark_x = w - 1 - landmarks[i][0]
+            curlandmark_y = landmarks[i][1]
+            flip_landmarks.append([curlandmark_x, curlandmark_y])
+
+        dest_landmarks = []
+
+        # 重新排列关键点顺序
+        flip_landmarks_list = [[0, 32], [38, 42], [33, 37]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+        dest_landmarks = self.copyLandmark(dest_landmarks, flip_landmarks, [[43, 46]])
+        flip_landmarks_list = [[47, 51], [58, 61], [62, 63], [52, 55], [56, 57], [68, 71], [64, 67]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+        dest_landmarks = self.copyLandmark(dest_landmarks, flip_landmarks, [[75, 77], [72, 74]])
+        flip_landmarks_list = [[78, 79], [80, 81], [82, 83], [84, 90], [91, 95], [96, 100], [101, 103], [104, 105]]
+        dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
+
+        return [dest_img, dest_landmarks]
+    
