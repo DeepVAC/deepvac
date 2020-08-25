@@ -73,10 +73,9 @@ def compareAndReport(feature_name, file_path, cls_num):
         name = names[i]
         path = paths[i]
         for idx, emb in enumerate(cur_db):
-            start = time.time()
             if path[idx] in done_paths:
                 continue
-            LOG.log(LOG.S.I, "continue time : {}".format(time.time()-start))
+
             min_distance = []
             min_distance = getMinTup(min_distance, dbs[0], emb, names[0])
             min_distance = getMinTup(min_distance, dbs[1], emb, names[1])
@@ -92,24 +91,23 @@ def compareAndReport(feature_name, file_path, cls_num):
             pred_ori = sorted_min_distance[0][0]
             #print('label : {}'.format(name[idx]))
             #print('pred : {}'.format(pred))
-            LOG.log(LOG.S.I, "label : {}".format(name[idx]))
-            LOG.log(LOG.S.I, "pred : {}".format(pred))
+            LOG.logI("label : {}".format(name[idx]))
+            LOG.logI("pred : {}".format(pred))
             if (total+idx) % 10000 == 0 and (total+idx) != 0:
-                LOG.log(LOG.S.I, "Done {} img...".format(total+idx))
+                LOG.logI("Done {} img...".format(total+idx))
             report.add(int(name[idx]), int(pred))
             print("{} {} {} {}".format(path[idx], name[idx], pred_ori, pred))
             f.write("{} {} {} {}\n".format(path[idx], name[idx], pred_ori, pred))
 
         total += cur_db.shape
-        LOG.log(LOG.S.I, "Total is {} now...".format(total))
+        LOG.logI("Total is {} now...".format(total))
     f.close()
 
     return report
 
 
 if __name__ == "__main__":
-
     config_cls = deepvac_config.cls
-    report = face.compareAndReport(config_cls.feature_name, config_cls.file_path, config_cls.cls_num)
+    report = compareAndReport(config_cls.feature_name, config_cls.file_path, config_cls.cls_num)
     report()
 
