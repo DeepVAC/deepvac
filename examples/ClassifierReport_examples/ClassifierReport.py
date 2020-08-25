@@ -36,7 +36,7 @@ def getMinTup(min_distance, db, emb, names):
 #       cls_num: number of ids
 # output:
 #       report: report info, use `report()` to call
-def compareAndReport(feature_name, file_path, cls_num):
+def compareAndReport(dbs, names, paths, file_path, cls_num):
 
     done_paths = []
     done_infos = []
@@ -55,18 +55,6 @@ def compareAndReport(feature_name, file_path, cls_num):
             report.add(label, pred)
             f.write(inf)
 
-    db1 = torch.load('db/{}_1.feature'.format(feature_name), map_location = {'cuda:0':'cuda:1'})
-    db2 = torch.load('db/{}_2.feature'.format(feature_name), map_location = {'cuda:0':'cuda:1'})
-    db3 = torch.load('db/{}_3.feature'.format(feature_name), map_location = {'cuda:1':'cuda:0'})
-    db4 = torch.load('db/{}_4.feature'.format(feature_name), map_location = {'cuda:1':'cuda:0'})
-    face_db1 = np.load('db/{}_1.feature.npz'.format(feature_name))
-    face_db2 = np.load('db/{}_2.feature.npz'.format(feature_name))
-    face_db3 = np.load('db/{}_3.feature.npz'.format(feature_name))
-    face_db4 = np.load('db/{}_4.feature.npz'.format(feature_name))
-    
-    dbs = [db1, db2, db3, db4]
-    names = [face_db1['names'], face_db2['names'], face_db3['names'], face_db4['names']]
-    paths = [face_db1['paths'], face_db2['paths'], face_db3['paths'], face_db4['paths']]
     total = 0
 
     for i, cur_db in enumerate(dbs):
@@ -106,8 +94,29 @@ def compareAndReport(feature_name, file_path, cls_num):
     return report
 
 
-if __name__ == "__main__":
+def test():
+    db1 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_1.feature', map_location = {'cuda:0':'cuda:1'})
+    db2 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_2.feature', map_location = {'cuda:0':'cuda:1'})
+    db3 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_3.feature', map_location = {'cuda:1':'cuda:0'})
+    db4 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_4.feature', map_location = {'cuda:1':'cuda:0'})
+    np1 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_1.feature.npz')
+    np2 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_2.feature.npz')
+    np3 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_3.feature.npz')
+    np4 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_4.feature.npz')
+
+    dbs = [db1, db2, db3, db4]
+    names = [np1['names'], np2['names'], np3['names'], np4['names']]
+    paths = [np1['paths'], np2['paths'], np3['paths'], np4['paths']]
+
     config_cls = deepvac_config.cls
-    report = compareAndReport(config_cls.feature_name, config_cls.file_path, config_cls.cls_num)
+    report = compareAndReport(dbs, names, paths, config_cls.file_path, config_cls.cls_num)
     report()
+
+
+if __name__ == "__main__":
+    #config_cls = deepvac_config.cls
+    #report = compareAndReport(config_cls.feature_name, config_cls.file_path, config_cls.cls_num)
+    #report()
+
+    test()
 
