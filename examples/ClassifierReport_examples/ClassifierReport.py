@@ -47,7 +47,7 @@ def getNearestTwoFeatureFromAllDB(emb, dbs, emb_indexes):
 # generate report
 # input:
 #       dbs: db features list
-#       names: idx info list
+#       emb_indexes: idx info list
 #       paths: img path list
 #       file_path: result file
 #       cls_num: number of ids
