@@ -11,19 +11,19 @@ from syszux_log import LOG
 
 # get the nearest and the second nearest features from a db
 # input: 
+#       emb: a img feature for compare
 #       db: db features
-#       emb: current test feature
-#       names: idx infomation
+#       emb_index: idx infomation
 #
 # output:
 #       min_distance: storage the result
-def getNearestTwoFeaturesFromDB(db, emb, names):
+def getNearestTwoFeaturesFromDB(emb, db, emb_index):
     min_distance = []
     distance = torch.norm(db - emb, dim=1)
     min_index = torch.argmin(distance).item()
-    min_distance.append((names[min_index], distance[min_index].item()))
+    min_distance.append((emb_index[min_index], distance[min_index].item()))
     sec_min_val, sec_min_index = distance.kthvalue(2)
-    min_distance.append((names[sec_min_index], sec_min_val.item()))
+    min_distance.append((emb_index[sec_min_index], sec_min_val.item()))
 
     return min_distance
 
@@ -31,14 +31,14 @@ def getNearestTwoFeaturesFromDB(db, emb, names):
 # input:
 #       emb: a img feature for compare
 #       dbs: db features list
-#       names: idx info list
+#       emb_indexes: idx info list
 # output:
-#       the nearest idx(name) and the second nearest idx(name)
-def getNearestTwoFeatureFromAllDB(emb, dbs, names):
+#       the nearest index and the second nearest index
+def getNearestTwoFeatureFromAllDB(emb, dbs, emb_indexes):
     min_distance = []
     for n in range(len(dbs)):
         emb = emb.to(dbs[n].device)
-        min_distance.extend(getNearestTwoFeaturesFromDB(dbs[n], emb, names[n]))
+        min_distance.extend(getNearestTwoFeaturesFromDB(emb, dbs[n], emb_indexes[n]))
 
     sorted_min_distance = sorted(min_distance, key=lambda t:t[1])
 
@@ -53,7 +53,7 @@ def getNearestTwoFeatureFromAllDB(emb, dbs, names):
 #       cls_num: number of ids
 # output:
 #       report: report info, use `report()` to call
-def getClassifierReport(dbs, names, paths, file_path, cls_num):
+def getClassifierReport(dbs, emb_indexes, paths, file_path, cls_num):
 
     done_paths = []
     done_infos = []
@@ -75,21 +75,21 @@ def getClassifierReport(dbs, names, paths, file_path, cls_num):
     total = 0
 
     for i, db in enumerate(dbs):
-        name = names[i]
+        emb_index = emb_indexes[i]
         path = paths[i]
         for idx, emb in enumerate(db):
             if path[idx] in done_paths:
                 continue
 
-            pred_ori, pred = getNearestTwoFeatureFromAllDB(emb, dbs, names)
+            pred_ori, pred = getNearestTwoFeatureFromAllDB(emb, dbs, emb_indexes)
             
-            LOG.logI("label : {}".format(name[idx]))
+            LOG.logI("label : {}".format(emb_index[idx]))
             LOG.logI("pred : {}".format(pred))
             if (total+idx) % 10000 == 0 and (total+idx) != 0:
                 LOG.logI("Done {} img...".format(total+idx))
-            report.add(int(name[idx]), int(pred))
-            print("{} {} {} {}".format(path[idx], name[idx], pred_ori, pred))
-            f.write("{} {} {} {}\n".format(path[idx], name[idx], pred_ori, pred))
+            report.add(int(emb_index[idx]), int(pred))
+            print("{} {} {} {}".format(path[idx], emb_index[idx], pred_ori, pred))
+            f.write("{} {} {} {}\n".format(path[idx], emb_index[idx], pred_ori, pred))
 
         total += db.shape
         LOG.logI("Total is {} now...".format(total))
