@@ -83,7 +83,7 @@ lib库对使用层面提供以下模块：
 
 ## 项目依赖
 - Python3。不支持Python2，其已被废弃；
-- 依赖包：torch, torchvision, scipy, numpy, cv2, Pillow；
+- 依赖包：torch, torchvision, tensorboard, scipy, numpy, cv2, Pillow；
 - 字体文件（可选）：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
 
 
