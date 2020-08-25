@@ -9,16 +9,16 @@ from syszux_report import ClassifierReport
 from syszux_log import LOG
 
 
-# get the closest and the second closest features
+# get the nearest and the second nearest features from a db
 # input: 
-#       min_distance: storage the result
 #       db: db features
 #       emb: current test feature
 #       names: idx infomation
 #
 # output:
 #       min_distance: storage the result
-def getMinTup(min_distance, db, emb, names):
+def getNearestTwoFeaturesFromDB(db, emb, names):
+    min_distance = []
     distance = torch.norm(db - emb, dim=1)
     min_index = torch.argmin(distance).item()
     min_distance.append((names[min_index], distance[min_index].item()))
@@ -26,6 +26,23 @@ def getMinTup(min_distance, db, emb, names):
     min_distance.append((names[sec_min_index], sec_min_val.item()))
 
     return min_distance
+
+# get the nearest and the second nearest features from all db
+# input:
+#       emb: a img feature for compare
+#       dbs: db features list
+#       names: idx info list
+# output:
+#       the nearest idx(name) and the second nearest idx(name)
+def getNearestTwoFeatureFromAllDB(emb, dbs, names):
+    min_distance = []
+    for n in range(len(dbs)):
+        emb = emb.to(dbs[n].device)
+        min_distance.extend(getNearestTwoFeaturesFromDB(dbs[n], emb, names[n]))
+
+    sorted_min_distance = sorted(min_distance, key=lambda t:t[1])
+
+    return sorted_min_distance[0][0], sorted_min_distance[1][0]
 
 # generate report
 # input:
@@ -36,7 +53,7 @@ def getMinTup(min_distance, db, emb, names):
 #       cls_num: number of ids
 # output:
 #       report: report info, use `report()` to call
-def compareAndReport(dbs, names, paths, file_path, cls_num):
+def getClassifierReport(dbs, names, paths, file_path, cls_num):
 
     done_paths = []
     done_infos = []
@@ -57,25 +74,15 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
 
     total = 0
 
-    for i, cur_db in enumerate(dbs):
+    for i, db in enumerate(dbs):
         name = names[i]
         path = paths[i]
-        for idx, emb in enumerate(cur_db):
+        for idx, emb in enumerate(db):
             if path[idx] in done_paths:
                 continue
 
-            min_distance = []
-
-            for n in range(len(dbs)):
-                emb = emb.to(dbs[n].device)
-                min_distance = getMinTup(min_distance, dbs[n], emb, names[n])
-                
-            sorted_min_distance = sorted(min_distance, key=lambda t:t[1])
-
-            pred = sorted_min_distance[1][0]
-            pred_ori = sorted_min_distance[0][0]
-            #print('label : {}'.format(name[idx]))
-            #print('pred : {}'.format(pred))
+            pred_ori, pred = getNearestTwoFeatureFromAllDB(emb, dbs, names)
+            
             LOG.logI("label : {}".format(name[idx]))
             LOG.logI("pred : {}".format(pred))
             if (total+idx) % 10000 == 0 and (total+idx) != 0:
@@ -84,7 +91,7 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
             print("{} {} {} {}".format(path[idx], name[idx], pred_ori, pred))
             f.write("{} {} {} {}\n".format(path[idx], name[idx], pred_ori, pred))
 
-        total += cur_db.shape
+        total += db.shape
         LOG.logI("Total is {} now...".format(total))
     f.close()
 
@@ -92,23 +99,22 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
 
 
 def test(deepvac_config):
-    db1 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_1.feature', map_location = {'cuda:0':'cuda:1'})
-    db2 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_2.feature', map_location = {'cuda:0':'cuda:1'})
-    db3 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_3.feature', map_location = {'cuda:1':'cuda:0'})
-    db4 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_4.feature', map_location = {'cuda:1':'cuda:0'})
-    np1 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_1.feature.npz')
-    np2 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_2.feature.npz')
-    np3 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_3.feature.npz')
-    np4 = np.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_4.feature.npz')
-
-    dbs = [db1, db2, db3, db4]
-    names = [np1['names'], np2['names'], np3['names'], np4['names']]
-    paths = [np1['paths'], np2['paths'], np3['paths'], np4['paths']]
-
     config_cls = deepvac_config.cls
-    report = compareAndReport(dbs, names, paths, config_cls.file_path, config_cls.cls_num)
-    report()
+    dbs = []
+    names = []
+    paths = []
 
+    db_paths = config_cls.db_paths
+    map_locs = config_cls.map_locs
+    np_paths = config_cls.np_paths
+    for i in range(len(db_paths)):
+        dbs.append(torch.load(db_paths[i], map_location = map_locs[i]))
+        np_f = np.load(np_paths[i])
+        names.append(np_f['names'])
+        paths.append(np_f['paths'])
+
+    report = getClassifierReport(dbs, names, paths, config_cls.file_path, config_cls.cls_num)
+    report()
 
 if __name__ == "__main__":
     #config_cls = deepvac_config.cls
