@@ -293,7 +293,8 @@ class DeepvacTrain(Deepvac):
             return
         from tensorboard import program
         tensorboard = program.TensorBoard()
-        tensorboard.configure(argv=[None, '--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
+        self.conf.tensorboard_ip = '0.0.0.0' if self.conf.tensorboard_ip is None else self.conf.tensorboard_ip
+        tensorboard.configure(argv=[None, '--host', str(self.conf.tensorboard_ip),'--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
         try:
             url = tensorboard.launch()
             LOG.logI('Tensorboard at {} '.format(url))
