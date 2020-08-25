@@ -7,8 +7,8 @@ import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
-from syszux_annotation import *
-from syszux_log import LOG,getCurrentGitBranch
+from .syszux_annotation import *
+from .syszux_log import LOG,getCurrentGitBranch
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:

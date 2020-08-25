@@ -4,7 +4,7 @@ import os
 import sys
 import string
 import random
-from syszux_log import LOG
+from .syszux_log import LOG
 
 try:
     from Crypto import Random

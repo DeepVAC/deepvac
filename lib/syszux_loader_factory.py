@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset,ConcatDataset,DataLoader
 
-from syszux_factory import SyszuxFactory
-import syszux_loader
+from .syszux_factory import SyszuxFactory
+import .syszux_loader
 
 class DatasetFactory(SyszuxFactory):
     def __init__(self):

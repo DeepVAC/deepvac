@@ -3,8 +3,8 @@ try:
 except:
     print("torchvision not found, some augmentors cannot be used.")
 
-from syszux_factory import SyszuxFactory
-import syszux_aug
+from .syszux_factory import SyszuxFactory
+import .syszux_aug
 
 class AugFactory(SyszuxFactory):
     def __init__(self):

@@ -6,7 +6,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-from syszux_helper import WarpMLS
+from .syszux_helper import WarpMLS
 
 class AugBase(object):
     def __init__(self, deepvac_config):

@@ -3,9 +3,9 @@ from collections import OrderedDict
 import sys
 sys.path.append('lib')
 from collections import defaultdict
-from syszux_aug_factory import AugFactory
-from syszux_loader_factory import LoaderFactory,DatasetFactory
-from syszux_synthesis_factory import SynthesisFactory
+from .syszux_aug_factory import AugFactory
+from .syszux_loader_factory import LoaderFactory,DatasetFactory
+from .syszux_synthesis_factory import SynthesisFactory
 import cv2
 import re
 import random
