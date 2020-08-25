@@ -1,6 +1,4 @@
 import sys
-sys.path.append('lib')
-sys.path.append('../lib')
 sys.path.append('../../lib')
 from config import config as deepvac_config
 import os
@@ -31,7 +29,9 @@ def getMinTup(min_distance, db, emb, names):
 
 # generate report
 # input:
-#       feature_name: name of feature files(4 pieces)
+#       dbs: db features list
+#       names: idx info list
+#       paths: img path list
 #       file_path: result file
 #       cls_num: number of ids
 # output:
@@ -52,7 +52,7 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
     if not len(done_infos) == 0:
         for inf in done_infos:
             _, label, _, pred = inf.strip().split(' ')
-            report.add(label, pred)
+            report.add(int(label), int(pred))
             f.write(inf)
 
     total = 0
@@ -65,14 +65,11 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
                 continue
 
             min_distance = []
-            min_distance = getMinTup(min_distance, dbs[0], emb, names[0])
-            min_distance = getMinTup(min_distance, dbs[1], emb, names[1])
+
+            for n in range(len(dbs)):
+                emb = emb.to(dbs[n].device)
+                min_distance = getMinTup(min_distance, dbs[n], emb, names[n])
                 
-            emb = emb.to('cuda:0')
-
-            min_distance = getMinTup(min_distance, dbs[2], emb, names[2])
-            min_distance = getMinTup(min_distance, dbs[3], emb, names[3])
-
             sorted_min_distance = sorted(min_distance, key=lambda t:t[1])
 
             pred = sorted_min_distance[1][0]
@@ -94,7 +91,7 @@ def compareAndReport(dbs, names, paths, file_path, cls_num):
     return report
 
 
-def test():
+def test(deepvac_config):
     db1 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_1.feature', map_location = {'cuda:0':'cuda:1'})
     db2 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_2.feature', map_location = {'cuda:0':'cuda:1'})
     db3 = torch.load('/gemfield/hostpv/gemfield/deepvac-service/src/db/asia_emor_fix_merged_3.feature', map_location = {'cuda:1':'cuda:0'})
@@ -117,6 +114,5 @@ if __name__ == "__main__":
     #config_cls = deepvac_config.cls
     #report = compareAndReport(config_cls.feature_name, config_cls.file_path, config_cls.cls_num)
     #report()
-
-    test()
+    test(deepvac_config)
 
