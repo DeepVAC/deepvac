@@ -3,9 +3,10 @@ from collections import OrderedDict
 import sys
 sys.path.append('lib')
 from collections import defaultdict
-from .syszux_aug_factory import AugFactory
-from .syszux_loader_factory import LoaderFactory,DatasetFactory
-from .syszux_synthesis_factory import SynthesisFactory
+from syszux_aug_factory import AugFactory
+from syszux_loader_factory import LoaderFactory,DatasetFactory
+from syszux_synthesis_factory import SynthesisFactory
+from syszux_log import LOG
 import cv2
 import re
 import random
@@ -120,6 +121,7 @@ class OcrAugExecutor(Executor):
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
         self.addAugChain('ac', ac, self.conf.aug_rate)
+        self.disp_step = self.conf.disp_step
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
@@ -138,11 +140,15 @@ class OcrAugExecutor(Executor):
         cv2.imwrite(output_file_name, img)
 
     def __call__(self):
+        idx = 0
         for f in self.loader():
             img = cv2.imread(f)
             for k in self._graph:
                 out = self._graph[k](img)
                 self.dumpImgToPath(k, f, out)
+            idx += 1
+            if idx % self.disp_step == 0:
+                LOG.logI('Current progress:{}'.format(idx))
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")

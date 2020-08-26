@@ -6,7 +6,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-from .syszux_helper import WarpMLS
+from syszux_helper import WarpMLS
 
 class AugBase(object):
     def __init__(self, deepvac_config):
@@ -28,6 +28,16 @@ class AugBase(object):
         if is_bgr2rgb:
             cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_img)
+
+class WithoutAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(WithoutAug,self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        return img
 
 # 图像添加随机斑点
 class SpeckleAug(AugBase):

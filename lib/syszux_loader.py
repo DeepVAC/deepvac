@@ -4,7 +4,7 @@ from torchvision import transforms as trans
 from torchvision.datasets import ImageFolder
 import numpy as np
 from PIL import Image, ImageFile
-from .syszux_log import LOG
+from syszux_log import LOG
 import cv2
 
 #Dataset -> VisionDataset -> DatasetFolder -> ImageFolder -> *Dataset
