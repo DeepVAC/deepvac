@@ -19,9 +19,9 @@ deepvac提供了PyTorch训练模型项目的工程化规范。为了达到这一
 |  目录/文件   |  说明   |
 |--------------|---------|
 |README.md     |项目的说明、git分支数量及其介绍、原始数据的存放路径说明         |
-|train.py      |训练和验证的入口文件,继承DeepvacTrain类体系（来自lib/syszux_deepvac.py）的扩展实现|
-|test.py       |测试的入口文件, 继承Deepvac类体系（来自lib/syszux_deepvac.py）的扩展实现|
-|config.py     |用户训练和测试的配置文件，syszux_config模块（来自lib/syszux_config）的扩展实现|
+|train.py      |训练和验证的入口文件,继承DeepvacTrain类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
+|test.py       |测试的入口文件, 继承Deepvac类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
+|config.py     |用户训练和测试的配置文件，syszux_config模块（来自deepvac/syszux_config）的扩展实现|
 |modules/model.py | 模型、Loss的定义文件，PyTorch Module类的扩展实现|
 |modules/utils.py | 工具类/方法的定义文件（可省略）|
 |data/train.txt | 训练集清单文件（可省略）|
@@ -67,7 +67,7 @@ deepvac采用的是git branch的解决方案。deepvac规定：
 请访问: [代码规范](./code_standard.md)。
 
 ## deepvac库
-lib库对使用层面提供以下模块：
+deepvac库对使用层面提供以下模块：
 
 |    模块            |      目录/文件               |  说明   |
 |--------------------|------------------------------|---------|
@@ -199,7 +199,7 @@ class FileLineCvStrDataset(FileLineDataset):
 ```
 哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
 
-再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac/lib库中的ImageFolderWithTransformDataset类：
+再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac库中的ImageFolderWithTransformDataset类：
 
 ```python
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
