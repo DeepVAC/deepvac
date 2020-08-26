@@ -73,6 +73,19 @@ class AugChain(Chain):
         i = random.randrange(len(self.op_list))
         return self.op_list[i](img)
 
+class DeepvacChain(Chain):
+    def __init__(self, flow_list, deepvac_config):
+        super(DeepvacChain, self).__init__(flow_list)
+        self.op_list = [eval("DeepvacChain.{}".format(x))(deepvac_config) for x in self.op_sym_list]
+        assert len(self.op_list) >0, 'module construct failed...'
+        self.conf = deepvac_config
+
+    def __call__(self, input):
+        for o in self.op_list:
+            o.setInput(input)
+            o.process()
+            input = o.getOutput()
+        return input
 
 class Executor(object):
     def __init__(self,deepvac_config):
