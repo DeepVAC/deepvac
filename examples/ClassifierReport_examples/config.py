@@ -1,5 +1,5 @@
 import os
-from syszux_config import *
+from deepvac.syszux_config import *
 ##########classifier report########
 config.cls = AttrDict()
 config.cls.file_path = './test_report.txt'

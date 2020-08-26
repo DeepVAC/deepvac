@@ -1,10 +1,5 @@
-import sys
-sys.path.append("lib")
-sys.path.append("../lib")
-sys.path.append("../../lib")
-
 from config import config as deepvac_config
-from syszux_synthesis_factory import SynthesisFactory
+from deepvac.syszux_synthesis_factory import SynthesisFactory
 
 synthesis = SynthesisFactory()
 

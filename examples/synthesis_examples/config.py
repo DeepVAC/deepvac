@@ -1,5 +1,5 @@
 import os
-from syszux_config import *
+from deepvac.syszux_config import *
 ##########text synthesis########
 config.text.total_num = 200000
 config.text.output_dir = '/gemfield/hostpv2/ocr_synthesis_output/RickandMorty'

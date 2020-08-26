@@ -107,8 +107,6 @@ import sys
 sys.path.append('/home/gemfield/github/deepvac')
 ```
 
-- 或者
-
 ## 3. 创建自己的PyTorch项目
 - 初始化自己项目的git仓库；
 - 在仓库中创建第一个研究分支，比如分支名为 LTS_b1_aug9_movie_video_plate_130w；

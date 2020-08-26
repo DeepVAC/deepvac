@@ -1,7 +1,5 @@
 import os
 from collections import OrderedDict
-import sys
-sys.path.append('lib')
 from collections import defaultdict
 from .syszux_aug_factory import AugFactory
 from .syszux_loader_factory import LoaderFactory,DatasetFactory

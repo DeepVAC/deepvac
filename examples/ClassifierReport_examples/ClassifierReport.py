@@ -1,13 +1,10 @@
-import sys
-sys.path.append('../../lib')
 from config import config as deepvac_config
 import os
 import numpy as np
 import torch
 import time
-from syszux_report import ClassifierReport
-from syszux_log import LOG
-
+from deepvac.syszux_report import ClassifierReport
+from deepvac.syszux_log import LOG
 
 # get the nearest and the second nearest features from a db
 # input: 
