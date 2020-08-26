@@ -4,6 +4,7 @@ from collections import defaultdict
 from .syszux_aug_factory import AugFactory
 from .syszux_loader_factory import LoaderFactory,DatasetFactory
 from .syszux_synthesis_factory import SynthesisFactory
+from .syszux_log import LOG
 import cv2
 import re
 import random
@@ -131,6 +132,7 @@ class OcrAugExecutor(Executor):
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
         self.addAugChain('ac', ac, self.conf.aug_rate)
+        self.log_every = self.conf.log_every if self.conf.log_every is not None else 1000
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
@@ -149,11 +151,13 @@ class OcrAugExecutor(Executor):
         cv2.imwrite(output_file_name, img)
 
     def __call__(self):
-        for f in self.loader():
+        for idx, f in enumerate(self.loader()):
             img = cv2.imread(f)
             for k in self._graph:
                 out = self._graph[k](img)
                 self.dumpImgToPath(k, f, out)
+            if idx % self.log_every == 0:
+                LOG.logI("Current process: {}".format(idx))
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")
