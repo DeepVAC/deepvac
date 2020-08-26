@@ -134,7 +134,7 @@ class OcrAugExecutor(Executor):
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
         self.addAugChain('ac', ac, self.conf.aug_rate)
-        self.disp_step = self.conf.disp_step
+        self.log_every = self.conf.log_every if self.conf.log_every!=None else 1000
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
@@ -153,14 +153,12 @@ class OcrAugExecutor(Executor):
         cv2.imwrite(output_file_name, img)
 
     def __call__(self):
-        idx = 0
-        for f in self.loader():
+        for idx, f in enumerate(self.loader()):
             img = cv2.imread(f)
             for k in self._graph:
                 out = self._graph[k](img)
                 self.dumpImgToPath(k, f, out)
-            idx += 1
-            if idx % self.disp_step == 0:
+            if idx % self.log_every == 0:
                 LOG.logI("Current process: {}".format(idx))
 
 if __name__ == "__main__":
