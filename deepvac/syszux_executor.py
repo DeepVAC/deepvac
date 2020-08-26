@@ -134,7 +134,7 @@ class OcrAugExecutor(Executor):
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
         self.addAugChain('ac', ac, self.conf.aug_rate)
-        self.log_every = self.conf.log_every if self.conf.log_every!=None else 1000
+        self.log_every = self.conf.log_every if self.conf.log_every is not None else 1000
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
