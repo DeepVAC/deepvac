@@ -150,7 +150,7 @@ class SynthesisTextFromVideo(SynthesisText):
         self.frame_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         assert self.frame_height > 4 * self.max_font, "video height must exceed {} pixels".format(4*self.max_font)
         self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height/2-self.max_font))
+        self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height/3-self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'scene'
         self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
