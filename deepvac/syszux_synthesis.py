@@ -146,11 +146,11 @@ class SynthesisTextFromVideo(SynthesisText):
         assert self.frames_num > 10, "invalid video file {}".format(self.video_file)
         self.sample_rate = self.conf.sample_rate
         if self.frames_num/self.sample_rate<self.total_num:
-            raise Exception("Total_num {} exceeds frame_nums/sample_rate, build exit!".format(self.total_num))
+            raise Exception("Total_num {} exceeds frame_nums({})/sample_rate({}), build exit!".format(self.total_num,int(self.frames_num),self.sample_rate))
         self.frame_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        assert self.frame_height > 2 * self.max_font, "video height must exceed {} pixels".format(2*self.max_font)
+        assert self.frame_height > 4 * self.max_font, "video height must exceed {} pixels".format(4*self.max_font)
         self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height-2*self.max_font))
+        self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height/3-self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'scene'
         self.fw = open(os.path.join(self.conf.output_dir,'video.txt'),'w')
