@@ -21,6 +21,7 @@ class Deepvac(object):
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.xb = torch.Tensor().to(self.conf.device)
         self.assertInGit()
         #init self.net
         self.initNet()
@@ -235,6 +236,32 @@ class Deepvac(object):
         torch.onnx._export(self.net, img, self.conf.onnx_output_model_path, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
+    def loadDB(self, db_path):
+        if not self.conf.db_path:
+            LOG.logI('No db configured.')
+            return
+        self.xb = torch.load(db_path).to(self.conf.device)
+
+    def addEmb2DB(self, emb):
+        if not self.conf.db_path:
+            LOG.logW('No db path configured.')
+        self.xb = torch.cat(self.xb, emb)
+
+    def saveDB(self, db_path):
+        torch.save(self.xb, db_path)
+
+    def search(self, xq, k=1):
+        D = I = []
+        if k < 1 or k > 10:
+            LOG.logE('illegal nearest neighbors parameter k(1 ~ 10): {}'.format(k))
+            return D, I
+
+        distance = torch.norm(self.xb - xq, dim=1)
+        for i in range(k):
+            values, indices = distance.kthvalue(i+1)
+            D.append(values.item())
+            I.append(indices.item())
+        return D, I
 
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
