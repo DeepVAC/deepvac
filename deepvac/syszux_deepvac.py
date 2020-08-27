@@ -165,15 +165,19 @@ class Deepvac(object):
     def process(self):
         LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
-    def __call__(self,input):
+    def __call__(self, input=None):
         if not self.state_dict:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
-        self.setInput(input)
+        
+        if input:
+            self.setInput(input)
+
         with torch.no_grad():
             self.process()
         #post process
         if self.conf.script_model_dir:
             sys.exit(0)
+            
         return self.getOutput()
 
     def _noGrad(self):
@@ -240,13 +244,14 @@ class Deepvac(object):
         self.xb = torch.load(db_path).to(self.conf.device)
 
     def addEmb2DB(self, emb):
-        self.xb = torch.cat(self.xb, emb)
+        self.xb = torch.cat((self.xb, emb))
 
     def saveDB(self, db_path):
         torch.save(self.xb, db_path)
 
     def search(self, xq, k=1):
-        D = I = []
+        D = []
+        I = []
         if k < 1 or k > 10:
             LOG.logE('illegal nearest neighbors parameter k(1 ~ 10): {}'.format(k))
             return D, I
