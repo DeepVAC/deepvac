@@ -237,14 +237,9 @@ class Deepvac(object):
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
     def loadDB(self, db_path):
-        if not self.conf.db_path:
-            LOG.logI('No db configured.')
-            return
         self.xb = torch.load(db_path).to(self.conf.device)
 
     def addEmb2DB(self, emb):
-        if not self.conf.db_path:
-            LOG.logW('No db path configured.')
         self.xb = torch.cat(self.xb, emb)
 
     def saveDB(self, db_path):
