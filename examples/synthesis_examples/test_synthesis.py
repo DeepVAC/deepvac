@@ -1,6 +1,3 @@
-import sys
-sys.path.append("../../../deepvac")
-
 from config import config as deepvac_config
 from deepvac.syszux_synthesis_factory import SynthesisFactory
 
