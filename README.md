@@ -2,7 +2,7 @@
 deepvac提供了PyTorch训练模型项目的工程化规范。为了达到这一目标，deepvac包含了：
 - 项目组织规范
 - 代码规范
-- deepvac lib库
+- deepvac库
 
 诸多PyTorch训练模型项目的内在逻辑都大同小异，因此deepvac致力于把更通用的逻辑剥离出来，从而使得工程代码的准确性、易读性、可维护性上更具优势。
 
@@ -19,9 +19,9 @@ deepvac提供了PyTorch训练模型项目的工程化规范。为了达到这一
 |  目录/文件   |  说明   |
 |--------------|---------|
 |README.md     |项目的说明、git分支数量及其介绍、原始数据的存放路径说明         |
-|train.py      |训练和验证的入口文件,继承DeepvacTrain类体系（来自lib/syszux_deepvac.py）的扩展实现|
-|test.py       |测试的入口文件, 继承Deepvac类体系（来自lib/syszux_deepvac.py）的扩展实现|
-|config.py     |用户训练和测试的配置文件，syszux_config模块（来自lib/syszux_config）的扩展实现|
+|train.py      |训练和验证的入口文件,继承DeepvacTrain类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
+|test.py       |测试的入口文件, 继承Deepvac类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
+|config.py     |用户训练和测试的配置文件，syszux_config模块（来自deepvac/syszux_config）的扩展实现|
 |modules/model.py | 模型、Loss的定义文件，PyTorch Module类的扩展实现|
 |modules/utils.py | 工具类/方法的定义文件（可省略）|
 |data/train.txt | 训练集清单文件（可省略）|
@@ -66,20 +66,20 @@ deepvac采用的是git branch的解决方案。deepvac规定：
 ## 代码规范
 请访问: [代码规范](./code_standard.md)。
 
-## deepvac lib库
-lib库对使用层面提供以下模块：
+## deepvac库
+deepvac库对使用层面提供以下模块：
 
 |    模块            |      目录/文件               |  说明   |
 |--------------------|------------------------------|---------|
-|SynthesisFactory    | lib/syszux_synthesis_factory.py | 用于数据合成或者清洗|
-|AugFactory          | lib/syszux_aug_factory.py       | 用于数据增强|
-|DatasetFactory       | lib/syszux_loader_factory.py   | Dataset的扩展实现，torch.utils.data.Dataset的子类们|
-|LoaderFactory       | lib/syszux_loader_factory.py   | 用于数据装载|
-|Deepvac{,Train,DDP}|lib/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
-|{,Face,Ocr}Report   | lib/syszux_report.py       | Report类体系，用于打印测试报告|
-|{,*Aug}Executor      | lib/syszux_executor.py       |Executor类体系，用于数据增强逻辑的抽象封装|
-|LOG                 | lib/syszux_log.py            |日志模块|
-|AttrDict            | lib/syszux_config.py          |配置模块 |
+|SynthesisFactory    | deepvac/syszux_synthesis_factory.py | 用于数据合成或者清洗|
+|AugFactory          | deepvac/syszux_aug_factory.py       | 用于数据增强|
+|DatasetFactory       | deepvac/syszux_loader_factory.py   | Dataset的扩展实现，torch.utils.data.Dataset的子类们|
+|LoaderFactory       | deepvac/syszux_loader_factory.py   | 用于数据装载|
+|Deepvac{,Train,DDP}|deepvac/syszux_deepvac.py     |Deepvac类体系，用于训练、验证、测试代码的基类|
+|{,Face,Ocr}Report   | deepvac/syszux_report.py       | Report类体系，用于打印测试报告|
+|{,*Aug}Executor      | deepvac/syszux_executor.py       |Executor类体系，用于数据增强逻辑的抽象封装|
+|LOG                 | deepvac/syszux_log.py            |日志模块|
+|AttrDict            | deepvac/syszux_config.py          |配置模块 |
 
 ## 项目依赖
 - Python3。不支持Python2，其已被废弃；
@@ -93,15 +93,19 @@ lib库对使用层面提供以下模块：
 参考[项目依赖](#项目依赖)  
 
 ## 2. 安装deepvac
+可以使用pip来进行安装：  
+```pip3 install deepvac```   
+或者  
+```python3 -m pip install deepvac```   
+如果你需要使用deepvac在gitlab上的最新代码，就需要使用如下的开发者模式：
+#### 开发者模式
 - 克隆该项目到本地：```git clone https://github.com/DeepVAC/deepvac ``` 
 - 在你的入口文件中添加：
 ```python
 import sys
 #replace with your local deepvac directory
-sys.path.append('/home/gemfield/github/deepvac/lib')
+sys.path.append('/home/gemfield/github/deepvac')
 ```
-
-- 或者（即将发布）：```pip3 install deepvac```
 
 ## 3. 创建自己的PyTorch项目
 - 初始化自己项目的git仓库；
@@ -109,7 +113,7 @@ sys.path.append('/home/gemfield/github/deepvac/lib')
 - 切换到上述的LTS_b1分支中，开始coding；
 
 ## 4. 编写配置文件
-配置文件的文件名均为 config.py，在代码开始处添加```from syszux_config import *```；  
+配置文件的文件名均为 config.py，在代码开始处添加```from deepvac.syszux_config import *```；  
 所有用户的配置都存放在这个文件里。 有些配置是全局唯一的，则直接配置如下：
 
 ```bash
@@ -195,7 +199,7 @@ class FileLineCvStrDataset(FileLineDataset):
 ```
 哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
 
-再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac/lib库中的ImageFolderWithTransformDataset类：
+再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac库中的ImageFolderWithTransformDataset类：
 
 ```python
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
@@ -253,4 +257,5 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
 - 启用自动混合精度训练；
 - 启用分布式训练；
 - 启用量化；  
+- 启用tensorboard；
 - （待完善）

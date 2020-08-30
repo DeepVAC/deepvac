@@ -1,16 +1,12 @@
-import sys
-sys.path.append('../../lib/')
-
 import torch
 from torch import nn
 from torch import optim
-from syszux_log import LOG
+from deepvac.syszux_log import LOG
 from modules.model import model
 from torch.utils.data import DataLoader
-from syszux_deepvac import DeepvacTrain
+from deepvac.syszux_deepvac import DeepvacTrain
 from torchvision.datasets import ImageFolder
-from syszux_loader import ImageFolderWithTransformDataset
-
+from deepvac.syszux_loader import ImageFolderWithTransformDataset
 
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
     def __init__(self, nsfw_config):

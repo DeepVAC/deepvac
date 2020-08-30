@@ -1,5 +1,5 @@
-from syszux_factory import SyszuxFactory
-import syszux_synthesis
+from .syszux_factory import SyszuxFactory
+from . import syszux_synthesis
 
 class SynthesisFactory(SyszuxFactory):
     def __init__(self):

@@ -7,8 +7,8 @@ import torch.optim as optim
 import torch.distributed as dist
 import time
 from enum import Enum
-from syszux_annotation import *
-from syszux_log import LOG,getCurrentGitBranch
+from .syszux_annotation import *
+from .syszux_log import LOG,getCurrentGitBranch
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
@@ -21,6 +21,7 @@ class Deepvac(object):
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
+        self.xb = torch.Tensor().to(self.conf.device)
         self.assertInGit()
         #init self.net
         self.initNet()
@@ -164,15 +165,19 @@ class Deepvac(object):
     def process(self):
         LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
-    def __call__(self,input):
+    def __call__(self, input=None):
         if not self.state_dict:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
-        self.setInput(input)
+        
+        if input:
+            self.setInput(input)
+
         with torch.no_grad():
             self.process()
         #post process
         if self.conf.script_model_dir:
             sys.exit(0)
+            
         return self.getOutput()
 
     def _noGrad(self):
@@ -235,6 +240,28 @@ class Deepvac(object):
         torch.onnx._export(self.net, img, self.conf.onnx_output_model_path, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
+    def loadDB(self, db_path):
+        self.xb = torch.load(db_path).to(self.conf.device)
+
+    def addEmb2DB(self, emb):
+        self.xb = torch.cat((self.xb, emb))
+
+    def saveDB(self, db_path):
+        torch.save(self.xb, db_path)
+
+    def search(self, xq, k=1):
+        D = []
+        I = []
+        if k < 1 or k > 10:
+            LOG.logE('illegal nearest neighbors parameter k(1 ~ 10): {}'.format(k))
+            return D, I
+
+        distance = torch.norm(self.xb - xq, dim=1)
+        for i in range(k):
+            values, indices = distance.kthvalue(i+1)
+            D.append(values.item())
+            I.append(indices.item())
+        return D, I
 
 class DeepvacTrain(Deepvac):
     #net must be PyTorch Module.
@@ -293,7 +320,8 @@ class DeepvacTrain(Deepvac):
             return
         from tensorboard import program
         tensorboard = program.TensorBoard()
-        tensorboard.configure(argv=[None, '--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
+        self.conf.tensorboard_ip = '0.0.0.0' if self.conf.tensorboard_ip is None else self.conf.tensorboard_ip
+        tensorboard.configure(argv=[None, '--host', str(self.conf.tensorboard_ip),'--logdir', event_dir, "--port", str(self.conf.tensorboard_port)])
         try:
             url = tensorboard.launch()
             LOG.logI('Tensorboard at {} '.format(url))

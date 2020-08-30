@@ -4,7 +4,7 @@ from torchvision import transforms as trans
 from torchvision.datasets import ImageFolder
 import numpy as np
 from PIL import Image, ImageFile
-from syszux_log import LOG
+from .syszux_log import LOG
 import cv2
 
 #Dataset -> VisionDataset -> DatasetFolder -> ImageFolder -> *Dataset
@@ -83,7 +83,10 @@ class OsWalkerLoader(object):
         self.conf = deepvac_config
         self.input_dir = self.conf.input_dir
 
-    def __call__(self):
+    def __call__(self, input_dir=None):
+        if input_dir:
+            self.input_dir = input_dir
+            
         for subdir, dirs, files in os.walk(self.input_dir):
             for file in files:
                 #print os.path.join(subdir, file)

@@ -1,11 +1,10 @@
 import os
 from collections import OrderedDict
-import sys
-sys.path.append('lib')
 from collections import defaultdict
-from syszux_aug_factory import AugFactory
-from syszux_loader_factory import LoaderFactory,DatasetFactory
-from syszux_synthesis_factory import SynthesisFactory
+from .syszux_aug_factory import AugFactory
+from .syszux_loader_factory import LoaderFactory,DatasetFactory
+from .syszux_synthesis_factory import SynthesisFactory
+from .syszux_log import LOG
 import cv2
 import re
 import random
@@ -73,6 +72,19 @@ class AugChain(Chain):
         i = random.randrange(len(self.op_list))
         return self.op_list[i](img)
 
+class DeepvacChain(Chain):
+    def __init__(self, flow_list, deepvac_config):
+        super(DeepvacChain, self).__init__(flow_list)
+        self.op_list = [eval("DeepvacChain.{}".format(x))(deepvac_config) for x in self.op_sym_list]
+        assert len(self.op_list) >0, 'module construct failed...'
+        self.conf = deepvac_config
+
+    def __call__(self, input):
+        for o in self.op_list:
+            o.setInput(input)
+            o.process()
+            input = o.getOutput()
+        return input
 
 class Executor(object):
     def __init__(self,deepvac_config):
@@ -120,6 +132,7 @@ class OcrAugExecutor(Executor):
         
         ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
         self.addAugChain('ac', ac, self.conf.aug_rate)
+        self.log_every = self.conf.log_every if self.conf.log_every is not None else 1000
 
     def auditConfig(self):
         self.output_dir = self.conf.output_dir
@@ -138,11 +151,13 @@ class OcrAugExecutor(Executor):
         cv2.imwrite(output_file_name, img)
 
     def __call__(self):
-        for f in self.loader():
+        for idx, f in enumerate(self.loader()):
             img = cv2.imread(f)
             for k in self._graph:
                 out = self._graph[k](img)
                 self.dumpImgToPath(k, f, out)
+            if idx % self.log_every == 0:
+                LOG.logI("Current process: {}".format(idx))
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")

@@ -6,7 +6,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-from syszux_helper import WarpMLS
+from .syszux_helper import WarpMLS
 
 class AugBase(object):
     def __init__(self, deepvac_config):
@@ -153,7 +153,7 @@ class LRmotionAug(AugBase):
         super(LRmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.ks = 5
+        self.ks = 3
 
     def __call__(self,img):
         kernel_motion_blur = np.zeros((self.ks, self.ks))
@@ -168,7 +168,7 @@ class UDmotionAug(AugBase):
         super(UDmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.ks = 9
+        self.ks = 3
 
     def __call__(self, img):
         kernel_motion_blur = np.zeros((self.ks, self.ks))

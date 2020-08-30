@@ -1,16 +1,11 @@
-import sys
-sys.path.append('../../lib/')
-
 import cv2
 import torch
-
 from torch import nn
-from syszux_log import LOG
+from deepvac.syszux_log import LOG
 from modules.model import model
-from syszux_deepvac import Deepvac
-from syszux_loader import OsWalkerLoader
-from syszux_report import ClassifierReport
-
+from deepvac.syszux_deepvac import Deepvac
+from deepvac.syszux_loader import OsWalkerLoader
+from deepvac.syszux_report import ClassifierReport
 
 class NSFWTestDataset(OsWalkerLoader):
     def __init__(self, nsfw_config):
