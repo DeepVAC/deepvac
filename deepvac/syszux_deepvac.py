@@ -146,7 +146,7 @@ class Deepvac(object):
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
         LOG.logI('Missing keys:{}'.format(len(missing_keys)))
-        LOG.logI('Unused checkpoint keys:{}'.format(len(unused_keys)))
+        LOG.logI('Unused keys:{}'.format(len(unused_keys)))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
         assert len(used_keys) > 0, 'load NONE from pretrained model'
         assert len(missing_keys) == 0, 'Net mismatched with pretrained model'
@@ -264,15 +264,10 @@ class Deepvac(object):
         return D, I
 
 class DeepvacTrain(Deepvac):
-    #net must be PyTorch Module.
     def __init__(self, deepvac_config):
         super(DeepvacTrain,self).__init__(deepvac_config)
-        self.dataset = None
-        self.loader = None
-        self.epoch = 0
-        self.step = 0
-        self.iter = 0
-        self._mandatory_member_name = ['train_dataset','val_dataset','train_loader','val_loader','net','criterion','optimizer']
+        self.initTrainParameters()
+        self.initTrainContext()
 
     def setTrainContext(self):
         self.is_train = True
@@ -292,8 +287,7 @@ class DeepvacTrain(Deepvac):
         self.batch_size = self.conf.val.batch_size
         self.net.eval()
 
-    def initNet(self):
-        super(DeepvacTrain,self).initNet()
+    def initTrainContext(self):
         self.scheduler = None
         self.initOutputDir()
         self.initSummaryWriter()
@@ -303,6 +297,14 @@ class DeepvacTrain(Deepvac):
         self.initCheckpoint()
         self.initTrainLoader()
         self.initValLoader()
+
+    def initTrainParameters(self):
+        self.dataset = None
+        self.loader = None
+        self.epoch = 0
+        self.step = 0
+        self.iter = 0
+        self._mandatory_member_name = ['train_dataset','val_dataset','train_loader','val_loader','net','criterion','optimizer']
 
     def initOutputDir(self):
         if self.conf.output_dir != 'output':
@@ -430,9 +432,9 @@ class DeepvacTrain(Deepvac):
         self.checkpoint_file = 'checkpoint:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
         torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
         torch.save({
-            'optimizer': self.optimizer.state_dict(), 
+            'optimizer': self.optimizer.state_dict(),
             'epoch': self.epoch,
-            'schedule': self.scheduler.state_dict() if self.scheduler else None
+            'scheduler': self.scheduler.state_dict() if self.scheduler else None
         }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
         self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
@@ -489,7 +491,8 @@ class DeepvacTrain(Deepvac):
 
     def process(self):
         self.iter = 0
-        for epoch in range(self.epoch, self.conf.epoch_num):
+        epoch_start = self.epoch
+        for epoch in range(epoch_start, self.conf.epoch_num):
             self.epoch = epoch
             LOG.logI('Epoch {} started...'.format(self.epoch))
             self.processTrain()
@@ -499,7 +502,6 @@ class DeepvacTrain(Deepvac):
     def __call__(self,input):
         self.auditConfig()
         self.process()
-
 
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):
@@ -517,9 +519,12 @@ class DeepvacDDP(DeepvacTrain):
         dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
         torch.cuda.set_device(self.args.gpu)
 
-    def initNet(self):
+        self.net = torch.nn.parallel.DistributedDataParallel(self.net, device_ids=[self.args.gpu])
+        LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
+
+    def initTrainContext(self):
         self.initDDP()
-        super(DeepvacDDP,self).initNet()
+        super(DeepvacDDP,self).initTrainContext()
     
     def initSummaryWriter(self):
         if self.args.rank != 0:
