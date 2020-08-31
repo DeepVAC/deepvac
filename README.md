@@ -97,7 +97,9 @@ deepvac库对使用层面提供以下模块：
 ```pip3 install deepvac```   
 或者  
 ```python3 -m pip install deepvac```   
-如果你需要使用deepvac在gitlab上的最新代码，就需要使用如下的开发者模式：
+
+
+如果你需要使用deepvac在github上的最新代码，就需要使用如下的开发者模式：
 #### 开发者模式
 - 克隆该项目到本地：```git clone https://github.com/DeepVAC/deepvac ``` 
 - 在你的入口文件中添加：
