@@ -411,9 +411,7 @@ class DeepvacTrain(Deepvac):
         pass
 
     def postEpoch(self):
-        if not self.scheduler:
-            return 
-        self.scheduler.step()
+        pass
 
     def doForward(self):
         self.output = self.net(self.sample)
@@ -468,6 +466,8 @@ class DeepvacTrain(Deepvac):
                 self.processVal()
                 self.setTrainContext()
         self.postEpoch()
+        if self.scheduler:
+            self.scheduler.step()
 
     def processVal(self):
         self.setValContext()
