@@ -21,10 +21,10 @@ class Deepvac(object):
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
         self.conf = deepvac_config
-        self.xb = torch.Tensor().to(self.conf.device)
         self.assertInGit()
         #init self.net
         self.initNet()
+        self.initNetPost()
 
     def assertInGit(self):
         if os.environ.get("disable_git"):
@@ -113,9 +113,12 @@ class Deepvac(object):
         #just print model parameters info
         self._parametersInfo()
         self.exportTorchViaScript()
+    
+    def initNetPost(self):
+        self.xb = torch.Tensor().to(self.device)
 
     def initDevice(self):
-        #to determine CUDA device
+        #to determine CUDA device, different in DDP
         self.device = torch.device(self.conf.device)
 
     def initNetWithCode(self):
@@ -241,7 +244,7 @@ class Deepvac(object):
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
     def loadDB(self, db_path):
-        self.xb = torch.load(db_path).to(self.conf.device)
+        self.xb = torch.load(db_path).to(self.device)
 
     def addEmb2DB(self, emb):
         self.xb = torch.cat((self.xb, emb))
@@ -395,17 +398,21 @@ class DeepvacTrain(Deepvac):
         self.writer.add_image(tag, image, step)
     
     @syszux_once
-    def addGraph(self, model, input):
-        self.writer.add_graph(model, input)
+    def addGraph(self, input):
+        self.writer.add_graph(self.net, input)
         
     def preEpoch(self):
         pass
 
     def preIter(self):
-        self.sample = self.img = self.img.to(self.device)
-        self.target = self.idx = self.idx.to(self.device)
+        self.sample = self.sample.to(self.device)
+        self.target = self.target.to(self.device)
         self.optimizer.zero_grad()
-        self.addGraph(self.net, self.img)
+        try:
+            self.addGraph(self.sample)
+        except:
+            LOG.logW("Tensorboard addGraph failed. You network foward may have more than one parameters?")
+            LOG.logW("Seems you need reimplement preIter function.")
 
     def postIter(self):
         pass
@@ -450,11 +457,11 @@ class DeepvacTrain(Deepvac):
         LOG.logI('SAVE LIST: {}'.format(self.save_list))
         self.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
 
-        for i, (img, idx) in enumerate(self.loader):
+        for i, (sample, target) in enumerate(self.loader):
             self.step = i
             self.iter += 1
-            self.idx = idx
-            self.img = img
+            self.target = target
+            self.sample = sample
             self.preIter()
             self.doForward()
             self.doLoss()
@@ -474,9 +481,9 @@ class DeepvacTrain(Deepvac):
         LOG.logI('Phase {} started...'.format(self.phase))
         with torch.no_grad():
             self.preEpoch()
-            for i, (img, idx) in enumerate(self.loader):
-                self.idx = idx
-                self.img = img
+            for i, (sample, target) in enumerate(self.loader):
+                self.target = target
+                self.sample = sample
                 self.preIter()
                 self.doForward()
                 self.doLoss()
@@ -508,17 +515,24 @@ class DeepvacDDP(DeepvacTrain):
         super(DeepvacDDP,self).__init__(deepvac_config)
         assert self.train_sampler is not None, "You should define self.train_sampler in DDP mode."
 
-    def initDDP(self):
+    def initDevice(self):
+        super(DeepvacDDP, self).initDevice()
         parser = argparse.ArgumentParser(description='DeepvacDDP')
         parser.add_argument("--gpu", default=-1, type=int, help="gpu")
         parser.add_argument('--rank', default=-1, type=int, help='node rank for distributed training')
         self.args = parser.parse_args()
         self.map_location = {'cuda:%d' % 0: 'cuda:%d' % self.args.rank}
+        #in DDP, device may come from command line
+        if self.args.gpu:
+            self.device = torch.device(self.args.gpu)
 
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "{}".format(self.args.gpu)
+        torch.cuda.set_device(self.args.gpu)
+            
+    def initDDP(self):
         LOG.logI("Start dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
         dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
-        torch.cuda.set_device(self.args.gpu)
-
+        #torch.cuda.set_device(self.args.gpu)
         self.net = torch.nn.parallel.DistributedDataParallel(self.net, device_ids=[self.args.gpu])
         LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
 
@@ -553,10 +567,10 @@ class DeepvacDDP(DeepvacTrain):
         super(DeepvacDDP, self).addImage(tag, image, step)
         
     @syszux_once
-    def addGraph(self, model, input):
+    def addGraph(self, input):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).addGraph(model.module, input)
+        self.writer.add_graph(self.net, input)
 
     def separateBN4OptimizerPG(self, modules):
         paras_only_bn = []
