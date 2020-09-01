@@ -76,7 +76,7 @@ def test(config):
         emb_indexes.append(np_f['names'])
         paths.append(np_f['paths'])
 
-    report = getClassifierByFaissReport(dbs, emb_indexes, paths, './report_info.txt', 90219)
+    report = getClassifierByFaissReport(dbs, emb_indexes, paths, config.file_path, config.cls_num)
     report()
 
 if __name__ == "__main__":
