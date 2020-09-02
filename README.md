@@ -6,6 +6,14 @@ deepvac提供了PyTorch训练模型项目的工程化规范。为了达到这一
 
 诸多PyTorch训练模型项目的内在逻辑都大同小异，因此deepvac致力于把更通用的逻辑剥离出来，从而使得工程代码的准确性、易读性、可维护性上更具优势。
 
+在DeepVAC内部，我们尽量使用最新版的PyTorch版本，并且使用Docker容器（实际上是基于Docker的更复杂的MLab2.0系统）进行训练和发布。我们为用户提供了构建好的Docker镜像，帮助用户省掉不必要的环境配置：
+```bash
+#只使用cpu
+docker run -it gemfield/pytorch:1.6.0-devel bash
+#使用GPU的话
+docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
+```
+该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev)
 
 ## 项目组织规范
 定义PyTorch训练模型项目的组织规范，包含：
