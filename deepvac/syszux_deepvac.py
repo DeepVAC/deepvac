@@ -150,11 +150,13 @@ class Deepvac(object):
         used_keys = code_net_keys & state_dict_keys
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
-        LOG.logI('Missing keys:{}'.format(len(missing_keys)))
-        LOG.logI('Unused keys:{}'.format(len(unused_keys)))
+        LOG.logI('Missing keys:{} | {}'.format(len(missing_keys), missing_keys))
+        LOG.logI('Unused keys:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
         assert len(used_keys) > 0, 'load NONE from pretrained model'
-        assert len(missing_keys) == 0, 'Net mismatched with pretrained model'
+
+        if len(missing_keys) > 0:
+            LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
 
     def loadStateDict(self):
         if not self.state_dict:

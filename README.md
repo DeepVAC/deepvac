@@ -293,7 +293,7 @@ config.weight_decay = None
 config.milestones = [2,4,6,8,10]
 ```
 
-### 训练Train
+### 训练
 ```python
 #训练的batch size
 config.train.batch_size = 128
@@ -307,10 +307,14 @@ config.save_num = 5
 config.checkpoint_suffix = '2020-09-01-17-37_acc:0.9682857142857143_epoch:10_step:6146_lr:0.00011543040395151496.pth'
 ```
 
-### 验证Val和测试Test
+### 验证和测试
 ```python
 #验证时所用的batch size
 config.val.batch_size = None
+
+#测试和验证不同之处有很多，其中一点就是要显式的从文件系统上加载训练过程中保存的模型：
+#model_path指定要加载模型的路径
+config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 ```
 
 ### DDP（分布式训练）
@@ -321,9 +325,13 @@ config.dist_url = "tcp://localhost:27030"
 
 #rank的数量，一定要修改
 config.world_size = 3
+```
 
-#以下两个为命令行参数，不是config.py中的配置
+以下两个配置为命令行参数，不是config.py中的配置:
+```bash
+#从0开始
 --rank <rank_idx>
+#从0开始
 --gpu <gpu_idx>
 ```
 
@@ -354,11 +362,11 @@ config.onnx_output_model_path = <your_onnx_file_path>
 如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
 ```python
 # NCNN网络结构的文件路径
-config.ncnn_param_output_path
+config.ncnn_param_output_path = <your_ncnn_netowrk_arch_file>
 # NCNN网络权重的文件路径
-config.ncnn_bin_output_path
+config.ncnn_bin_output_path = <your_ncnn_netowrk_weights_file>
 # onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
-config.onnx2ncnn
+config.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ```
 ### 输出CoreML
 ### 启用自动混合精度训练
