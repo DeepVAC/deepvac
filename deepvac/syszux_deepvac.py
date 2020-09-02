@@ -112,10 +112,12 @@ class Deepvac(object):
         self.loadStateDict()
         #just print model parameters info
         self._parametersInfo()
+        #compile pytorch state dict to TorchScript
         self.exportTorchViaScript()
     
     def initNetPost(self):
         self.xb = torch.Tensor().to(self.device)
+        self.sample = None
 
     def initDevice(self):
         #to determine CUDA device, different in DDP
@@ -168,6 +170,10 @@ class Deepvac(object):
     def process(self):
         LOG.logE("You must reimplement process() to process self.input_output['input']", exit=True)
 
+    def processSingle(self,sample):
+        self.sample = sample
+        return self.net(self.sample)
+
     def __call__(self, input=None):
         if not self.state_dict:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
@@ -177,9 +183,6 @@ class Deepvac(object):
 
         with torch.no_grad():
             self.process()
-        #post process
-        if self.conf.script_model_dir:
-            sys.exit(0)
             
         return self.getOutput()
 
@@ -187,14 +190,20 @@ class Deepvac(object):
         for p in self.net.parameters():
             p.requires_grad_(False)
 
-    def exportTorchViaTrace(self, img):
+    @syszux_once
+    def exportTorchViaTrace(self):
         if not self.conf.trace_model_dir:
+            if self.conf.script_model_dir:
+                LOG.logI("config.script_model_dir found, save & exit...")
+                sys.exit(0)
             return
         self._noGrad()
-        ts = torch.jit.trace(self.net, img)
+        ts = torch.jit.trace(self.net, self.sample)
         ts.save(self.conf.trace_model_dir)
+        LOG.logI("config.trace_model_dir found, save & exit...")
         sys.exit(0)
 
+    @syszux_once
     def exportTorchViaScript(self):
         if not self.conf.script_model_dir:
             return
@@ -202,7 +211,8 @@ class Deepvac(object):
         ts = torch.jit.script(self.net)
         ts.save(self.conf.script_model_dir)
     
-    def exportNCNN(self, img):
+    @syszux_once
+    def exportNCNN(self):
         if not self.conf.ncnn_param_output_path or not self.conf.ncnn_bin_output_path:
             return
         if not self.conf.onnx2ncnn:
@@ -216,7 +226,7 @@ class Deepvac(object):
         if not self.conf.onnx_output_model_path:
             f = tempfile.NamedTemporaryFile()
             self.conf.onnx_output_model_path = f.name
-        self.exportONNX(img)
+        self.exportONNX()
         
         cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_output_model_path + " " + self.conf.ncnn_param_output_path + " " + self.conf.ncnn_bin_output_path
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -234,13 +244,15 @@ class Deepvac(object):
         
         LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_param_output_path, self.conf.ncnn_bin_output_path))
 
+    @syszux_once
     def exportCoreML(self):
         pass
 
-    def exportONNX(self, img):
+    @syszux_once
+    def exportONNX(self):
         if not self.conf.onnx_output_model_path:
             return
-        torch.onnx._export(self.net, img, self.conf.onnx_output_model_path, export_params=True)
+        torch.onnx._export(self.net, self.sample, self.conf.onnx_output_model_path, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
 
     def loadDB(self, db_path):
@@ -304,6 +316,7 @@ class DeepvacTrain(Deepvac):
     def initTrainParameters(self):
         self.dataset = None
         self.loader = None
+        self.target = None
         self.epoch = 0
         self.step = 0
         self.iter = 0
@@ -407,6 +420,14 @@ class DeepvacTrain(Deepvac):
     def preIter(self):
         self.sample = self.sample.to(self.device)
         self.target = self.target.to(self.device)
+
+        #exportNCNN must before exportONNX
+        self.exportNCNN()
+        self.exportONNX()
+        #whether export TorchScript via trace, only here we can get self.sample
+        self.exportTorchViaTrace()
+
+        #clean grad
         self.optimizer.zero_grad()
         try:
             self.addGraph(self.sample)

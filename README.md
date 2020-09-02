@@ -259,13 +259,109 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
 一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
 
 ## 10. 再谈配置文件
-基于deepvac的PyTorch项目，可以通过在config.py中添加一些特殊配置项来自动实现特定的功能。
-- 输出TorchScript；
-- 输出ONNX；
-- 输出NCNN；
-- 输出CoreML；
-- 启用自动混合精度训练；
-- 启用分布式训练；
-- 启用量化；  
-- 启用tensorboard；
-- （待完善）
+基于deepvac的PyTorch项目，可以通过在config.py中添加一些配置项来自动实现特定的功能。
+
+### 通用配置
+```python
+#单卡训练和测试所使用的device，多卡请使用DeepvacDDP
+config.device = "cuda"
+#是否禁用git branch约束
+config.disable_git = False
+#模型输出和加载所使用的路径，非必要不要改动
+config.output_dir = "output"
+#日志输出的目录，非必要不要改动
+config.log_dir = "log"
+#每多少次迭代打印一次训练日志
+config.log_every = 10
+```
+### Dataloader
+```python
+#Dataloader的线程数
+config.num_workers = 3
+```
+### 优化器
+```python
+#学习率
+config.lr = 0.01
+#学习率下降比
+config.lr_factor = 0.2703
+#SGD相关
+config.momentum = 0.9
+config.nesterov = False
+config.weight_decay = None
+#使用MultiStepLR时的学习率下降Epoch idx
+config.milestones = [2,4,6,8,10]
+```
+
+### 训练Train
+```python
+#训练的batch size
+config.train.batch_size = 128
+#训练多少个Epoch
+config.epoch_num = 30
+#一个Epoch中保存多少次模型和Checkpoint文件
+config.save_num = 5
+#checkpoint_suffix一旦配置，则启动train.py的时候将加载output/<git_branch>/checkpoint:<checkpoint_suffix>
+#训练将会从Epoch10重新开始
+#不配置或者配置为空字符串，表明从头开始训练
+config.checkpoint_suffix = '2020-09-01-17-37_acc:0.9682857142857143_epoch:10_step:6146_lr:0.00011543040395151496.pth'
+```
+
+### 验证Val和测试Test
+```python
+#验证时所用的batch size
+config.val.batch_size = None
+```
+
+### DDP（分布式训练）
+要启用分布式训练，你的类需要继承DeepvacDDP，并且进行如下配置：
+```python
+#dist_url，单机多卡无需改动，多机训练一定要修改
+config.dist_url = "tcp://localhost:27030"
+
+#rank的数量，一定要修改
+config.world_size = 3
+
+#以下两个为命令行参数，不是config.py中的配置
+--rank <rank_idx>
+--gpu <gpu_idx>
+```
+
+### 启用tensorboard服务  
+Deepvac会自动在log/<git_branch>/下写入tensorboard数据，如果需要在线可视化，则还需要如下配置：
+```python
+# 如果不配置，则不启用tensorboard服务
+config.tensorboard_port = "6007"
+# 不配置的话为0.0.0.0，如非必要则无需改变
+config.tensorboard_ip = None
+```
+
+### 输出TorchScript
+一旦配置如下的参数后，Deepvac会认为你的目的是转换和保存TorchScript模型，因此将会在一次前向后退出程序。
+```python
+#通过script的方式将pytorch训练的模型编译为TorchScript模型
+config.script_model_dir = <your_pt_file_path>
+
+#通过trace的方式将pytorch训练的模型转换为TorchScript模型
+config.trace_model_dir = <your_pt_file_path>
+```
+### 输出ONNX模型
+```python
+#输出config.onnx_output_model_path
+config.onnx_output_model_path = <your_onnx_file_path>
+```
+### 输出NCNN模型
+如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
+```python
+# NCNN网络结构的文件路径
+config.ncnn_param_output_path
+# NCNN网络权重的文件路径
+config.ncnn_bin_output_path
+# onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
+config.onnx2ncnn
+```
+### 输出CoreML
+### 启用自动混合精度训练
+### 启用量化
+
+
