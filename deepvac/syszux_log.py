@@ -54,26 +54,33 @@ class LOG(object):
         W = 'Warning'
         E = 'Error'
 
+    LOG_LEVEL = S.I
     logfunc = {S.I: lambda x : logger.info(x),
                 S.W: lambda x : logger.warning(x),
                 S.E: lambda x : logger.error(x)
                 }
+            
+    intfunc = {S.I: 0, S.W: 1, S.E: 2}
     @staticmethod
     def log(level, str):
         if level not in LOG.logfunc.keys():
             LOG.logfunc[LOG.S.E]("incorrect value of parameter level when call log function.")
+
+        if LOG.intfunc[level] < LOG.intfunc[LOG.LOG_LEVEL]:
+            return 
+
         LOG.logfunc[level](str)
 
     @staticmethod
     def logI(str):
-        LOG.logfunc[LOG.S.I](str)
+        LOG.log(LOG.S.I, str)
 
     @staticmethod
     def logW(str):
-        LOG.logfunc[LOG.S.W](str)
+        LOG.log(LOG.S.W, str)
 
     @staticmethod
     def logE(str, exit=False):
-        LOG.logfunc[LOG.S.E](str)
+        LOG.log(LOG.S.E, str)
         if exit:
             sys.exit(1)
