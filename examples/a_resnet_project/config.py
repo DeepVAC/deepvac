@@ -30,6 +30,7 @@ config.val.transform_op = transforms.Compose([transforms.Resize(config.input_siz
 
 # test
 config.test.ds_name = "gemfield"
-config.test.cls_to_idx = ['neutral', 'porn', 'sexy']
+config.test.input_size = (224, 224)
+config.test.cls_to_idx = ['normal', 'porn', 'sexy']
 config.test.input_dir = "/gemfield/hostpv/nsfw/porn_cls3/test/"
-config.test.model_path = "output/LTS_NSFW_train_standard/model:2020-08-17-10-05_acc:0.877159855021952_epoch:0_step:332_lr:0.001.pth"
+config.test.model_path = None

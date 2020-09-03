@@ -1,8 +1,9 @@
 import cv2
 import torch
+import numpy as np
 from torch import nn
-from deepvac.syszux_log import LOG
 from modules.model import model
+from deepvac.syszux_log import LOG
 from deepvac.syszux_deepvac import Deepvac
 from deepvac.syszux_loader import OsWalkerLoader
 from deepvac.syszux_report import ClassifierReport
@@ -28,6 +29,8 @@ class DeepvacNSFW(Deepvac):
             # img
             img = cv2.imread(filename, cv2.IMREAD_COLOR)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)            
+            img = cv2.resize(img, self.conf.test.input_size, interpolation=cv2.INTER_LINEAR)
+            img = (img / 255.0 - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
             img = torch.Tensor(img).permute(2, 0, 1).unsqueeze(0).to(self.conf.device)
             # forward
             with torch.no_grad():
