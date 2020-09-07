@@ -18,13 +18,15 @@ class AugBase(object):
     def __call__(self,img):
         raise Exception("Not implemented!")
 
-    def pillow2cv(self, pillow_img, is_rgb2bgr=True):
+    @staticmethod
+    def pillow2cv(pillow_img, is_rgb2bgr=True):
         cv_image = np.array(pillow_img)
         if is_bgr2rgb:
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
         return cv_image
 
-    def cv2pillow(self, cv_img, is_bgr2rgb=True):
+    @staticmethod
+    def cv2pillow(cv_img, is_bgr2rgb=True):
         if is_bgr2rgb:
             cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_img)
