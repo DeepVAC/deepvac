@@ -103,10 +103,11 @@ class GaussianAug(AugBase):
         super(GaussianAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.ks = 5
+        self.ks = [9,11,13,15,17]
 
     def __call__(self, img):
-        img_gaussian = cv2.GaussianBlur(img,(self.ks, self.ks), 0)
+        ks = self.ks[np.random.randint(0,len(self.ks))]
+        img_gaussian = cv2.GaussianBlur(img,(ks, ks), 0)
         return img_gaussian
 
 # 添加横线增强
@@ -155,12 +156,13 @@ class LRmotionAug(AugBase):
         super(LRmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.ks = 3
+        self.ks = [3,5,7,9]
 
     def __call__(self,img):
-        kernel_motion_blur = np.zeros((self.ks, self.ks))
-        kernel_motion_blur[int((self.ks - 1) / 2), :] = np.ones(self.ks)
-        kernel_motion_blur = kernel_motion_blur / self.ks
+        ks = self.ks[np.random.randint(0,len(self.ks))]
+        kernel_motion_blur = np.zeros((ks, ks))
+        kernel_motion_blur[int((ks - 1) / 2), :] = np.ones(ks)
+        kernel_motion_blur = kernel_motion_blur / ks
         img_lrmotion = cv2.filter2D(img, -1, kernel_motion_blur)
         return img_lrmotion
 
@@ -170,12 +172,13 @@ class UDmotionAug(AugBase):
         super(UDmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.ks = 3
+        self.ks = [3,5,7,9]
 
     def __call__(self, img):
-        kernel_motion_blur = np.zeros((self.ks, self.ks))
-        kernel_motion_blur[:, int((self.ks - 1) / 2)] = np.ones(self.ks)
-        kernel_motion_blur = kernel_motion_blur / self.ks
+        ks = self.ks[np.random.randint(0,len(self.ks))] 
+        kernel_motion_blur = np.zeros((ks, ks))
+        kernel_motion_blur[:, int((ks - 1) / 2)] = np.ones(ks)
+        kernel_motion_blur = kernel_motion_blur / ks
         img_udmotion = cv2.filter2D(img, -1, kernel_motion_blur)
         return img_udmotion
 
