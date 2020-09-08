@@ -1,23 +1,28 @@
 from config import config as deepvac_config
 import os
+import sys
 import numpy as np
 import torch
 import time
-import faiss
+try:
+    import faiss
+except:
+    LOG.W("Faiss not installed. You cannot use the API implemented based on Faiss library.")
+
 from deepvac.syszux_report import ClassifierReport
 from deepvac.syszux_log import LOG
 
-def swig_ptr_from_FloatTensor(x):
+def swigPtrFromTensor(x):
     """ gets a Faiss SWIG pointer from a pytorch trensor (on CPU or GPU) """
     assert x.is_contiguous()
-    assert x.dtype == torch.float32
-    return faiss.cast_integer_to_float_ptr(x.storage().data_ptr() + x.storage_offset() * 4)
 
-def swig_ptr_from_LongTensor(x):
-    """ gets a Faiss SWIG pointer from a pytorch trensor (on CPU or GPU) """
-    assert x.is_contiguous()
-    assert x.dtype == torch.int64, 'dtype=%s' % x.dtype
-    return faiss.cast_integer_to_long_ptr(x.storage().data_ptr() + x.storage_offset() * 8)
+    if x.dtype == torch.float32:
+        return faiss.cast_integer_to_float_ptr(x.storage().data_ptr() + x.storage_offset() * 4)
+    
+    if x.dtype == torch.int64:
+        return faiss.cast_integer_to_long_ptr(x.storage().data_ptr() + x.storage_offset() * 8)
+
+    raise Exception("tensor type not supported: {}".format(x.dtype))
 
 class FeatureVector(object):
     def __init__(self, deepvac_config):
@@ -61,6 +66,7 @@ class NamesPathsClsFeatureVector(FeatureVector):
         super(NamesPathsClsFeatureVector, self).__init__(deepvac_config)
         assert self.conf.class_num, 'You must configure config.class_num in config.py'
         assert self.conf.np_path_list, 'You must configure config.np_path_list in config.py'
+        assert len(self.conf.np_path_list) == len(self.conf.db_path_list), 'config.db_path_list number should be same with config.np_path_list'
         self.names = []
         self.paths = []
 
@@ -71,26 +77,19 @@ class NamesPathsClsFeatureVector(FeatureVector):
             self.names.append(npf['names'])
             self.paths.append(npf['paths'])
 
-    def searchDB(self, xb, xq, name, k=2):
-        D,I = super(NamesPathsClsFeatureVector, self).searchDB(xb, xq, k)
-        if not D or not I:
-            return D,I,[]
-        return D, I, name[I]
-
     def searchAllDB(self, xq, k=2):
-        D = []
-        N = []
+        TMP_D = []
+        TMP_N = []
         for i, db in enumerate(self.dbs):
-            name = self.names[i]
             xq = xq.to(db.device)
-            distances, indices, names = self.searchDB(db, xq, name, k)
-            D.extend(distances)
-            N.extend(names)
+            distances, indices = self.searchDB(db, xq, k)
+            TMP_D.extend(distances)
+            TMP_N.extend(self.names[i][indices])
 
-        RN = [n for _,n in sorted(zip(D,N))]
-        RD = sorted(D)
+        N = [n for _,n in sorted(zip(TMP_D,TMP_N))]
+        D = sorted(TMP_D)
 
-        return RD[:k], RN[:k]
+        return D[:k], N[:k]
 
     def printClassifierReport(self):
         report = ClassifierReport(self.conf.name, self.conf.class_num, self.conf.class_num)
@@ -98,8 +97,8 @@ class NamesPathsClsFeatureVector(FeatureVector):
             name = self.names[i]
             path = self.paths[i]
             for idx, emb in enumerate(db):
-                RD, RN = self.searchAllDB(emb)
-                pred_ori, pred = RN[0], RN[1]
+                _, N = self.searchAllDB(emb)
+                should_be_gt, pred = N[0], N[1]
                 LOG.logI("label : {}".format(name[idx]))
                 LOG.logI("pred : {}".format(pred))
                 if idx % self.conf.log_every == 0:
@@ -107,49 +106,21 @@ class NamesPathsClsFeatureVector(FeatureVector):
                 report.add(int(name[idx]), int(pred))
         report()
 
-class FeatureVectorByFaiss(object):
-    def __init__(self, deepvac_config):
-        self.conf = deepvac_config
-        assert self.conf.class_num, 'You must configure config.class_num in config.py'
-        assert self.conf.np_path_list, 'You must configure config.np_path_list in config.py'
-        self.names = []
-        self.paths = []
-        if not self.conf.name:
-            self.conf.name = 'gemfield'
-        if not self.conf.log_every:
-            self.conf.log_every = 10000
-    
-    def loadDB(self):
-        for np_path in self.conf.np_path_list:
-            npf = np.load(np_path)
-            self.names.append(npf['names'])
-            self.paths.append(npf['paths'])
-
-    def search_index_pytorch(self, index, x, k, D=None, I=None):
-        pass
-
-    def searchAllDB(self, xq, k=2):
-        raise Exception("Cannot do searchAllDB in base class, since no names can be used to re index feature accross multi DB BLOCK.")
-
-    def printClassifierReport(self):
-        pass
-
-class NamesPathsClsFeatureVectorByFaiss(FeatureVectorByFaiss):
+class NamesPathsClsFeatureVectorByFaiss(NamesPathsClsFeatureVector):
     def __init__(self, deepvac_config):
         super(NamesPathsClsFeatureVectorByFaiss, self).__init__(deepvac_config)
-        self.dbs = []
+        if 'faiss' not in sys.modules:
+            LOG.logE("Faiss not installed, cannot use this class.", exit=True)
 
     def loadDB(self):
         super(NamesPathsClsFeatureVectorByFaiss, self).loadDB()
-        assert self.conf.db_path_list, 'You must configure config.db_path_list in config.py'
-        assert len(self.conf.np_path_list) == len(self.conf.db_path_list), 'config.db_path_list number should be same with config.np_path_list'
         for db_path in self.conf.db_path_list:
             self.dbs.append(torch.load(db_path).to('cpu').numpy().astype('float32'))
 
     def searchAllDB(self, xq, k=2):
         D = []
         N = []
-        d = 512
+        d = self.dbs[0][0].shape[-1]
         LOG.logI('Load index start...')
         cpu_index = faiss.IndexFlatL2(d)
         gpu_index = faiss.index_cpu_to_all_gpus(cpu_index)
@@ -159,7 +130,7 @@ class NamesPathsClsFeatureVectorByFaiss(FeatureVectorByFaiss):
             name = self.names[i]
             gpu_index.reset()
             gpu_index.add(db)
-            tempD, tempI = self.gpu_index.search(xq, k)
+            tempD, tempI = gpu_index.search(xq, k)
             tempN = name[tempI]
 
             if len(D) == 0:
@@ -186,8 +157,8 @@ class NamesPathsClsFeatureVectorByFaiss(FeatureVectorByFaiss):
 
             for idx, n in enumerate(RN):
                 pred_ori, pred = n[0], n[1]
-                #LOG.logI("label : {}".format(name[idx]))
-                #LOG.logI("pred : {}".format(pred))
+                LOG.logI("label : {}".format(name[idx]))
+                LOG.logI("pred : {}".format(pred))
                 if idx % self.conf.log_every == 0:
                     LOG.logI("Process {} img...".format(idx))
                 report.add(int(name[idx]), int(pred))
@@ -224,9 +195,9 @@ class NamesPathsClsFeatureVectorByFaissPytorch(FeatureVectorByFaiss):
             assert I.size() == (n, k)
         
         torch.cuda.synchronize()
-        xptr = swig_ptr_from_FloatTensor(x)
-        Iptr = swig_ptr_from_LongTensor(I)
-        Dptr = swig_ptr_from_FloatTensor(D)
+        xptr = swigPtrFromTensor(x)
+        Iptr = swigPtrFromTensor(I)
+        Dptr = swigPtrFromTensor(D)
         index.search_c(n, xptr, k, Dptr, Iptr)
         torch.cuda.synchronize()
         
