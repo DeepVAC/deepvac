@@ -21,6 +21,7 @@ config.cls_faiss_block.class_num = 90219 # numbers of idx
 config.cls_faiss_block.log_every = 10000 # log
 config.cls_faiss_block.db_path_list = []  # your db_paths list
 config.cls_faiss_block.np_path_list = []  # your np_paths list
+config.cls_faiss_block.block_map = [] # your block map [0, 0, 1, 1] , length is equal to np_path_list and db_path_list
 config.cls_faiss_block.file_path = './test_report.txt'  # result file path
 ##########classifier_faiss_pth report########
 config.cls_faiss_pth = AttrDict()
