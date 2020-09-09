@@ -1,4 +1,6 @@
-from deepvac.syszux_feature_vector import NamesPathsClsFeatureVector, NamesPathsClsFeatureVectorByFaiss, NamesPathsClsFeatureVectorByFaissPytorch
+import sys
+sys.path.insert(0, '/gemfield/hostpv/wangyuhang/new/deepvac/')
+from deepvac.syszux_feature_vector import NamesPathsClsFeatureVector, NamesPathsClsFeatureVectorByFaiss, NamesPathsClsFeatureVectorByFaissPytorch, NamesPathsClsFeatureVectorByFaissMulBlock
 
 
 if __name__ == "__main__":
@@ -12,6 +14,13 @@ if __name__ == "__main__":
     # faiss feature vector test
     fv = NamesPathsClsFeatureVectorByFaiss(deepvac_config.cls_faiss)
     fv.loadDB()
+    fv.loadIndex()
+    fv.printClassifierReport()
+
+    # faiss mul block feature vector test
+    fv = NamesPathsClsFeatureVectorByFaissMulBlock(deepvac_config.cls_faiss_block)
+    fv.loadDB()
+    fv.loadIndex()
     fv.printClassifierReport()
 
     # faiss pytorch feature vector test

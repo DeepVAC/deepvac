@@ -12,9 +12,16 @@ config.cls.file_path = './test_report.txt'  # result file path
 config.cls_faiss = AttrDict()
 config.cls_faiss.class_num = 90219 # numbers of idx
 config.cls_faiss.log_every = 10000 # log
-config.cls_faiss.db_path_list = [] # your db_paths list
-config.cls_faiss.np_path_list = [] # your np_paths list
+config.cls_faiss.db_path_list = []
+config.cls_faiss.np_path_list = []
 config.cls_faiss.file_path = './test_report.txt' # result file path
+##########classifier_faiss_block report########
+config.cls_faiss_block = AttrDict()
+config.cls_faiss_block.class_num = 90219 # numbers of idx
+config.cls_faiss_block.log_every = 10000 # log
+config.cls_faiss_block.db_path_list = []  # your db_paths list
+config.cls_faiss_block.np_path_list = []  # your np_paths list
+config.cls_faiss_block.file_path = './test_report.txt'  # result file path
 ##########classifier_faiss_pth report########
 config.cls_faiss_pth = AttrDict()
 config.cls_faiss_pth.class_num = 90219  # numbers of idx
