@@ -1,7 +1,4 @@
-import sys
-sys.path.insert(0, '/gemfield/hostpv/wangyuhang/new/deepvac/')
 from deepvac.syszux_feature_vector import NamesPathsClsFeatureVector, NamesPathsClsFeatureVectorByFaiss, NamesPathsClsFeatureVectorByFaissPytorch, NamesPathsClsFeatureVectorByFaissMulBlock
-
 
 if __name__ == "__main__":
     from config import config as deepvac_config
