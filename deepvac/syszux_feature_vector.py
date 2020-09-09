@@ -106,34 +106,130 @@ class NamesPathsClsFeatureVector(FeatureVector):
                 report.add(int(name[idx]), int(pred))
         report()
 
-class NamesPathsClsFeatureVectorByFaiss(NamesPathsClsFeatureVector):
+class NamesPathsClsFeatureVectorByFaiss(object):
     def __init__(self, deepvac_config):
-        super(NamesPathsClsFeatureVectorByFaiss, self).__init__(deepvac_config)
         if 'faiss' not in sys.modules:
             LOG.logE("Faiss not installed, cannot use this class.", exit=True)
+        self.conf = deepvac_config
+        assert self.conf.db_path_list, 'You must configure config.db_path_list in config.py'
+        assert self.conf.np_path_list, 'You must configure config.np_path_list in config.py'
+        assert len(self.conf.np_path_list) == len(self.conf.db_path_list), 'config.np_path_list number should be same with config.db_path_list'
+                        
+        if not self.conf.name:
+            self.conf.name = 'gemfield'
+        if not self.conf.log_every:
+            self.conf.log_every = 10000
+        
+        self.dbs = []
+        self.names = []
+        self.paths = []
+        self.gpu_index = []
 
     def loadDB(self):
-        super(NamesPathsClsFeatureVectorByFaiss, self).loadDB()
-        for db_path in self.conf.db_path_list:
-            self.dbs.append(torch.load(db_path).to('cpu').numpy().astype('float32'))
+        for i, (db_path, np_path) in enumerate(zip(self.conf.db_path_list, self.conf.np_path_list)):
+            npf = np.load(np_path)
+            if i == 0:
+                self.dbs = torch.load(db_path).to('cpu').numpy().astype('float32')
+                self.names = npf['names']
+                self.paths = npf['paths']
+                continue
+            self.dbs = np.vstack((self.dbs, torch.load(db_path).to('cpu').numpy().astype('float32')))
+            self.names = np.hstack((self.names, npf['names']))
+            self.paths = np.hstack((self.paths, npf['paths']))
+        torch.cuda.empty_cache()
+
+    def loadIndex(self):
+        assert self.dbs != [], "You should load db before load index, use self.loadDB() ..."
+        d = self.dbs[0].shape[-1]
+        ngpu = faiss.get_num_gpus()
+        index = faiss.IndexFlatL2(d)
+        vres = faiss.GpuResourcesVector()
+        vdev = faiss.IntVector()
+        gpu_resources = []
+        
+        for i in range(0, ngpu):
+            res = faiss.StandardGpuResources()
+            vdev.push_back(i)
+            vres.push_back(res)
+        
+        co = faiss.GpuMultipleClonerOptions()
+        co.shard = True
+        self.gpu_index = faiss.index_cpu_to_gpu_multiple(vres, vdev, index, co)
+        self.gpu_index.referenced_objects = gpu_resources
+        
+        self.gpu_index.add(self.dbs)
 
     def searchAllDB(self, xq, k=2):
+        assert self.gpu_index != [], "You should load index before search, use self.loadIndex() ..."
+        D, I = self.gpu_index.search(xq, k)
+        N = self.names[I]
+
+        return D, N
+
+    def printClassifierReport(self):
+        report = ClassifierReport(self.conf.name, self.conf.class_num, self.conf.class_num)
+        RD, RN = self.searchAllDB(self.dbs)
+
+        for idx, n in enumerate(RN):
+            pred_ori, pred = n[0], n[1]
+            LOG.logI("label : {}".format(self.names[idx]))
+            LOG.logI("pred : {}".format(pred))
+            if idx % self.conf.log_every == 0:
+                LOG.logI("Process {} img...".format(idx))
+            
+            report.add(int(name[idx]), int(pred))
+        report()
+
+class NamesPathsClsFeatureVectorByFaissMulBlock(NamesPathsClsFeatureVectorByFaiss):
+    def __init__(self, deepvac_config):
+        super(NamesPathsClsFeatureVectorByFaissMulBlock, self).__init__(deepvac_config)
+
+    def loadDB(self):
+        dbs = []
+        names = []
+        paths = []
+        for i, (db_path, np_path) in enumerate(zip(self.conf.db_path_list, self.conf.np_path_list)):
+            npf = np.load(np_path)
+            if dbs == [] and names == [] and paths == []:
+                dbs = torch.load(db_path).to('cpu').numpy().astype('float32')
+                names = npf['names']
+                paths = npf['paths']
+                continue
+            dbs = np.vstack((dbs, torch.load(db_path).to('cpu').numpy().astype('float32')))
+            names = np.hstack((names, npf['names']))
+            paths = np.hstack((paths, npf['paths']))
+            if (i+1) % 2 == 0:
+                self.dbs.append(dbs)
+                self.names.append(names)
+                self.paths.append(paths)
+                dbs = []
+                names = []
+                paths = []
+        dbs = []
+        torch.cuda.empty_cache()
+
+    def loadIndex(self):
+        assert self.dbs != [], "You should load db before load index, use self.loadDB() ..."
+        d = self.dbs[0].shape[-1]
+        ngpu = faiss.get_num_gpus()
+        index = faiss.IndexFlatL2(d)
+
+        res = faiss.StandardGpuResources()
+        
+        for i in range(len(self.dbs)):
+            gpu_index = faiss.index_cpu_to_gpu(res, i, index)
+            gpu_index.add(self.dbs[i])
+            self.gpu_index.append(gpu_index)
+
+    def searchAllDB(self, xq, k=2):
+        assert self.gpu_index != [], "You should load index before search, use self.loadIndex() ..."
+        
         D = []
         N = []
-        d = self.dbs[0][0].shape[-1]
-        LOG.logI('Load index start...')
-        cpu_index = faiss.IndexFlatL2(d)
-        gpu_index = faiss.index_cpu_to_all_gpus(cpu_index)
-        LOG.logI('Load index finished...')
-        
-        for i, db in enumerate(self.dbs):
-            name = self.names[i]
-            gpu_index.reset()
-            gpu_index.add(db)
-            tempD, tempI = gpu_index.search(xq, k)
-            tempN = name[tempI]
-
-            if len(D) == 0:
+        for i, gindex in enumerate(self.gpu_index):
+            tempD, tempI = gindex.search(xq, k)
+            tempN = self.names[i][tempI]
+            if i == 0:
                 D, N = tempD, tempN
                 continue
             D = np.hstack((D, tempD))
@@ -144,16 +240,15 @@ class NamesPathsClsFeatureVectorByFaiss(NamesPathsClsFeatureVector):
             index = np.argsort(d)
             RD[i] = D[i][index]
             RN[i] = N[i][index]
-
+            
         return RD[:, :k], RN[:, :k]
 
     def printClassifierReport(self):
         report = ClassifierReport(self.conf.name, self.conf.class_num, self.conf.class_num)
-        for i, xq in enumerate(self.dbs):
-            LOG.logI('Process {} db...'.format(i))
+        
+        for i, db in enumerate(self.dbs):
             name = self.names[i]
-            path = self.paths[i]
-            RD, RN = self.searchAllDB(xq)
+            RD, RN = self.searchAllDB(db)
 
             for idx, n in enumerate(RN):
                 pred_ori, pred = n[0], n[1]
@@ -161,11 +256,13 @@ class NamesPathsClsFeatureVectorByFaiss(NamesPathsClsFeatureVector):
                 LOG.logI("pred : {}".format(pred))
                 if idx % self.conf.log_every == 0:
                     LOG.logI("Process {} img...".format(idx))
+                
                 report.add(int(name[idx]), int(pred))
-
+            LOG.logI("{} xq finished...".format(i))
+                
         report()
 
-class NamesPathsClsFeatureVectorByFaissPytorch(FeatureVectorByFaiss):
+class NamesPathsClsFeatureVectorByFaissPytorch(NamesPathsClsFeatureVector):
     def __init__(self, deepvac_config):
         super(NamesPathsClsFeatureVectorByFaissPytorch, self).__init__(deepvac_config)
         self.dbs = []
