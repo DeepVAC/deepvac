@@ -11,13 +11,11 @@ if __name__ == "__main__":
     # faiss feature vector test
     fv = NamesPathsClsFeatureVectorByFaiss(deepvac_config.cls_faiss)
     fv.loadDB()
-    fv.loadIndex()
     fv.printClassifierReport()
 
     # faiss mul block feature vector test
     fv = NamesPathsClsFeatureVectorByFaissMulBlock(deepvac_config.cls_faiss_block)
     fv.loadDB()
-    fv.loadIndex()
     fv.printClassifierReport()
 
     # faiss pytorch feature vector test
