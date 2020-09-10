@@ -43,7 +43,7 @@ class FeatureSimilarityProbe(object):
             indexes.append(pair[1])
         return indexes
 
-    def __genConflictPairsAppearMore(self):
+    def __genDeleteIdWithMoreOccurrence(self):
         while True:
             indexes = self.__getIndexList()
             res = Counter(indexes)
@@ -53,18 +53,20 @@ class FeatureSimilarityProbe(object):
             self.delete.append(max_idx)
             self.pairs = [pair for pair in self.pairs if pair[0] != max_idx and pair[1] != max_idx]
 
-    def getConflictChecklist(self):
-        self.pairs = [pair for pair in self.pairs if self.__isUseful(pair)]
-        self.__genConflictPairsAppearMore()
-
+    def __genDeleteIdWithGreaterId(self):
         for pair in self.pairs:
             label_idx = int(pair[0].split('/')[1]) if '/' in pair[0] else pair[0]
             pred_idx = int(pair[1].split('/')[1]) if '/' in pair[1] else pair[1]
             del_ = pair[0] if label_idx >= pred_idx else pair[1]
             self.delete.append(del_)
 
-    def writeConflictChecklistFile(self):
-        self.getConflictChecklist()
+    def dumpIdToDelete(self):
+        self.pairs = [pair for pair in self.pairs if self.__isUseful(pair)]
+        self.__genDeleteIdWithMoreOccurrence()
+        self.__genDeleteIdWithGreaterId()
+
+    def writeDeleteIdChecklistFile(self):
+        self.dumpIdToDelete()
         with open(self.conf.output_path, 'w') as f:
             for d in self.delete:
                 f.write('{}\n'.format(d))
@@ -73,4 +75,4 @@ if __name__ == "__main__":
     from config import config as deepvac_config
     fs = FeatureSimilarityProbe(deepvac_config.repeat)
     fs.loadPairs()
-    fs.writeConflictChecklistFile()
+    fs.writeDeleteIdChecklistFile()
