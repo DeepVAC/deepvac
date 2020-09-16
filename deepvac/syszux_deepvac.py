@@ -9,6 +9,7 @@ import time
 from enum import Enum
 from .syszux_annotation import *
 from .syszux_log import LOG,getCurrentGitBranch
+from .syszux_helper import AverageMeter
 try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
@@ -322,6 +323,9 @@ class DeepvacTrain(Deepvac):
         self.epoch = 0
         self.step = 0
         self.iter = 0
+        self.train_time = AverageMeter()
+        self.load_data_time = AverageMeter()
+        self.data_cpu2gpu_time = AverageMeter()
         self._mandatory_member_name = ['train_dataset','val_dataset','train_loader','val_loader','net','criterion','optimizer']
 
     def initOutputDir(self):
@@ -424,10 +428,12 @@ class DeepvacTrain(Deepvac):
         self.exportTorchViaTrace()
 
     def earlyIter(self):
+        start = time.time()
         self.sample = self.sample.to(self.device)
         self.target = self.target.to(self.device)
         if not self.is_train:
             return
+        self.data_cpu2gpu_time.update(time.time() - start)
         try:
             self.addGraph(self.sample)
         except:
@@ -462,6 +468,9 @@ class DeepvacTrain(Deepvac):
         if self.step % self.conf.log_every != 0:
             return
         self.addScalar('{}/Loss'.format(self.phase), self.loss.item(), self.iter)
+        self.addScalar('{}/LoadDataTime(secs/batch)'.format(self.phase), self.load_data_time.val, self.iter)
+        self.addScalar('{}/DataCpu2GpuTime(secs/batch)'.format(self.phase), self.data_cpu2gpu_time.val, self.iter)
+        self.addScalar('{}/TrainTime(secs/batch)'.format(self.phase), self.train_time.val, self.iter)
         LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, self.loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
 
     def saveState(self, time):
@@ -486,7 +495,13 @@ class DeepvacTrain(Deepvac):
         LOG.logI('Model will be saved on step {} and the epoch end.'.format(self.save_list))
         self.addScalar('{}/LR'.format(self.phase), self.optimizer.param_groups[0]['lr'], self.epoch)
         self.preEpoch()
+        self.train_time.reset()
+        self.load_data_time.reset()
+        self.data_cpu2gpu_time.reset()
+        
+        start = time.time()
         for i, (sample, target) in enumerate(self.loader):
+            self.load_data_time.update(time.time() - start)
             self.step = i
             self.iter += 1
             self.target = target
@@ -504,6 +519,14 @@ class DeepvacTrain(Deepvac):
             if self.step in self.save_list:
                 self.processVal()
                 self.setTrainContext()
+            current = time.time()
+            self.train_time.update(current - start)
+            start = current
+
+        self.addScalar('{}/TrainTime(hours/epoch)'.format(self.phase), round(self.train_time.sum / 3600, 2), self.epoch)
+        self.addScalar('{}/AverageBatchTrainTime(secs)'.format(self.phase), self.train_time.avg, self.epoch)
+        self.addScalar('{}/AveragBatchLoadDataTime(secs)'.format(self.phase), self.load_data_time.avg, self.epoch)
+
         self.postEpoch()
         if self.scheduler:
             self.scheduler.step()
