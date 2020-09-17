@@ -33,7 +33,7 @@ if not os.path.exists('log'):
 
 deepvac_log_format = '%(asctime)s %(levelname)-8s %(message)s'
 # set up logging to file
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
                     format= deepvac_log_format,
                     datefmt='%m-%d %H:%M',
                     filename='log/{}:{}:{}:{}.log'.format(deepvac_pid, getArgv(),deepvac_time, deepvac_branch_name),
