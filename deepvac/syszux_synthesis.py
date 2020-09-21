@@ -191,8 +191,6 @@ class SynthesisTextFromImage(SynthesisText):
         self.images_num = len(self.images)
         if self.images_num==0:
             raise Exception("No image was found in {}!".format(self.images))
-        if self.images_num<self.total_num:
-            raise Exception("Total_num {} exceeds the image numbers {}, build exit!".format(self.total_num, self.images_num))
         self.scene_hw = (1080,1920)
         self.font_offset = (1000, 800)
         self.is_border = self.conf.is_border
