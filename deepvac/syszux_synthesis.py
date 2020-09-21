@@ -125,7 +125,7 @@ class SynthesisTextPure(SynthesisText):
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]),self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
-        if self.is_border:
+        if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
@@ -170,7 +170,7 @@ class SynthesisTextFromVideo(SynthesisText):
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
-        if self.is_border:
+        if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
@@ -210,7 +210,7 @@ class SynthesisTextFromImage(SynthesisText):
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
         fillcolor = self.fg_color[i%self.fg_color_len]
-        if self.is_border:
+        if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
             self.draw.text(self.font_offset,s,fillcolor,font=font)
