@@ -191,8 +191,6 @@ class SynthesisTextFromImage(SynthesisText):
         self.images_num = len(self.images)
         if self.images_num==0:
             raise Exception("No image was found in {}!".format(self.images))
-        if self.images_num<self.total_num:
-            raise Exception("Total_num {} exceeds the image numbers {}, build exit!".format(self.total_num, self.images_num))
         self.scene_hw = (1080,1920)
         self.font_offset = (1000, 800)
         self.is_border = self.conf.is_border
@@ -200,7 +198,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
 
     def buildScene(self, i):
-        image = cv2.imread(os.path.join(self.images_dir, self.images[i]))
+        image = cv2.imread(os.path.join(self.images_dir, self.images[i%self.images_num]))
         image = cv2.resize(image,(self.scene_hw[1],self.scene_hw[0]))
         self.pil_img = Image.fromarray(cv2.cvtColor(image,cv2.COLOR_BGR2RGB))
         self.draw = ImageDraw.Draw(self.pil_img)
