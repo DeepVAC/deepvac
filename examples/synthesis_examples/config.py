@@ -10,4 +10,4 @@ config.text.images_dir = '/opt/private/dataset_ocr/synthesis_from_images'
 config.text.sample_rate = 1
 #config.text.fonts_dir = '/home/lihang/dataset/Ocr1/video/font/'
 config.text.fonts_dir = '/home/lihang/dataset/Ocr1/video/font/'
-config.text.is_border = True
+config.text.is_border = 0.5
