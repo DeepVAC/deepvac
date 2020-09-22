@@ -128,36 +128,12 @@ class FaceAugExecutor(Executor):
 class OcrAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(OcrAugExecutor, self).__init__(deepvac_config)
-        self.loader = LoaderFactory().get('OsWalkerLoader')(deepvac_config)
-        
-        ac = AugChain('SpeckleAug || AffineAug || PerspectAug || GaussianAug || HorlineAug || VerlineAug || LRmotionAug || UDmotionAug || NoisyAug || DistortAug || PerspectiveAug || StretchAug',deepvac_config)
-        self.addAugChain('ac', ac, self.conf.aug_rate)
-        self.log_every = self.conf.log_every if self.conf.log_every is not None else 1000
 
-    def auditConfig(self):
-        self.output_dir = self.conf.output_dir
+        ac1 = AugChain('SpeckleAug@0.2 => HorlineAug@0.2 => NoisyAug@0.2',deepvac_config)
+        ac2 = AugChain('MotionAug || AffineAug || PerspectAug || GaussianAug || VerlineAug || LRmotionAug || UDmotionAug || PerspectiveAug || StretchAug',deepvac_config)
 
-    def dumpImgToPath(self, aug_kind, file_name, img):
-        fdir,fname = file_name.split(os.sep)[-2:]
-
-        #make sure output dir exist
-        output_dir = os.path.join(self.conf.output_dir, fdir)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        #replace name
-        fname = '{}_{}'.format(aug_kind, fname)
-        output_file_name = os.path.join(output_dir, fname)
-        cv2.imwrite(output_file_name, img)
-
-    def __call__(self):
-        for idx, f in enumerate(self.loader()):
-            img = cv2.imread(f)
-            for k in self._graph:
-                out = self._graph[k](img)
-                self.dumpImgToPath(k, f, out)
-            if idx % self.log_every == 0:
-                LOG.logI("Current process: {}".format(idx))
+        self.addAugChain('ac1', ac1, 0.2)
+        self.addAugChain('ac2', ac2, 0.9)
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")
