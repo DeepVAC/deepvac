@@ -211,6 +211,8 @@ class DistortAug(AugBase):
         img_h, img_w = img.shape[:2]
         cut = img_w // self.segment
         thresh = cut // 3
+        if thresh == 0:
+            return img
 
         src_pts = list()
         dst_pts = list()
@@ -251,6 +253,8 @@ class StretchAug(AugBase):
 
         cut = img_w // self.segment
         thresh = cut * 4 // 5
+        if thresh==0:
+            return img
 
         src_pts = list()
         dst_pts = list()
@@ -290,6 +294,8 @@ class PerspectiveAug(AugBase):
         img_h, img_w = img.shape[:2]
 
         thresh = img_h // 2
+        if thresh==0:
+            return img
         
         src_pts = list()
         dst_pts = list()
