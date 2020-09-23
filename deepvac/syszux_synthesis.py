@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import os
 import random
-import warnings
+from .syszux_log import LOG
 from .syszux_helper import Haishoku
 
 class SynthesisBase(object):
@@ -75,7 +75,7 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
-    def pick_Fg(self, i, s):
+    def pickFg_Color(self, i, s):
         left = self.font_offset[0]
         up = self.font_offset[1] 
         right = self.font_offset[0] + len(s)*self.max_font
@@ -87,13 +87,13 @@ class SynthesisText(SynthesisBase):
         max_dis = 0
         for fg in fg_lst:
             distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[0]-fg[1])
-            print(self.images[i%self.images_num], dominant, fg, distance)
+            #print(self.images[i%self.images_num], dominant, fg, distance)
             if distance > self.distance:
                 return fg
             if distance > max_dis:
                max_dis_fg = fg
                max_dis = distance
-        warnings.warn("No fg_color is suitable for image {} !!!".format(i))
+        LOG.logI("No fg_color is suitable for image {} !!!".format(i))
         return max_dis_fg
 
     def text_border(self, x, y, font, shadowcolor, fillcolor,text):
@@ -118,7 +118,7 @@ class SynthesisText(SynthesisBase):
             self.buildTextWithScene(i)
             self.dumpTextImg(i)
             if i%5000==0:
-                print('{}/{}'.format(i,self.total_num))
+                LOG.logI('{}/{}'.format(i,self.total_num))
 
 class SynthesisTextPure(SynthesisText):
     def __init__(self, deepvac_config):
@@ -198,7 +198,7 @@ class SynthesisTextFromVideo(SynthesisText):
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
-            fillcolor = self.pick_Fg(i, s)
+            fillcolor = self.pickFg_Color(i, s)
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
 class SynthesisTextFromImage(SynthesisText):
@@ -237,5 +237,5 @@ class SynthesisTextFromImage(SynthesisText):
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
-            fillcolor = self.pick_Fg(i, s)
+            fillcolor = self.pickFg_Color(i, s)
             self.draw.text(self.font_offset,s,fillcolor,font=font)
