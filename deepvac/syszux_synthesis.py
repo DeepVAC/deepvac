@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import os
 import random
+from .syszux_helper import Haishoku
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
