@@ -194,10 +194,11 @@ class SynthesisTextFromVideo(SynthesisText):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
-        fillcolor = self.fg_color[i%self.fg_color_len]
         if np.random.rand() < self.is_border:
+            fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
+            fillcolor = self.pick_Fg(i, s)
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
 class SynthesisTextFromImage(SynthesisText):
