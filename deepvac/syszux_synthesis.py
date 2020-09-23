@@ -64,7 +64,7 @@ class SynthesisText(SynthesisBase):
         self.fg_color = [(10,10,10),(200,10,10),(10,10,200),(200,200,10),(255,255,255)]
         self.fg_color_len = len(self.fg_color)
 
-        self.distance = 255  # The min distance of fg_color and bg_color 
+        self.distance = 100  # The min distance of fg_color and bg_color 
 
     def buildScene(self,i):
         raise Exception("Not implemented!")
@@ -75,7 +75,7 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
-    def pickFg_Color(self, i, s):
+    def pickFgColor(self, i, s):
         left = self.font_offset[0]
         up = self.font_offset[1] 
         right = self.font_offset[0] + len(s)*self.max_font
@@ -86,7 +86,7 @@ class SynthesisText(SynthesisBase):
         fg_lst = self.fg_color[k:] + self.fg_color[:k]
         max_dis = 0
         for fg in fg_lst:
-            distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[0]-fg[1])
+            distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[2]-fg[2])
             #print(self.images[i%self.images_num], dominant, fg, distance)
             if distance > self.distance:
                 return fg
@@ -198,7 +198,7 @@ class SynthesisTextFromVideo(SynthesisText):
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
-            fillcolor = self.pickFg_Color(i, s)
+            fillcolor = self.pickFgColor(i, s)
             self.draw.text(self.font_offset,s,fillcolor,font=font)
 
 class SynthesisTextFromImage(SynthesisText):
@@ -237,5 +237,5 @@ class SynthesisTextFromImage(SynthesisText):
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
-            fillcolor = self.pickFg_Color(i, s)
+            fillcolor = self.pickFgColor(i, s)
             self.draw.text(self.font_offset,s,fillcolor,font=font)
