@@ -72,6 +72,25 @@ class SynthesisText(SynthesisBase):
     def dumpTextImg(self,i):
         raise Exception("Not implemented!")
 
+    def pick_fg(self, i, s):
+        left = self.font_offset[0]
+        up = self.font_offset[1] 
+        right = self.font_offset[0] + len(s)*self.max_font
+        below = self.font_offset[1] + self.max_font
+        dominant = Haishoku.getDominant(self.pil_img.crop((left,up,right,below)))
+
+        k = i % len(self.fg_color)
+        fg_lst = self.fg_color[k:] + self.fg_color[:k]
+        max_dis = 0
+        for fg in fg_lst:
+            distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[0]-fg[1])
+            #print(self.images[i%self.images_num], dominant, fg, distance)
+            if distance > 200:
+                return fg
+            if distance > max_dis:
+               max_dis_fg = fg
+        return max_dis_fg
+
     def text_border(self, x, y, font, shadowcolor, fillcolor,text):
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
         for i in [x-1,x+1,x]:
@@ -208,7 +227,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.font_size = np.random.randint(self.min_font,self.max_font+1)
         font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
-        fillcolor = self.fg_color[i%self.fg_color_len]
+        fillcolor = self.pick_fg(i, s)
         if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
         else:
