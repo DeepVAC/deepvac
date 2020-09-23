@@ -3,7 +3,6 @@
 import math
 import numpy as np
 from PIL import Image
-import urllib.request,io
 from deepvac.syszux_log import LOG
 
 class WarpMLS:
@@ -204,9 +203,6 @@ class AverageMeter:
 def get_image(image_path):
     # if the image_path is a remote url, read the image at first
     if isinstance(image_path, str):
-        if image_path.startswith("http://") or image_path.startswith("https://"):
-            image_path = io.BytesIO(urllib.request.urlopen(image_path).read())
-
         image = Image.open(image_path)
     else:
         image = image_path
