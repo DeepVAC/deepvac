@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 from deepvac.syszux_log import LOG
 
+
 class WarpMLS:
     def __init__(self, src, src_pts, dst_pts, dst_w, dst_h, trans_ratio=1.):
         self.src = src
@@ -394,4 +395,3 @@ class Haishoku(object):
         dominant_tuple = colors_mean[0]
         dominant = dominant_tuple[1]
         return dominant
-
