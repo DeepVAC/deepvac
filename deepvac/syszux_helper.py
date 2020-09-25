@@ -4,6 +4,11 @@ import math
 import numpy as np
 from PIL import Image
 from deepvac.syszux_log import LOG
+try:
+    from fontTools.ttLib import TTFont
+except:
+    LOG.logW('no fonttools, pip install fonttools please')
+
 
 class WarpMLS:
     def __init__(self, src, src_pts, dst_pts, dst_w, dst_h, trans_ratio=1.):
@@ -395,3 +400,11 @@ class Haishoku(object):
         dominant = dominant_tuple[1]
         return dominant
 
+def getFontTables(font_path):
+    return TTFont(font_path)
+
+def hasGlyph(font, glyph):
+    for table in font['cmap'].tables:
+        if ord(glyph) in table.cmap.keys():
+            return True
+    return False
