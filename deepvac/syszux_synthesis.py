@@ -4,7 +4,11 @@ import numpy as np
 import os
 import random
 from .syszux_log import LOG
-from .syszux_helper import Haishoku, getFontTables, hasGlyph
+from .syszux_helper import Haishoku
+try:
+    from fontTools.ttLib import TTFont
+except:
+    LOG.logW('no fonttools, pip install fonttools please')
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
@@ -34,6 +38,15 @@ class SynthesisText(SynthesisBase):
     def __init__(self, deepvac_config):
         super(SynthesisText, self).__init__(deepvac_config)
         self.i_just_want_font = None
+
+    def getFontTables(self, font_path):
+        return TTFont(font_path)
+
+    def hasGlyph(self, font, glyph):
+        for table in font['cmap'].tables:
+            if ord(glyph) in table.cmap.keys():
+                return True
+        return False
 
     def auditConfig(self):
         super(SynthesisText, self).auditConfig()
@@ -89,9 +102,9 @@ class SynthesisText(SynthesisBase):
             for c in line:
                 self.support_fonts4char[c]= []
             for idx, font_file in enumerate(self.font_file_list):
-                font_table = getFontTables(os.path.join(self.fonts_dir,font_file))
+                font_table = self.getFontTables(os.path.join(self.fonts_dir,font_file))
                 for c in line:
-                    if hasGlyph(font_table, c):
+                    if self.hasGlyph(font_table, c):
                         self.support_fonts4char[c].append(idx)
 
         self.fg_color = [(10,10,10),(200,10,10),(10,10,200),(200,200,10),(255,255,255)]
