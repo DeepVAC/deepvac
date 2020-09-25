@@ -33,6 +33,7 @@ class SynthesisBase(object):
 class SynthesisText(SynthesisBase):
     def __init__(self, deepvac_config):
         super(SynthesisText, self).__init__(deepvac_config)
+        self.i_just_want_font = None
 
     def auditConfig(self):
         super(SynthesisText, self).auditConfig()
@@ -52,14 +53,35 @@ class SynthesisText(SynthesisBase):
         self.fonts_dir = self.conf.fonts_dir
         if not os.path.exists(self.fonts_dir):
             raise Exception("Dir {} not found!".format(self.fonts_dir))
-        self.fonts = os.listdir(self.fonts_dir)
-        self.fonts_len = len(self.fonts)
-        if self.fonts_len == 0:
+        self.font_file_list = os.listdir(self.fonts_dir)
+        self.font_num = len(self.font_file_list)
+        if self.font_num == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
-        self.font_size = 50
+        self.current_font_size = 50
         self.max_font = 60
         self.min_font = 25
         self.crop_scale = 4
+        self.scene_hw = (1080,1920)
+        self.gb18030_font_file_list = []
+
+        for i, font_file in enumerate(self.font_file_list):
+            LOG.logI("found font: {}:{}".format(i, font_file))
+            if font_file.startswith('gb18030'):
+                self.gb18030_font_file_list.append(font_file)
+
+        self.runtime_fonts = dict()
+        self.runtime_gb18030_fonts = dict()
+        for font_size in range (self.min_font, self.max_font + 1):
+            self.runtime_fonts[font_size] = []
+            for font_file in self.font_file_list:
+                font = ImageFont.truetype(os.path.join(self.fonts_dir,font_file), font_size, encoding='utf-8')
+                self.runtime_fonts[font_size].append(font)
+
+        for font_size in range (self.min_font, self.max_font + 1):
+            self.runtime_gb18030_fonts[font_size] = []
+            for font_file in self.gb18030_font_file_list:
+                font = ImageFont.truetype(os.path.join(self.fonts_dir,font_file), font_size, encoding='utf-8')
+                self.runtime_gb18030_fonts[font_size].append(font)
 
         self.fg_color = [(10,10,10),(200,10,10),(10,10,200),(200,200,10),(255,255,255)]
         self.fg_color_len = len(self.fg_color)
@@ -96,6 +118,23 @@ class SynthesisText(SynthesisBase):
         LOG.logI("No fg_color is suitable for image {} !!!".format(i))
         return max_dis_fg
 
+    def setCurrentFontSizeAndGetFont(self, i):
+        s = self.lex[i%self.lex_len]
+        self.current_font_size = np.random.randint(self.min_font,self.max_font+1)
+        if self.i_just_want_font is not None:
+            return s, self.runtime_fonts[self.current_font_size][self.i_just_want_font % self.font_num]
+        
+        font_idx = i%self.font_num
+        font = self.runtime_fonts[self.current_font_size][i%self.font_num]
+        for c in s:
+            if font_idx in self.support_fonts4char[c]:
+                continue
+            font = self.runtime_gb18030_fonts[self.current_font_size][np.random.randint(0,len(self.runtime_gb18030_fonts[font_size]))]
+            break
+
+        return s, font
+        
+
     def text_border(self, x, y, font, shadowcolor, fillcolor,text):
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
         for i in [x-1,x+1,x]:
@@ -104,10 +143,11 @@ class SynthesisText(SynthesisBase):
         self.draw.text((x,y),text,fillcolor,font=font)
 
     def dumpTextImg(self,i):
-        crop_offset = int(self.font_size / self.crop_scale)
-        crop_list = [np.random.randint(-crop_offset, crop_offset+1) for x in range(3)]
+        crop_offset = int(self.current_font_size / self.crop_scale)
+        #crop_list = [np.random.randint(-crop_offset, crop_offset+1) for _ in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+crop_list[0]:self.font_offset[1]+self.font_size+10, self.font_offset[0]+crop_list[1]:self.font_offset[0]+self.font_size*len(self.lex[i%self.lex_len])+crop_list[2]]
+        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset/2):self.font_offset[1]+self.current_font_size + np.random.randint(0, crop_offset),
+                self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.current_font_size*len(self.lex[i%self.lex_len])+np.random.randint(-crop_offset, crop_offset+1)]
         image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
         self.dumpImgToPath(image_name,img_crop)
         self.fw.write(image_name+' '+self.lex[i%self.lex_len]+'\n')
@@ -131,8 +171,7 @@ class SynthesisTextPure(SynthesisText):
         super(SynthesisTextPure, self).auditConfig()
         self.bg_color = [(255,255,255),(10,10,200),(200,10,10),(10,10,200),(10,10,10)]
         self.bg_color_len = len(self.bg_color)
-        self.scene_hw = (1080, 1920)
-        self.font_offset = (1000,800)
+        self.font_offset = (self.max_font,800)
         self.is_border = self.conf.is_border
         self.fw = open(os.path.join(self.conf.output_dir,'pure.txt'),'w')
 
@@ -146,9 +185,9 @@ class SynthesisTextPure(SynthesisText):
         self.dump_prefix = 'pure'
 
     def buildTextWithScene(self, i):
-        self.font_size = np.random.randint(self.min_font,self.max_font+1)
-        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]),self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
+        font = self.setCurrentFontSizeAndGetFont(i, s)
+
         fillcolor = self.fg_color[i%self.fg_color_len]
         if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -175,6 +214,12 @@ class SynthesisTextFromVideo(SynthesisText):
         self.frame_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         assert self.frame_height > 4 * self.max_font, "video height must exceed {} pixels".format(4*self.max_font)
         self.frame_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.resize_ratio = None
+
+        if self.frame_width < self.scene_hw[1]:
+            self.resize_ratio = self.scene_hw[1] / self.frame_width
+            self.frame_height = self.frame_height * self.resize_ratio
+
         self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height/3-self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'scene'
@@ -185,15 +230,17 @@ class SynthesisTextFromVideo(SynthesisText):
             success,frame = self.video_capture.read()
 
             if not success:
-                return 
-            
+                return
+        if self.resize_ratio is not None:
+            frame = cv2.resize(frame,(self.scene_hw[1], self.frame_height))
+
         self.pil_img = Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
         self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        self.font_size = np.random.randint(self.min_font,self.max_font+1)
-        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
+        font = self.setCurrentFontSizeAndGetFont(i, s)
+
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -217,8 +264,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.images_num = len(self.images)
         if self.images_num==0:
             raise Exception("No image was found in {}!".format(self.images))
-        self.scene_hw = (1080,1920)
-        self.font_offset = (1000, 800)
+        self.font_offset = (int(self.max_font/self.crop_scale),int(self.self.scene_hw[0]/3-self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'image'
         self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
@@ -230,9 +276,9 @@ class SynthesisTextFromImage(SynthesisText):
         self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        self.font_size = np.random.randint(self.min_font,self.max_font+1)
-        font = ImageFont.truetype(os.path.join(self.fonts_dir,self.fonts[i%self.fonts_len]), self.font_size,encoding='utf-8')
         s = self.lex[i%self.lex_len]
+        font = self.setCurrentFontSizeAndGetFont(i, s)
+
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
