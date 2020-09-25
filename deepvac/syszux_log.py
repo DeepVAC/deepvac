@@ -31,14 +31,15 @@ deepvac_time = getTime()
 if not os.path.exists('log'):
     os.makedirs('log')
 
-deepvac_log_format = '%(asctime)s %(levelname)-8s %(message)s'
-# set up logging to file
-logging.basicConfig(level=logging.INFO,
-                    format= deepvac_log_format,
-                    datefmt='%m-%d %H:%M',
-                    filename='log/{}:{}:{}:{}.log'.format(deepvac_pid, getArgv(),deepvac_time, deepvac_branch_name),
-                    filemode='w')
 logger=logging.getLogger("DEEPVAC")
+logger.setLevel(logging.DEBUG)
+
+deepvac_log_format = '%(asctime)s %(levelname)-8s %(message)s'
+fh = logging.FileHandler('log/{}:{}:{}:{}.log'.format(deepvac_pid, getArgv(),deepvac_time, deepvac_branch_name))
+fh.setLevel(logging.INFO)
+fh.setFormatter( logging.Formatter(deepvac_log_format) )
+logger.addHandler(fh)
+
 # add console output
 console_log_format = '%(asctime)s {}:{} %(levelname)-8s %(message)s'.format(deepvac_pid, deepvac_branch_name)
 console = logging.StreamHandler()
