@@ -8,7 +8,7 @@ from .syszux_helper import Haishoku
 try:
     from fontTools.ttLib import TTFont
 except:
-    LOG.logW('no fonttools, pip install fonttools please')
+    LOG.logE('no fonttools, pip install fonttools please', exit=True)
 
 class SynthesisBase(object):
     def __init__(self, deepvac_config):
@@ -80,6 +80,7 @@ class SynthesisText(SynthesisBase):
         for i, font_file in enumerate(self.font_file_list):
             LOG.logI("found font: {}:{}".format(i, font_file))
             if font_file.startswith('gb18030'):
+                LOG.logI("And this is a gb18030 font!")
                 self.gb18030_font_file_list.append(font_file)
 
         self.runtime_fonts = dict()
@@ -106,6 +107,8 @@ class SynthesisText(SynthesisBase):
                 for c in line:
                     if self.hasGlyph(font_table, c):
                         self.support_fonts4char[c].append(idx)
+                    elif font_file in self.gb18030_font_file_list:
+                        LOG.logE('{} not supported in current font! Are you sure {} is a gb18030 font?'.format(c, font_file))
 
         self.fg_color = [(10,10,10),(200,10,10),(10,10,200),(200,200,10),(255,255,255)]
         self.fg_color_len = len(self.fg_color)
@@ -153,11 +156,10 @@ class SynthesisText(SynthesisBase):
         for c in s:
             if font_idx in self.support_fonts4char[c]:
                 continue
-            font = self.runtime_gb18030_fonts[self.current_font_size][np.random.randint(0,len(self.runtime_gb18030_fonts[font_size]))]
+            font = self.runtime_gb18030_fonts[self.current_font_size][np.random.randint(0,len(self.runtime_gb18030_fonts[self.current_font_size]))]
             break
 
         return s, font
-        
 
     def text_border(self, x, y, font, shadowcolor, fillcolor,text):
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
@@ -209,9 +211,7 @@ class SynthesisTextPure(SynthesisText):
         self.dump_prefix = 'pure'
 
     def buildTextWithScene(self, i):
-        s = self.lex[i%self.lex_len]
-        font = self.setCurrentFontSizeAndGetFont(i, s)
-
+        s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.fg_color[i%self.fg_color_len]
         if np.random.rand() < self.is_border:
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -262,9 +262,7 @@ class SynthesisTextFromVideo(SynthesisText):
         self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        s = self.lex[i%self.lex_len]
-        font = self.setCurrentFontSizeAndGetFont(i, s)
-
+        s, font = self.setCurrentFontSizeAndGetFont(i)
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
@@ -300,9 +298,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.draw = ImageDraw.Draw(self.pil_img)
 
     def buildTextWithScene(self, i):
-        s = self.lex[i%self.lex_len]
-        font = self.setCurrentFontSizeAndGetFont(i, s)
-
+        s, font = self.setCurrentFontSizeAndGetFont(i)
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
             self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
