@@ -172,7 +172,7 @@ class SynthesisText(SynthesisBase):
         crop_offset = int(self.current_font_size / self.crop_scale)
         #crop_list = [np.random.randint(-crop_offset, crop_offset+1) for _ in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset/2):self.font_offset[1]+self.current_font_size + np.random.randint(0, crop_offset),
+        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset/2):self.font_offset[1]+self.current_font_size + np.random.randint(crop_offset/2, crop_offset * 1.5),
                 self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.current_font_size*len(self.lex[i%self.lex_len])+np.random.randint(-crop_offset, crop_offset+1)]
         image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
         self.dumpImgToPath(image_name,img_crop)
@@ -242,7 +242,7 @@ class SynthesisTextFromVideo(SynthesisText):
 
         if self.frame_width < self.scene_hw[1]:
             self.resize_ratio = self.scene_hw[1] / self.frame_width
-            self.frame_height = self.frame_height * self.resize_ratio
+            self.frame_height = int(self.frame_height * self.resize_ratio)
 
         self.font_offset = (int(self.max_font/self.crop_scale),int(self.frame_height/3-self.max_font))
         self.is_border = self.conf.is_border
@@ -286,7 +286,7 @@ class SynthesisTextFromImage(SynthesisText):
         self.images_num = len(self.images)
         if self.images_num==0:
             raise Exception("No image was found in {}!".format(self.images))
-        self.font_offset = (int(self.max_font/self.crop_scale),int(self.self.scene_hw[0]/3-self.max_font))
+        self.font_offset = (int(self.max_font/self.crop_scale),int(self.scene_hw[0]/3-self.max_font))
         self.is_border = self.conf.is_border
         self.dump_prefix = 'image'
         self.fw = open(os.path.join(self.conf.output_dir,'image.txt'),'w')
