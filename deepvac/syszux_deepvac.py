@@ -194,12 +194,18 @@ class Deepvac(object):
             p.requires_grad_(False)
 
     @syszux_once
-    def exportTorchViaTrace(self):
+    def exportTorchViaTrace(self, sample=None):
         if not self.conf.trace_model_dir:
             if self.conf.script_model_dir:
                 LOG.logI("config.script_model_dir found, save & exit...")
                 sys.exit(0)
             return
+        if sample is None and self.sample is None:
+            LOG.logE("either call exportTorchViaTrace and pass value to pamameter sample, or call exportTorchViaTrace in Train mode.", exit=True)
+
+        if sample is not None:
+            self.sample = sample
+
         self._noGrad()
         ts = torch.jit.trace(self.net, self.sample)
         ts.save(self.conf.trace_model_dir)
