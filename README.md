@@ -31,7 +31,9 @@ docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
 |test.py       |测试的入口文件, 继承Deepvac类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
 |config.py     |用户训练和测试的配置文件，syszux_config模块（来自deepvac/syszux_config）的扩展实现|
 |modules/model.py | 模型、Loss的定义文件，PyTorch Module类的扩展实现|
+|modules/model_{name}.py | 同上，有多个model的时候，使用suffix区分|
 |modules/utils.py | 工具类/方法的定义文件（可省略）|
+|modules/utils_{name}.py | 同上，有多个工具类/函数文件的时候，使用suffix区分（可省略）|
 |data/train.txt | 训练集清单文件（可省略）|
 |data/val.txt   | 验证集清单文件（可省略）|
 |output/model*  | 输出或输入的模型文件 |
