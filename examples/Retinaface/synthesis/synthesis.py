@@ -6,7 +6,7 @@ import torch.utils.data as data
 import cv2
 import numpy as np
 
-class WiderFaceDetection(data.Dataset):
+class RetinaTrainDataset(data.Dataset):
     def __init__(self, txt_path, preproc=None):
         self.preproc = preproc
         self.imgs_path = []
@@ -75,6 +75,72 @@ class WiderFaceDetection(data.Dataset):
             img, target = self.preproc(img, target)
 
         return torch.from_numpy(img), target
+
+class RetinaValDataset(data.Dataset):
+    def __init__(self, retina_config):
+        self.conf = retina_config
+        f = open(self.conf.val.label_path, 'r')
+        state = 0
+        lines = f.readlines()
+        lines = list(map(lambda x: x.rstrip('\r\n'), lines))
+        self.bboxes = []
+        self.img_paths = []
+        f.close()
+        current_boxes = []
+        current_name = None
+        for line in lines:
+            if state == 0 and '--' in line:
+                self.img_paths.append(line)
+                state = 1
+                current_name = line
+                continue
+            if state == 1:
+                state = 2
+                continue
+            if state == 2 and '--' in line:
+                self.img_paths.append(line)
+                state = 1
+                self.bboxes.append(current_boxes)
+                current_name = line
+                current_boxes = []
+                continue
+            if state == 2:
+                box = [float(x) for x in line.split(' ')[:4]]
+                current_boxes.append(box)
+                continue
+        self.bboxes.append(current_boxes)
+        self.len = len(self.img_paths)
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, index):
+        path = os.path.join(self.conf.val.img_folder, self.img_paths[index])
+        target = self.bboxes[index]
+        img_raw = cv2.imread(path, cv2.IMREAD_COLOR)
+        img = np.float32(img_raw)
+
+        # testing scale
+        target_size = 1600
+        max_size = 2150
+        im_shape = img.shape
+        im_size_min = np.min(im_shape[0:2])
+        im_size_max = np.max(im_shape[0:2])
+        resize = float(target_size) / float(im_size_min)
+        # prevent bigger axis from being more than max_size:
+        if np.round(resize * im_size_max) > max_size:
+            resize = float(max_size) / float(im_size_max)
+        #resize = 1
+
+        #if resize != 1:
+        #    img = cv2.resize(img, None, None, fx=resize, fy=resize, interpolation=cv2.INTER_LINEAR)
+        im_height, im_width, _ = img.shape
+        #scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
+        img -= (104, 117, 123)
+        img = img.transpose(2, 0, 1)
+        img = torch.from_numpy(img)
+        target = np.array(target)
+        return img, target
 
 def detection_collate(batch):
     """Custom collate fn for dealing with batches of images that have a different
