@@ -11,7 +11,7 @@ import pickle
 import argparse
 import numpy as np
 from scipy.io import loadmat
-from utils.widerface_evaluate.bbox import bbox_overlaps
+from modules.bbox import bbox_overlaps
 from IPython import embed
 
 
@@ -156,8 +156,6 @@ def image_eval(pred, gt, ignore, iou_thresh):
     recall_list = np.zeros(_gt.shape[0])
     proposal_list = np.ones(_pred.shape[0])
 
-    #_pred[:, 2] = _pred[:, 2] + _pred[:, 0]
-    #_pred[:, 3] = _pred[:, 3] + _pred[:, 1]
     _gt[:, 2] = _gt[:, 2] + _gt[:, 0]
     _gt[:, 3] = _gt[:, 3] + _gt[:, 1]
 

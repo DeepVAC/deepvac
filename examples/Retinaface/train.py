@@ -3,23 +3,24 @@ from torch.utils.data import Dataset, DataLoader
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
+
 import cv2
 import math
 import time
 import numpy as np
 import os
+
 from deepvac.syszux_log import LOG
-from modules.model import RetinaFace
-from utils.prior_box import PriorBox
-from utils.multibox_loss import MultiBoxLoss
-from utils.py_cpu_nms import py_cpu_nms
-from utils.box_utils import decode, decode_landm
-from utils.data_augment import preproc
-from utils.wider_face import WiderFaceDetection, detection_collate, my_collate
-from utils.evaluation import image_eval, img_pr_info, dataset_pr_info, voc_ap
 from deepvac.syszux_deepvac import DeepvacTrain
-from torchvision.datasets import ImageFolder
-from deepvac.syszux_loader import ImageFolderWithTransformDataset
+
+from modules.model import RetinaFace, MultiBoxLoss
+from modules.utils_prior_box import PriorBox
+from modules.utils_nms import py_cpu_nms
+from modules.utils_box import decode, decode_landm
+from modules.utils_evaluation import image_eval, img_pr_info, dataset_pr_info, voc_ap
+
+from aug.aug import preproc
+from utils.wider_face import WiderFaceDetection, detection_collate
 
 class RetinaValDataset(Dataset):
     def __init__(self, retina_config):
@@ -93,10 +94,8 @@ class DeepvacRetina(DeepvacTrain):
         priorbox = PriorBox(self.conf.cfg, image_size=self.conf.cfg['image_size'])
         with torch.no_grad():
             self.priors = priorbox.forward()
-            self.priors = self.priors.cuda()
+            self.priors = self.priors.to(self.device)
         self.step_index = 0
-        self.accuracy_list = []
-
     
     def initNetWithCode(self):
         self.net = RetinaFace(self.conf.cfg)
@@ -129,7 +128,6 @@ class DeepvacRetina(DeepvacTrain):
     def doLoss(self):
         if not self.is_train:
             return
-        self.optimizer.zero_grad()
         self.loss_l, self.loss_c, self.loss_landm = self.criterion(self.output, self.priors, self.target)
         self.loss = self.conf.cfg['loc_weight'] * self.loss_l + self.loss_c + self.loss_landm
 
@@ -165,24 +163,23 @@ class DeepvacRetina(DeepvacTrain):
     def postIter(self):
         if self.is_train:
             return
-        self.accuracy_list.append(1)
         loc, conf, landms = self.output
         conf = F.softmax(conf, dim=-1)
         priorbox = PriorBox(self.conf.cfg, image_size=(self.sample.shape[2], self.sample.shape[3]))
         priors = priorbox.forward()
-        priors = priors.cuda()
+        priors = priors.to(self.device)
         prior_data = priors.data
         resize = 1.0
-        scale = torch.Tensor([self.sample.shape[1], self.sample.shape[0], self.sample.shape[1], self.sample.shape[0]])
+        scale = torch.Tensor([self.sample.shape[3], self.sample.shape[2], self.sample.shape[3], self.sample.shape[2]])
         scale = scale.to(self.device)
         boxes = decode(loc.data.squeeze(0), prior_data, self.conf.cfg['variance'])
         boxes = boxes * scale / resize
         boxes = boxes.cpu().numpy()
         scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
         landms = decode_landm(landms.data.squeeze(0), prior_data, self.conf.cfg['variance'])
-        scale1 = torch.Tensor([self.sample.shape[3], self.sample.shape[2], self.sample.shape[3], self.sample.shape[2],
-                        self.sample.shape[3], self.sample.shape[2], self.sample.shape[3], self.sample.shape[2],
-                        self.sample.shape[3], self.sample.shape[2]])
+        scale1 = torch.Tensor([self.sample.shape[1], self.sample.shape[3], self.sample.shape[1], self.sample.shape[3],
+                        self.sample.shape[1], self.sample.shape[3], self.sample.shape[1], self.sample.shape[3],
+                        self.sample.shape[1], self.sample.shape[3]])
         scale1 = scale1.to(self.device)
         landms = landms * scale1 / resize
         landms = landms.cpu().numpy()
