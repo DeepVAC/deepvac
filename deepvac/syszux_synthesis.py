@@ -67,7 +67,6 @@ class SynthesisText(SynthesisBase):
         if not os.path.exists(self.fonts_dir):
             raise Exception("Dir {} not found!".format(self.fonts_dir))
         self.font_file_list = os.listdir(self.fonts_dir)
-        print(self.font_file_list)
         self.font_num = len(self.font_file_list)
         if self.font_num == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
@@ -137,7 +136,6 @@ class SynthesisText(SynthesisBase):
         max_dis = 0
         for fg in fg_lst:
             distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[2]-fg[2])
-            #print(self.images[i%self.images_num], dominant, fg, distance)
             if distance > self.distance:
                 return fg
             if distance > max_dis:
@@ -154,12 +152,10 @@ class SynthesisText(SynthesisBase):
         
         font_idx = i%self.font_num
         font = self.runtime_fonts[self.current_font_size][i%self.font_num]
-        print(s)
         for c in s:
             if font_idx in self.support_fonts4char[c]:
                 continue
             font = self.runtime_gb18030_fonts[self.current_font_size][np.random.randint(0,len(self.runtime_gb18030_fonts[self.current_font_size]))]
-            print(font)
             break
 
         return s, font
