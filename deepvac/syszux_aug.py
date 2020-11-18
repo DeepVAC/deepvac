@@ -6,7 +6,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-from .syszux_helper import WarpMLS
+from .syszux_helper import WarpMLS, apply_perspective_transform, Remaper, Liner, apply_emboss, reverse_img
 
 class AugBase(object):
     def __init__(self, deepvac_config):
@@ -573,4 +573,60 @@ class RandomFilpFacialKpListAug(AugBase):
         dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
 
         return [dest_img, dest_landmarks]
-    
+
+class TextRendererPerspectiveAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(TextRendererPerspectiveAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.max_x = 10
+        self.max_y = 10
+        self.max_z = 5
+
+    def __call__(self, img):
+        return apply_perspective_transform(img, self.max_x, self.max_y, self.max_z)
+
+class TextRendererCurveAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(TextRendererCurveAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        h, w = img.shape[:2]
+        re_img, text_box_pnts = Remaper().apply(img, [[0,0],[w,0],[w,h],[0,h]])
+        return re_img
+
+class TextRendererLineAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(TextRendererLineAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.offset = 5
+
+    def __call__(self, img):
+        h, w = img.shape[:2]
+        pos = [[self.offset,self.offset],[w-self.offset,self.offset],[w-self.offset,h-self.offset],[self.offset,h-self.offset]]
+        re_img, text_box_pnts = Liner().apply(img, pos)
+        return re_img
+
+class TextRendererEmbossAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(TextRendererEmbossAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        return apply_emboss(img)
+
+class TextRendererReverseAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(TextRendererReverseAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        return reverse_img(img)

@@ -1,10 +1,13 @@
 # -*- coding:utf-8 -*-
 # Author: RubanSeven
 import math
+import cv2
 import numpy as np
+import random
+
 from PIL import Image
 from deepvac.syszux_log import LOG
-
+from functools import reduce
 
 class WarpMLS:
     def __init__(self, src, src_pts, dst_pts, dst_w, dst_h, trans_ratio=1.):
@@ -395,3 +398,448 @@ class Haishoku(object):
         dominant_tuple = colors_mean[0]
         dominant = dominant_tuple[1]
         return dominant
+
+emboss_kernal = np.array([
+    [-2, -1, 0],
+    [-1, 1, 1],
+    [0, 1, 2]
+])
+
+
+def apply_emboss(word_img):
+    return cv2.filter2D(word_img, -1, emboss_kernal)
+
+class LineState(object):
+    tableline_x_offsets = range(1, 5)
+    tableline_y_offsets = range(1, 5)
+    tableline_thickness = [2, 3]
+
+    # 0/1/2/3: 仅单边（左上右下）
+    # 4/5/6/7: 两边都有线（左上，右上，右下，左下）
+    tableline_options = range(0, 8)
+
+    middleline_thickness = [1, 2, 3]
+    middleline_thickness_p = [0.2, 0.7, 0.1]
+
+
+class Liner(object):
+    def __init__(self):
+        self.linestate = LineState()
+        self.cfg = {}
+        self.cfg['line'] = {}
+
+        self.cfg['line']['under_line'] = {}
+        self.cfg['line']['under_line']['enable'] = True
+        self.cfg['line']['under_line']['fraction'] = 0.5
+
+        self.cfg['line']['table_line'] = {}
+        self.cfg['line']['table_line']['enable'] = True
+        self.cfg['line']['table_line']['fraction'] = 0.5
+
+        self.cfg['line']['middle_line'] = {}
+        self.cfg['line']['middle_line']['enable'] = True
+        self.cfg['line']['middle_line']['fraction'] = 0
+
+
+        self.cfg['line_color'] = {}
+        self.cfg['line_color']['enable'] = True
+
+        self.cfg['line_color']['black'] = {}
+        self.cfg['line_color']['black']['fraction'] = 0.5
+        self.cfg['line_color']['black']['l_boundary'] = [0,0,0]
+        self.cfg['line_color']['black']['h_boundary'] = [64,64,64]
+
+        self.cfg['line_color']['blue'] = {}
+        self.cfg['line_color']['blue']['fraction'] = 0.5
+        self.cfg['line_color']['blue']['l_boundary'] = [0,0,150]
+        self.cfg['line_color']['blue']['h_boundary'] = [60,64,255]
+
+
+    def get_line_color(self):
+        p = []
+        colors = []
+        for k, v in self.cfg['line_color'].items():
+            if k == 'enable':
+                continue
+            p.append(v['fraction'])
+            colors.append(k)
+
+        # pick color by fraction
+        color_name = np.random.choice(colors, p=p)
+        l_boundary = self.cfg['line_color'][color_name]['l_boundary']
+        h_boundary = self.cfg['line_color'][color_name]['h_boundary']
+        # random color by low and high RGB boundary
+        r = np.random.randint(l_boundary[0], h_boundary[0])
+        g = np.random.randint(l_boundary[1], h_boundary[1])
+        b = np.random.randint(l_boundary[2], h_boundary[2])
+        return b, g, r
+
+    def apply(self, word_img, text_box_pnts):
+        """
+        :param word_img:  word image with big background
+        :param text_box_pnts: left-top, right-top, right-bottom, left-bottom of text word
+        :return:
+        """
+        line_p = []
+        funcs = []
+
+        if self.cfg['line']['under_line']['enable']:
+            line_p.append(self.cfg['line']['under_line']['fraction'])
+            funcs.append(self.apply_under_line)
+
+        if self.cfg['line']['table_line']['enable']:
+            line_p.append(self.cfg['line']['table_line']['fraction'])
+            funcs.append(self.apply_table_line)
+
+        if self.cfg['line']['middle_line']['enable']:
+            line_p.append(self.cfg['line']['middle_line']['fraction'])
+            funcs.append(self.apply_middle_line)
+
+
+        if len(line_p) == 0:
+            return word_img, text_box_pnts
+
+        line_effect_func = np.random.choice(funcs, p=line_p)
+
+        if self.cfg['line_color']['enable'] or self.cfg['font_color']['enable']:
+            line_color = self.get_line_color()
+        else:
+            line_color = word_color + random.randint(0, 10)
+
+        return line_effect_func(word_img, text_box_pnts, line_color)
+
+    def apply_under_line(self, word_img, text_box_pnts, line_color):
+        y_offset = random.choice([0, 1])
+
+        text_box_pnts[2][1] += y_offset
+        text_box_pnts[3][1] += y_offset
+
+        dst = cv2.line(word_img,
+                       (text_box_pnts[2][0], text_box_pnts[2][1]),
+                       (text_box_pnts[3][0], text_box_pnts[3][1]),
+                       color=line_color,
+                       thickness=3,
+                       lineType=cv2.LINE_AA)
+
+        return dst, text_box_pnts
+
+    def apply_table_line(self, word_img, text_box_pnts, line_color):
+        """
+        共有 8 种可能的画法，横线横穿整张 word_img
+        0/1/2/3: 仅单边（左上右下）
+        4/5/6/7: 两边都有线（左上，右上，右下，左下）
+        """
+        dst = word_img
+        option = random.choice(self.linestate.tableline_options)
+        thickness = random.choice(self.linestate.tableline_thickness)
+
+        top_y_offset = random.choice(self.linestate.tableline_y_offsets)
+        bottom_y_offset = random.choice(self.linestate.tableline_y_offsets)
+        left_x_offset = random.choice(self.linestate.tableline_x_offsets)
+        right_x_offset = random.choice(self.linestate.tableline_x_offsets)
+
+        def is_top():
+            return option in [1, 4, 5]
+
+        def is_bottom():
+            return option in [3, 6, 7]
+
+        def is_left():
+            return option in [0, 4, 7]
+
+        def is_right():
+            return option in [2, 5, 6]
+
+        if is_top():
+            text_box_pnts[0][1] -= top_y_offset
+            text_box_pnts[1][1] -= top_y_offset
+
+        if is_bottom():
+            text_box_pnts[2][1] += bottom_y_offset
+            text_box_pnts[3][1] += bottom_y_offset
+
+        if is_left():
+            text_box_pnts[0][0] -= left_x_offset
+            text_box_pnts[3][0] -= left_x_offset
+
+        if is_right():
+            text_box_pnts[1][0] += right_x_offset
+            text_box_pnts[2][0] += right_x_offset
+
+        if is_bottom():
+            dst = cv2.line(dst,
+                           (0, text_box_pnts[2][1]),
+                           (word_img.shape[1], text_box_pnts[3][1]),
+                           color=line_color,
+                           thickness=thickness,
+                           lineType=cv2.LINE_AA)
+
+        if is_top():
+            dst = cv2.line(dst,
+                           (0, text_box_pnts[0][1]),
+                           (word_img.shape[1], text_box_pnts[1][1]),
+                           color=line_color,
+                           thickness=thickness,
+                           lineType=cv2.LINE_AA)
+
+        if is_left():
+            dst = cv2.line(dst,
+                           (text_box_pnts[0][0], 0),
+                           (text_box_pnts[3][0], word_img.shape[0]),
+                           color=line_color,
+                           thickness=thickness,
+                           lineType=cv2.LINE_AA)
+
+        if is_right():
+            dst = cv2.line(dst,
+                           (text_box_pnts[1][0], 0),
+                           (text_box_pnts[2][0], word_img.shape[0]),
+                           color=line_color,
+                           thickness=thickness,
+                           lineType=cv2.LINE_AA)
+
+        return dst, text_box_pnts
+
+    def apply_middle_line(self, word_img, text_box_pnts, line_color):
+        y_center = int((text_box_pnts[0][1] + text_box_pnts[3][1]) / 2)
+
+        thickness = np.random.choice(self.linestate.middleline_thickness, p=self.linestate.middleline_thickness_p)
+
+        dst = cv2.line(word_img,
+                       (text_box_pnts[0][0], y_center),
+                       (text_box_pnts[1][0], y_center),
+                       color=line_color,
+                       thickness=thickness,
+                       lineType=cv2.LINE_AA)
+
+        return dst, text_box_pnts
+
+# http://planning.cs.uiuc.edu/node102.html
+def get_rotate_matrix(x, y, z):
+    """
+    按照 zyx 的顺序旋转，输入角度单位为 degrees, 均为顺时针旋转
+    :param x: X-axis
+    :param y: Y-axis
+    :param z: Z-axis
+    :return:
+    """
+    x = math.radians(x)
+    y = math.radians(y)
+    z = math.radians(z)
+
+    c, s = math.cos(y), math.sin(y)
+    M_y = np.matrix([[c, 0., s, 0.],
+                     [0., 1., 0., 0.],
+                     [-s, 0., c, 0.],
+                     [0., 0., 0., 1.]])
+
+    c, s = math.cos(x), math.sin(x)
+    M_x = np.matrix([[1., 0., 0., 0.],
+                     [0., c, -s, 0.],
+                     [0., s, c, 0.],
+                     [0., 0., 0., 1.]])
+
+    c, s = math.cos(z), math.sin(z)
+    M_z = np.matrix([[c, -s, 0., 0.],
+                     [s, c, 0., 0.],
+                     [0., 0., 1., 0.],
+                     [0., 0., 0., 1.]])
+
+    return M_x * M_y * M_z
+
+
+def cliped_rand_norm(mu=0, sigma3=1):
+    """
+    :param mu: 均值
+    :param sigma3: 3 倍标准差， 99% 的数据落在 (mu-3*sigma, mu+3*sigma)
+    :return:
+    """
+    # 标准差
+    sigma = sigma3 / 3
+    dst = sigma * np.random.randn() + mu
+    dst = np.clip(dst, 0 - sigma3, sigma3)
+    return dst
+
+
+def warpPerspective(src, M33, sl, gpu):
+    if gpu:
+        from libs.gpu.GpuWrapper import cudaWarpPerspectiveWrapper
+        dst = cudaWarpPerspectiveWrapper(src.astype(np.uint8), M33, (sl, sl), cv2.INTER_CUBIC)
+    else:
+        dst = cv2.warpPerspective(src, M33, (sl, sl), flags=cv2.INTER_CUBIC)
+    return dst
+
+
+# https://stackoverflow.com/questions/17087446/how-to-calculate-perspective-transform-for-opencv-from-rotation-angles
+# https://nbviewer.jupyter.org/github/manisoftwartist/perspectiveproj/blob/master/perspective.ipynb
+# http://planning.cs.uiuc.edu/node102.html
+class PerspectiveTransform(object):
+    def __init__(self, x, y, z, scale, fovy):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.scale = scale
+        self.fovy = fovy
+
+    def transform_image(self, src, gpu=False):
+        if len(src.shape) > 2:
+            H, W, C = src.shape
+        else:
+            H, W = src.shape
+
+        M33, sl, _, ptsOut = self.get_warp_matrix(W, H, self.x, self.y, self.z, self.scale, self.fovy)
+        sl = int(sl)
+
+        dst = warpPerspective(src, M33, sl, gpu)
+
+        return dst, M33, ptsOut
+
+    def transform_pnts(self, pnts, M33):
+        """
+        :param pnts: 2D pnts, left-top, right-top, right-bottom, left-bottom
+        :param M33: output from transform_image()
+        :return: 2D pnts apply perspective transform
+        """
+        pnts = np.asarray(pnts, dtype=np.float32)
+        pnts = np.array([pnts])
+        dst_pnts = cv2.perspectiveTransform(pnts, M33)[0]
+
+        return dst_pnts
+
+    def get_warped_pnts(self, ptsIn, ptsOut, W, H, sidelength):
+        ptsIn2D = ptsIn[0, :]
+        ptsOut2D = ptsOut[0, :]
+        ptsOut2Dlist = []
+        ptsIn2Dlist = []
+
+        for i in range(0, 4):
+            ptsOut2Dlist.append([ptsOut2D[i, 0], ptsOut2D[i, 1]])
+            ptsIn2Dlist.append([ptsIn2D[i, 0], ptsIn2D[i, 1]])
+
+        pin = np.array(ptsIn2Dlist) + [W / 2., H / 2.]
+        pout = (np.array(ptsOut2Dlist) + [1., 1.]) * (0.5 * sidelength)
+        pin = pin.astype(np.float32)
+        pout = pout.astype(np.float32)
+
+        return pin, pout
+
+    def get_warp_matrix(self, W, H, x, y, z, scale, fV):
+        fVhalf = np.deg2rad(fV / 2.)
+        d = np.sqrt(W * W + H * H)
+        sideLength = scale * d / np.cos(fVhalf)
+        h = d / (2.0 * np.sin(fVhalf))
+        n = h - (d / 2.0)
+        f = h + (d / 2.0)
+
+        # Translation along Z-axis by -h
+        T = np.eye(4, 4)
+        T[2, 3] = -h
+
+        # Rotation matrices around x,y,z
+        R = get_rotate_matrix(x, y, z)
+
+        # Projection Matrix
+        P = np.eye(4, 4)
+        P[0, 0] = 1.0 / np.tan(fVhalf)
+        P[1, 1] = P[0, 0]
+        P[2, 2] = -(f + n) / (f - n)
+        P[2, 3] = -(2.0 * f * n) / (f - n)
+        P[3, 2] = -1.0
+
+        # pythonic matrix multiplication
+        M44 = reduce(lambda x, y: np.matmul(x, y), [P, T, R])
+
+        # shape should be 1,4,3 for ptsIn and ptsOut since perspectiveTransform() expects data in this way.
+        # In C++, this can be achieved by Mat ptsIn(1,4,CV_64FC3);
+        ptsIn = np.array([[
+            [-W / 2., H / 2., 0.],
+            [W / 2., H / 2., 0.],
+            [W / 2., -H / 2., 0.],
+            [-W / 2., -H / 2., 0.]
+        ]])
+        ptsOut = cv2.perspectiveTransform(ptsIn, M44)
+
+        ptsInPt2f, ptsOutPt2f = self.get_warped_pnts(ptsIn, ptsOut, W, H, sideLength)
+
+        # check float32 otherwise OpenCV throws an error
+        assert (ptsInPt2f.dtype == np.float32)
+        assert (ptsOutPt2f.dtype == np.float32)
+        M33 = cv2.getPerspectiveTransform(ptsInPt2f, ptsOutPt2f).astype(np.float32)
+
+        return M33, sideLength, ptsInPt2f, ptsOutPt2f
+
+def apply_perspective_transform(img, max_x, max_y, max_z):
+    x = cliped_rand_norm(0, max_x)
+    y = cliped_rand_norm(0, max_y)
+    z = cliped_rand_norm(0, max_z)
+
+    transformer = PerspectiveTransform(x, y, z, scale=1.0, fovy=50)
+    dst_img, M33, dst_img_pnts = transformer.transform_image(img, False)
+    dst_img_pnts = np.array(dst_img_pnts,dtype = np.int32)
+
+    x_min, y_min = np.min(dst_img_pnts,axis=0)
+    x_max, y_max = np.max(dst_img_pnts,axis=0)
+    return dst_img[y_min:y_max, x_min:x_max]
+
+class Remaper(object):
+    def __init__(self):
+        self.period = 360  
+        self.min = 1
+        self.max = 5
+
+    def apply(self, word_img, text_box_pnts):
+        """
+        :param word_img:  word image with big background
+        :param text_box_pnts: left-top, right-top, right-bottom, left-bottom of text word
+        :return:
+        """
+        max_val = np.random.uniform(self.min, self.max)
+
+        h = word_img.shape[0]
+        w = word_img.shape[1]
+
+        img_x = np.zeros((h, w), np.float32)
+        img_y = np.zeros((h, w), np.float32)
+
+        xmin = text_box_pnts[0][0]
+        xmax = text_box_pnts[1][0]
+        ymin = text_box_pnts[0][1]
+        ymax = text_box_pnts[2][1]
+
+        remap_y_min = ymin
+        remap_y_max = ymax
+
+        for y in range(h):
+            for x in range(w):
+                remaped_y = y + self._remap_y(x, max_val)
+
+                if y == ymin:
+                    if remaped_y < remap_y_min:
+                        remap_y_min = remaped_y
+
+                if y == ymax:
+                    if remaped_y > remap_y_max:
+                        remap_y_max = remaped_y
+
+                # 某一个位置的 y 值应该为哪个位置的 y 值
+                img_y[y, x] = remaped_y
+                # 某一个位置的 x 值应该为哪个位置的 x 值
+                img_x[y, x] = x
+
+        remaped_text_box_pnts = [
+            [xmin, remap_y_min],
+            [xmax, remap_y_min],
+            [xmax, remap_y_max],
+            [xmin, remap_y_max]
+        ]
+
+        # TODO: use cuda::remap
+        dst = cv2.remap(word_img, img_x, img_y, cv2.INTER_CUBIC)
+        return dst, remaped_text_box_pnts
+
+    def _remap_y(self, x, max_val):
+        return int(max_val * np.math.sin(2 * 3.14 * x / self.period))
+
+def reverse_img(word_img):
+    offset = np.random.randint(-10, 10)
+    return 255 + offset - word_img
