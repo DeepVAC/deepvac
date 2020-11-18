@@ -136,7 +136,6 @@ class SynthesisText(SynthesisBase):
         max_dis = 0
         for fg in fg_lst:
             distance = abs(dominant[0]-fg[0]) + abs(dominant[1]-fg[1]) + abs(dominant[2]-fg[2])
-            #print(self.images[i%self.images_num], dominant, fg, distance)
             if distance > self.distance:
                 return fg
             if distance > max_dis:
