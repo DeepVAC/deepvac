@@ -177,7 +177,6 @@ class SynthesisText(SynthesisBase):
 
         x, y = tuple(self.font_offset)
         offset = font.getoffset(text)
-        x -= offset[0]
         y -= offset[1]
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
         for i in [x-1,x+1,x]:
@@ -192,7 +191,6 @@ class SynthesisText(SynthesisBase):
 
         offset = font.getoffset(s)
         x, y = tuple(self.font_offset)
-        x -= offset[0]
         y -= offset[1]
 
         if np.random.rand() < self.conf.random_space:
