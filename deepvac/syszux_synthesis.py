@@ -73,7 +73,7 @@ class SynthesisText(SynthesisBase):
         self.current_font_size = 50
         self.max_font = 60
         self.min_font = 25
-        self.crop_scale = 4
+        self.crop_scale = 8
         self.scene_hw = (1080,1920)
         self.gb18030_font_file_list = []
 
@@ -114,6 +114,10 @@ class SynthesisText(SynthesisBase):
         self.fg_color_len = len(self.fg_color)
 
         self.distance = 100  # The min distance of fg_color and bg_color 
+
+        self.s_width = 0
+        self.s_height = 0
+
 
     def buildScene(self,i):
         raise Exception("Not implemented!")
@@ -160,19 +164,75 @@ class SynthesisText(SynthesisBase):
 
         return s, font
 
-    def text_border(self, x, y, font, shadowcolor, fillcolor,text):
+    def get_word_size(self, font, word):
+        offset = font.getoffset(word)
+        size = font.getsize(word)
+        size = (size[0] - offset[0], size[1] - offset[1])
+        return size
+
+    def draw_text_border(self, font, shadowcolor, fillcolor, text):
+        word_size = self.get_word_size(font, text)
+        self.s_height = word_size[1]
+        self.s_width = word_size[0]
+
+        x, y = tuple(self.font_offset)
+        offset = font.getoffset(text)
+        y -= offset[1]
         shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
         for i in [x-1,x+1,x]:
             for j in [y-1,y+1,y]:
                 self.draw.text((i, j), text, font=font, fill=shadowcolor)
         self.draw.text((x,y),text,fillcolor,font=font)
+    
+    def draw_text(self, font, fillcolor, s):
+        word_size = self.get_word_size(font, s)
+        self.s_height = word_size[1]
+        self.s_width = word_size[0] 
+
+        offset = font.getoffset(s)
+        x, y = tuple(self.font_offset)
+        y -= offset[1]
+
+        if np.random.rand() < self.conf.random_space:
+            self.draw_text_with_random_space(font, fillcolor, s)
+        else:
+            self.draw.text((x,y),s,fillcolor,font=font)
+
+    def draw_text_with_random_space(self, font, fillcolor, s):
+        chars_size = []
+        width = 0
+        height = 0
+        y_offset = 10 ** 5
+        for c in s:
+            size = font.getsize(c)
+            chars_size.append(size)
+            width += size[0]
+
+            if size[1] > height:
+                height = size[1]
+
+            c_offset = font.getoffset(c)
+            if c_offset[1] < y_offset:
+                y_offset = c_offset[1]
+
+        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max))
+        width += (char_space_width * (len(s) - 1))
+
+        c_x, c_y = self.font_offset
+
+        for i, c in enumerate(s):
+            self.draw.text((c_x, c_y - y_offset), c, fillcolor, font=font)
+            c_x += (chars_size[i][0] + char_space_width)
+
+        self.s_width = width
+        self.s_height = height
 
     def dumpTextImg(self,i):
         crop_offset = int(self.current_font_size / self.crop_scale)
         #crop_list = [np.random.randint(-crop_offset, crop_offset+1) for _ in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset/2):self.font_offset[1]+self.current_font_size + np.random.randint(crop_offset/2, crop_offset * 1.5),
-                self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.current_font_size*len(self.lex[i%self.lex_len])+np.random.randint(-crop_offset, crop_offset+1)]
+        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[1]+self.s_height + np.random.randint(-crop_offset, crop_offset+1),
+                self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.s_width+np.random.randint(-crop_offset, crop_offset+1)]
         image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
         self.dumpImgToPath(image_name,img_crop)
         self.fw.write(image_name+' '+self.lex[i%self.lex_len]+'\n')
@@ -213,9 +273,9 @@ class SynthesisTextPure(SynthesisText):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.fg_color[i%self.fg_color_len]
         if np.random.rand() < self.is_border:
-            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+            self.draw_text_border(font,"white",fillcolor,s)
         else:
-            self.draw.text(self.font_offset,s,fillcolor,font=font)
+            self.draw_text(font,fillcolor,s)
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
@@ -264,10 +324,10 @@ class SynthesisTextFromVideo(SynthesisText):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
-            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+            self.draw_text_border(font,"white",fillcolor,s)
         else:
             fillcolor = self.pickFgColor(i, s)
-            self.draw.text(self.font_offset,s,fillcolor,font=font)
+            self.draw_text(font,fillcolor,s)
 
 class SynthesisTextFromImage(SynthesisText):
     def __init__(self, deepvac_config):
@@ -300,7 +360,7 @@ class SynthesisTextFromImage(SynthesisText):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         if np.random.rand() < self.is_border:
             fillcolor = self.fg_color[i%self.fg_color_len]
-            self.text_border(self.font_offset[0],self.font_offset[1],font,"white",fillcolor,s)
+            self.draw_text_border(font,"white",fillcolor,s)
         else:
             fillcolor = self.pickFgColor(i, s)
-            self.draw.text(self.font_offset,s,fillcolor,font=font)
+            self.draw_text(font,fillcolor,s)
