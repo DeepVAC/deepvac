@@ -134,8 +134,7 @@ class Deepvac(object):
             LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
             return
         LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
-        device = torch.cuda.current_device()
-        self.state_dict = torch.load(self.conf.model_path, map_location=lambda storage, loc: storage.cuda(device))
+        self.state_dict = torch.load(self.conf.model_path, map_location=self.device)
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
