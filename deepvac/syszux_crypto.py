@@ -65,16 +65,16 @@ class SyszuxCipher(object):
 
 if __name__ == "__main__":
     modes = ['encrypt', 'decrypt']
-    if len(sys.argv) < 2:
-        LOG.logE('Usage: {} <file_path> [mode]'.format(sys.argv[0]), exit=True)
+    if len(sys.argv) < 3:
+        LOG.logE('Usage: {} <file_path> <mode> <key>'.format(sys.argv[0]), exit=True)
 
-    sc = SyszuxCipher('gemfieldisacivilnetmaintainer')
-    try:
-        mode = sys.argv[2]
-    except:
-        mode = 'encrypt'
-    
+    file = sys.argv[1]
+    mode = sys.argv[2]
     if mode not in modes:
-        mode = 'encrypt'
+        LOG.logE("Unsupported mode: {}".format(mode), exit=True)
+ 
+    key = sys.argv[3]
+    sc = SyszuxCipher(key)
 
-    sc(sys.argv[1], mode)
+    LOG.logI("You will use {} to {} {}".format(key, mode, file))
+    sc(file, mode)

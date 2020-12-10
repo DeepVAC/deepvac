@@ -2,9 +2,8 @@ import time
 import warnings
 import numpy as np
 import scipy.sparse as ss
-
+from .syszux_log import LOG
 from collections import OrderedDict
-
 
 class Report(object):
     def __init__(self, ds_name = "Unknown", total_num = 0):
@@ -40,7 +39,7 @@ class Report(object):
         report_keys = [k for k,v in self.report_dict.items()]
         report_values = [ff(k) if not v else v for k,v in self.report_dict.items() ]
 
-        print(self.report_str.format(*report_keys, *report_values))
+        LOG.logI(self.report_str.format(*report_keys, *report_values))
 
         assert self.process_num == self.total_num, "total num error"
 
@@ -163,8 +162,7 @@ class OcrReport(Report):
         self.char_report_dict['accuracy_per_char'] = self.char_report_dict['correct_per_char'] / self.char_report_dict['total_per_char']
         report_keys = [k for k,v in self.char_report_dict.items()]
         report_values = [v for k,v in self.char_report_dict.items() ]
-        print(self.char_report_str.format(*report_keys, *report_values))
-
+        LOG.logI(self.char_report_str.format(*report_keys, *report_values))
 
 # used in classifier
 class ClassifierReport(Report):

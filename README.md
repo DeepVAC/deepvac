@@ -31,7 +31,9 @@ docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
 |test.py       |测试的入口文件, 继承Deepvac类体系（来自deepvac/syszux_deepvac.py）的扩展实现|
 |config.py     |用户训练和测试的配置文件，syszux_config模块（来自deepvac/syszux_config）的扩展实现|
 |modules/model.py | 模型、Loss的定义文件，PyTorch Module类的扩展实现|
+|modules/model_{name}.py | 同上，有多个model的时候，使用suffix区分|
 |modules/utils.py | 工具类/方法的定义文件（可省略）|
+|modules/utils_{name}.py | 同上，有多个工具类/函数文件的时候，使用suffix区分（可省略）|
 |data/train.txt | 训练集清单文件（可省略）|
 |data/val.txt   | 验证集清单文件（可省略）|
 |output/model*  | 输出或输入的模型文件 |
@@ -293,7 +295,7 @@ config.weight_decay = None
 config.milestones = [2,4,6,8,10]
 ```
 
-### 训练Train
+### 训练
 ```python
 #训练的batch size
 config.train.batch_size = 128
@@ -307,10 +309,14 @@ config.save_num = 5
 config.checkpoint_suffix = '2020-09-01-17-37_acc:0.9682857142857143_epoch:10_step:6146_lr:0.00011543040395151496.pth'
 ```
 
-### 验证Val和测试Test
+### 验证和测试
 ```python
 #验证时所用的batch size
 config.val.batch_size = None
+
+#测试和验证不同之处有很多，其中一点就是要显式的从文件系统上加载训练过程中保存的模型：
+#model_path指定要加载模型的路径
+config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 ```
 
 ### DDP（分布式训练）
@@ -321,9 +327,13 @@ config.dist_url = "tcp://localhost:27030"
 
 #rank的数量，一定要修改
 config.world_size = 3
+```
 
-#以下两个为命令行参数，不是config.py中的配置
+以下两个配置为命令行参数，不是config.py中的配置:
+```bash
+#从0开始
 --rank <rank_idx>
+#从0开始
 --gpu <gpu_idx>
 ```
 
@@ -354,11 +364,11 @@ config.onnx_output_model_path = <your_onnx_file_path>
 如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
 ```python
 # NCNN网络结构的文件路径
-config.ncnn_param_output_path
+config.ncnn_param_output_path = <your_ncnn_netowrk_arch_file>
 # NCNN网络权重的文件路径
-config.ncnn_bin_output_path
+config.ncnn_bin_output_path = <your_ncnn_netowrk_weights_file>
 # onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
-config.onnx2ncnn
+config.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ```
 ### 输出CoreML
 ### 启用自动混合精度训练
