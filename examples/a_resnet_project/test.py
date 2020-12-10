@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 import torch
-import numpy as np
 from torch import nn
-from modules.model import model
+from torchvision import models
 from deepvac.syszux_log import LOG
+from modules.model import model
 from deepvac.syszux_deepvac import Deepvac
 from deepvac.syszux_loader import OsWalkerLoader
 from deepvac.syszux_report import ClassifierReport
