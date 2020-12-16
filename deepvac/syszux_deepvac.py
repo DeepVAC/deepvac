@@ -190,6 +190,8 @@ class Deepvac(object):
 
     def _noGrad(self):
         for p in self.net.parameters():
+            if not p.is_leaf:
+                p = p.detach()
             p.requires_grad_(False)
 
     @syszux_once
