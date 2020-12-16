@@ -134,8 +134,7 @@ class Deepvac(object):
             LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
             return
         LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
-        device = torch.cuda.current_device()
-        self.state_dict = torch.load(self.conf.model_path, map_location=lambda storage, loc: storage.cuda(device))
+        self.state_dict = torch.load(self.conf.model_path, map_location=self.device)
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
@@ -189,10 +188,6 @@ class Deepvac(object):
             
         return self.getOutput()
 
-    def _noGrad(self):
-        for p in self.net.parameters():
-            p.requires_grad_(False)
-
     @syszux_once
     def exportTorchViaTrace(self, sample=None):
         if not self.conf.trace_model_dir:
@@ -206,9 +201,9 @@ class Deepvac(object):
         if sample is not None:
             self.sample = sample
 
-        self._noGrad()
-        ts = torch.jit.trace(self.net, self.sample)
-        ts.save(self.conf.trace_model_dir)
+        with torch.no_grad():
+            ts = torch.jit.trace(self.net, self.sample)
+            ts.save(self.conf.trace_model_dir)
         LOG.logI("config.trace_model_dir found, save & exit...")
         sys.exit(0)
 
@@ -216,9 +211,9 @@ class Deepvac(object):
     def exportTorchViaScript(self):
         if not self.conf.script_model_dir:
             return
-        self._noGrad()
-        ts = torch.jit.script(self.net)
-        ts.save(self.conf.script_model_dir)
+        with torch.no_grad():
+            ts = torch.jit.script(self.net)
+            ts.save(self.conf.script_model_dir)
     
     @syszux_once
     def exportNCNN(self):
