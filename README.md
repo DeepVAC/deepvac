@@ -347,30 +347,53 @@ config.tensorboard_ip = None
 ```
 
 ### 输出TorchScript
-一旦配置如下的参数后，Deepvac会认为你的目的是转换和保存TorchScript模型，因此将会在一次前向后退出程序。
+如果要转换PyTorch模型到TorchScript，你需要设置如下的配置：
 ```python
 #通过script的方式将pytorch训练的模型编译为TorchScript模型
-config.script_model_dir = <your_pt_file_path>
+config.script_model_dir = <your_script_model_dir_only4smoketest>
 
 #通过trace的方式将pytorch训练的模型转换为TorchScript模型
-config.trace_model_dir = <your_pt_file_path>
+config.trace_model_dir = <your_trace_model_dir_only4smoketest>
 ```
+注意：
+- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为TorchScript。之后，在每次保存PyTorch模型的时候，会同时保存TorchScript；
+- <your_trace_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+
 ### 输出ONNX模型
+如果要转换PyTorch模型到ONNX，你需要设置如下的配置：
 ```python
-#输出config.onnx_output_model_path
-config.onnx_output_model_path = <your_onnx_file_path>
+#输出config.onnx_model_dir
+config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
 ```
+注意：
+- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为ONNX。之后，在每次保存PyTorch模型的时候，会同时保存ONNX。
+- <your_onnx_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 ### 输出NCNN模型
 如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
 ```python
-# NCNN网络结构的文件路径
-config.ncnn_param_output_path = <your_ncnn_netowrk_arch_file>
-# NCNN网络权重的文件路径
-config.ncnn_bin_output_path = <your_ncnn_netowrk_weights_file>
+# NCNN的文件路径, ncnn.arch ncnn.bin
+config.ncnn_model_dir = <your_ncnn_model_dir_only4smoketest>
 # onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
 config.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ```
+注意：
+- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为NCNN。之后，在每次保存PyTorch模型的时候，会同时保存NCNN。
+- <your_ncnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 ### 输出CoreML
+如果要转换PyTorch模型到CoreML，你需要设置如下的配置：
+```python
+config.coreml_model_dir = <your_coreml_model_dir_only4smoketest>
+config.coreml_preprocessing_args = dict(is_bgr=False, image_scale = 1.0 / 255.0, red_bias = 0, green_bias = 0, blue_bias = 0,image_format='NCHW')
+#config.coreml_preprocessing_args = dict(is_bgr=False, image_scale = 1.0 / (0.226 * 255.0), red_bias = -0.485 / 0.226, green_bias = -0.456 / 0.226, blue_bias = -0.406 / 0.226,image_format='NCHW')
+config.minimum_ios_deployment_target = '13'
+#如果类别多，使用代码初始化这个值
+config.coreml_class_labels = ["cls1","cls2","cls3","cls4","cls5","cls6"]
+config.coreml_mode = 'classifier'
+```
+注意：
+- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
+- <your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
 ### 启用自动混合精度训练
 ### 启用量化
 

@@ -6,6 +6,8 @@ import torch
 import torch.optim as optim
 import torch.distributed as dist
 import time
+import subprocess
+import tempfile
 from enum import Enum
 from .syszux_annotation import *
 from .syszux_log import LOG,getCurrentGitBranch
@@ -113,8 +115,6 @@ class Deepvac(object):
         self.loadStateDict()
         #just print model parameters info
         self._parametersInfo()
-        #compile pytorch state dict to TorchScript
-        self.exportTorchViaScript()
     
     def initNetPost(self):
         self.xb = torch.Tensor().to(self.device)
@@ -188,56 +188,68 @@ class Deepvac(object):
             
         return self.getOutput()
 
-    @syszux_once
-    def exportTorchViaTrace(self, sample=None):
+    def exportTorchViaTrace(self, sample=None, output_trace_file=None):
         if not self.conf.trace_model_dir:
-            if self.conf.script_model_dir:
-                LOG.logI("config.script_model_dir found, save & exit...")
-                sys.exit(0)
             return
         if sample is None and self.sample is None:
             LOG.logE("either call exportTorchViaTrace and pass value to pamameter sample, or call exportTorchViaTrace in Train mode.", exit=True)
 
         if sample is not None:
             self.sample = sample
+        
+        if output_trace_file is None:
+            output_trace_file = self.conf.trace_model_dir
 
         with torch.no_grad():
+            self.net.eval()
             ts = torch.jit.trace(self.net, self.sample)
-            ts.save(self.conf.trace_model_dir)
-        LOG.logI("config.trace_model_dir found, save & exit...")
-        sys.exit(0)
+            ts.save(output_trace_file)
 
-    @syszux_once
-    def exportTorchViaScript(self):
+        LOG.logI("config.trace_model_dir found, save to {}...".format(output_trace_file))
+
+    def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
             return
+
+        if output_script_file is None:
+            output_script_file = self.conf.script_model_dir
+
         with torch.no_grad():
+            self.net.eval()
             ts = torch.jit.script(self.net)
-            ts.save(self.conf.script_model_dir)
+            ts.save(output_script_file)
+
+        LOG.logI("config.script_model_dir found, save to {}...".format(output_script_file))
     
-    @syszux_once
-    def exportNCNN(self):
-        if not self.conf.ncnn_param_output_path or not self.conf.ncnn_bin_output_path:
+    def exportNCNN(self, output_ncnn_file=None):
+        if not self.conf.ncnn_model_dir:
             return
+
         if not self.conf.onnx2ncnn:
             LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
 
-        import onnx
-        import subprocess
-        import tempfile
-        from onnxsim import simplify
+        if output_ncnn_file is None:
+            output_ncnn_file = self.conf.ncnn_model_dir
+
+        self.ncnn_arch_dir = '{}.param'.format(output_ncnn_file)
+        try:
+            import onnx
+            from onnxsim import simplify
+        except:
+            LOG.logE("You must install onnx and onnxsim package if you want to convert pytorch to ncnn.")
         
-        if not self.conf.onnx_output_model_path:
+        if not self.conf.onnx_model_dir:
             f = tempfile.NamedTemporaryFile()
-            self.conf.onnx_output_model_path = f.name
+            self.conf.onnx_model_dir = f.name
+
         self.exportONNX()
         
-        cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_output_model_path + " " + self.conf.ncnn_param_output_path + " " + self.conf.ncnn_bin_output_path
+        cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_model_dir + " " + self.conf.ncnn_arch_dir + " " + output_ncnn_file
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
             LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
-            model_op, check_ok = simplify(self.conf.onnx_output_model_path, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
-            onnx.save(model_op, self.conf.onnx_output_model_path)
+            model_op, check_ok = simplify(self.conf.onnx_model_dir, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
+            onnx.save(model_op, self.conf.onnx_model_dir)
             if not check_ok:
                 LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right")
             else:
@@ -246,18 +258,46 @@ class Deepvac(object):
             if pd.stderr.read() != b"":
                 LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
         
-        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_param_output_path, self.conf.ncnn_bin_output_path))
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_arch_dir, output_ncnn_file))
 
-    @syszux_once
-    def exportCoreML(self):
-        pass
-
-    @syszux_once
-    def exportONNX(self):
-        if not self.conf.onnx_output_model_path:
+    def exportCoreML(self, output_coreml_file=None):
+        if not self.conf.coreml_model_dir:
             return
-        torch.onnx._export(self.net, self.sample, self.conf.onnx_output_model_path, export_params=True)
-        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.conf.onnx_output_model_path))
+
+        if output_coreml_file is None:
+            output_coreml_file = self.conf.coreml_model_dir
+
+        try:
+            from onnx_coreml import convert
+        except:
+            LOG.logE("You must install onnx-coreml, coremltools package if you want to convert PyTorch to CoreML model. E.g. pip install --upgrade onnx-coreml coremltools")
+
+        input_names = ["deepvac_in"]
+        output_names = ["deepvac_out"]
+
+        if not self.conf.onnx_model_dir:
+            f = tempfile.NamedTemporaryFile()
+            self.conf.onnx_model_dir = f.name
+
+        #to onnx
+        torch.onnx.export(model, self.sample, self.conf.onnx_model_dir, verbose=True, input_names=input_names, output_names=output_names)
+        #onnx2coreml
+        model_coreml = convert(model=self.conf.onnx_model_dir, preprocessing_args= self.conf.coreml_preprocessing_args, mode=self.conf.coreml_mode, image_input_names=['deepvac_in'],
+            class_labels=self.conf.coreml_class_labels, predicted_feature_name='deepvac_out', minimum_ios_deployment_target=self.conf.minimum_ios_deployment_target)
+
+        # Save the CoreML model
+        coreml_model.save(output_coreml_file)
+
+    def exportONNX(self, output_onnx_file=None):
+        if not self.conf.onnx_model_dir:
+            return
+        if output_onnx_file is None:
+            output_onnx_file = self.onnx_model_dir
+        else:
+            self.onnx_model_dir = output_onnx_file
+
+        torch.onnx._export(self.net, self.sample, output_onnx_file, export_params=True)
+        LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
 
     def loadDB(self, db_path):
         self.xb = torch.load(db_path).to(self.device)
@@ -424,12 +464,16 @@ class DeepvacTrain(Deepvac):
     def addGraph(self, input):
         self.writer.add_graph(self.net, input)
 
-    def export3rd(self):
+    @syszux_once
+    def smokeTestForExport3rd(self):
         #exportNCNN must before exportONNX
-        self.exportNCNN()
         self.exportONNX()
+        self.exportNCNN()
+        self.exportCoreML()
         #whether export TorchScript via trace, only here we can get self.sample
         self.exportTorchViaTrace()
+        #compile pytorch state dict to TorchScript
+        self.exportTorchViaScript()
 
     def earlyIter(self):
         start = time.time()
@@ -477,15 +521,33 @@ class DeepvacTrain(Deepvac):
         self.addScalar('{}/TrainTime(secs/batch)'.format(self.phase), self.train_time.val, self.iter)
         LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, self.loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
 
-    def saveState(self, time):
-        self.state_file = 'model:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        self.checkpoint_file = 'checkpoint:{}_acc:{}_epoch:{}_step:{}_lr:{}.pth'.format(time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        torch.save(self.net.state_dict(), '{}/{}'.format(self.output_dir, self.state_file))
+    def saveState(self, current_time):
+        file_partial_name = '{}_acc:{}_epoch:{}_step:{}_lr:{}'.format(current_time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        state_file = '{}/model:{}.pth'.format(self.output_dir, file_partial_name)
+        checkpoint_file = '{}/checkpoint:{}.pth'.format(self.output_dir, file_partial_name)
+        output_trace_file = '{}/trace:{}.pt'.format(self.output_dir, file_partial_name)
+        output_script_file = '{}/script:{}.pt'.format(self.output_dir, file_partial_name)
+        output_onnx_file = '{}/onnx:{}.onnx'.format(self.output_dir, file_partial_name)
+        output_ncnn_file = '{}/ncnn:{}.bin'.format(self.output_dir, file_partial_name)
+        #save state_dict
+        torch.save(self.net.state_dict(), state_file)
+        #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
             'epoch': self.epoch,
-            'scheduler': self.scheduler.state_dict() if self.scheduler else None
-        }, '{}/{}'.format(self.output_dir, self.checkpoint_file))
+            'scheduler': self.scheduler.state_dict() if self.scheduler else None},  checkpoint_file)
+        #save onnx
+        #save pt via trace
+        self.exportTorchViaTrace(self.sample, output_trace_file)
+        #save pt vida script
+        self.exportTorchViaScript(output_script_file)
+        #save onnx
+        self.exportONNX(output_onnx_file)
+        #save ncnn
+        self.exportNCNN(output_ncnn_file)
+        #save coreml
+        self.exportCoreML(output_coreml_file)
+        #tensorboard
         self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
     def processTrain(self):
@@ -512,7 +574,7 @@ class DeepvacTrain(Deepvac):
             self.sample = sample
             self.preIter()
             self.earlyIter()
-            self.export3rd()
+            self.smokeTestForExport3rd()
             self.optimizer.zero_grad()
             self.doForward()
             self.doLoss()
@@ -607,10 +669,10 @@ class DeepvacDDP(DeepvacTrain):
     def preEpoch(self):
         self.train_sampler.set_epoch(self.epoch)
 
-    def export3rd(self):
+    def smokeTestForExport3rd(self):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).export3rd()
+        super(DeepvacDDP, self).smokeTestForExport3rd()
 
     def saveState(self, time):
         if self.args.rank != 0:
