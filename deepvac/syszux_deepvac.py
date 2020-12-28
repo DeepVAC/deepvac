@@ -397,13 +397,13 @@ class DeepvacTrain(Deepvac):
         self.criterion = torch.nn.CrossEntropyLoss()
         LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
 
-    def initCheckpoint(self, map_location=None):
+    def initCheckpoint(self):
         if not self.conf.checkpoint_suffix or self.conf.checkpoint_suffix == "":
             LOG.logI('Omit the checkpoint file since not specified...')
             return
         LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
-        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=map_location))
-        state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=map_location)
+        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=self.device))
+        state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=self.device)
         self.optimizer.load_state_dict(state_dict['optimizer'])
         if self.scheduler:
             self.scheduler.load_state_dict(state_dict['scheduler'])
@@ -678,9 +678,6 @@ class DeepvacDDP(DeepvacTrain):
         if self.args.rank != 0:
             return
         super(DeepvacDDP, self).saveState(self.getTime())
-
-    def initCheckpoint(self):
-        super(DeepvacDDP, self).initCheckpoint(self.map_location)
 
     def addScalar(self, tag, value, step):
         if self.args.rank != 0:
