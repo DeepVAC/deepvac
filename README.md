@@ -336,6 +336,12 @@ config.world_size = 3
 #从0开始
 --gpu <gpu_idx>
 ```
+上述的配置表明我们将使用3个进程在3个CUDA设备上进行训练。配置完成后，我们在命令行手工启动3个进程：
+```bash
+python train.py --rank 0 --gpu 0
+python train.py --rank 1 --gpu 1
+python train.py --rank 2 --gpu 2
+```
 
 ### 启用tensorboard服务  
 Deepvac会自动在log/<git_branch>/下写入tensorboard数据，如果需要在线可视化，则还需要如下配置：
