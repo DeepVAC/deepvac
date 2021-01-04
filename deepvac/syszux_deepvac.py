@@ -375,8 +375,8 @@ class DeepvacTrain(Deepvac):
 
         self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
         LOG.logI('model save dir: {}'.format(self.output_dir))
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        #for DDP race condition
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def initSummaryWriter(self):
         event_dir = "{}/{}".format(self.conf.log_dir, self.branch)
