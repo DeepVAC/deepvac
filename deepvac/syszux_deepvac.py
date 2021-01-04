@@ -529,6 +529,7 @@ class DeepvacTrain(Deepvac):
         output_script_file = '{}/script:{}.pt'.format(self.output_dir, file_partial_name)
         output_onnx_file = '{}/onnx:{}.onnx'.format(self.output_dir, file_partial_name)
         output_ncnn_file = '{}/ncnn:{}.bin'.format(self.output_dir, file_partial_name)
+        output_coreml_file = '{}/coreml:{}.mlmodel'.format(self.output_dir, file_partial_name)
         #save state_dict
         torch.save(self.net.state_dict(), state_file)
         #save checkpoint
