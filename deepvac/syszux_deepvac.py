@@ -474,6 +474,7 @@ class DeepvacTrain(Deepvac):
         self.exportTorchViaTrace()
         #compile pytorch state dict to TorchScript
         self.exportTorchViaScript()
+        self.setTrainContext()
 
     def earlyIter(self):
         start = time.time()
@@ -575,7 +576,6 @@ class DeepvacTrain(Deepvac):
             self.sample = sample
             self.preIter()
             self.earlyIter()
-            self.smokeTestForExport3rd()
             self.optimizer.zero_grad()
             self.doForward()
             self.doLoss()
@@ -584,6 +584,9 @@ class DeepvacTrain(Deepvac):
             self.doLog()
             self.postIter()
             self.train_time.update(time.time() - start)
+            if self.step == 0:
+                self.smokeTestForExport3rd()
+
             if self.step in self.save_list:
                 self.processVal()
                 self.setTrainContext()
