@@ -402,8 +402,8 @@ class DeepvacTrain(Deepvac):
             LOG.logI('Omit the checkpoint file since not specified...')
             return
         LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
-        self.net.load_state_dict(torch.load(self.output_dir+'/model:{}'.format(self.conf.checkpoint_suffix), map_location=self.device))
-        state_dict = torch.load(self.output_dir+'/checkpoint:{}'.format(self.conf.checkpoint_suffix), map_location=self.device)
+        self.net.load_state_dict(torch.load(self.output_dir+'/model__{}'.format(self.conf.checkpoint_suffix), map_location=self.device))
+        state_dict = torch.load(self.output_dir+'/checkpoint__{}'.format(self.conf.checkpoint_suffix), map_location=self.device)
         self.optimizer.load_state_dict(state_dict['optimizer'])
         if self.scheduler:
             self.scheduler.load_state_dict(state_dict['scheduler'])
@@ -523,14 +523,14 @@ class DeepvacTrain(Deepvac):
         LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.phase, self.epoch, self.step, self.loader_len,self.loss.item(),self.optimizer.param_groups[0]['lr']))
 
     def saveState(self, current_time):
-        file_partial_name = '{}_acc:{}_epoch:{}_step:{}_lr:{}'.format(current_time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
-        state_file = '{}/model:{}.pth'.format(self.output_dir, file_partial_name)
-        checkpoint_file = '{}/checkpoint:{}.pth'.format(self.output_dir, file_partial_name)
-        output_trace_file = '{}/trace:{}.pt'.format(self.output_dir, file_partial_name)
-        output_script_file = '{}/script:{}.pt'.format(self.output_dir, file_partial_name)
-        output_onnx_file = '{}/onnx:{}.onnx'.format(self.output_dir, file_partial_name)
-        output_ncnn_file = '{}/ncnn:{}.bin'.format(self.output_dir, file_partial_name)
-        output_coreml_file = '{}/coreml:{}.mlmodel'.format(self.output_dir, file_partial_name)
+        file_partial_name = '{}__acc_{}__epoch_{}__step_{}__lr_{}'.format(current_time, self.accuracy, self.epoch, self.step, self.optimizer.param_groups[0]['lr'])
+        state_file = '{}/model__{}.pth'.format(self.output_dir, file_partial_name)
+        checkpoint_file = '{}/checkpoint__{}.pth'.format(self.output_dir, file_partial_name)
+        output_trace_file = '{}/trace__{}.pt'.format(self.output_dir, file_partial_name)
+        output_script_file = '{}/script__{}.pt'.format(self.output_dir, file_partial_name)
+        output_onnx_file = '{}/onnx__{}.onnx'.format(self.output_dir, file_partial_name)
+        output_ncnn_file = '{}/ncnn__{}.bin'.format(self.output_dir, file_partial_name)
+        output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.output_dir, file_partial_name)
         #save state_dict
         torch.save(self.net.state_dict(), state_file)
         #save checkpoint
