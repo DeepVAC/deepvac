@@ -408,6 +408,11 @@ config.coreml_mode = 'classifier'
 - <your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 - 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
 ### 启用自动混合精度训练
+如果要开启自动混合精度训练（AMP），你只需要设置如下配置即可：
+```python
+config.amp = True
+```
+详情参考[PyTorch的自动混合精度](https://zhuanlan.zhihu.com/p/165152789)。
 ### 启用量化
 目前PyTorch有三种量化方式，详情参考[PyTorch的量化](https://zhuanlan.zhihu.com/p/299108528):
 - 动态量化
