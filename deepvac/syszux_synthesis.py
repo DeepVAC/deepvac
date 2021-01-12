@@ -201,15 +201,22 @@ class SynthesisText(SynthesisBase):
     def draw_text(self, font, fillcolor, s):
         # vertical font
         is_vertical = False
-        if np.random.rand() < self.conf.is_vertical:
+        if np.random.rand() < self.conf.vertical_ratio:
             font = ImageFont.TransposedFont(font, orientation=Image.ROTATE_90)
             is_vertical = True
 
         # border
         is_border = False
-        if np.random.rand() < self.conf.is_border:
+        if np.random.rand() < self.conf.border_ratio:
             shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
             is_border = True
+
+        # random_space
+        is_random_space = False
+        char_space_width = 0
+        if np.random.rand() < self.conf.random_space_ratio:
+            is_random_space = True
+
 
         chars_size = []
         width = 0
@@ -232,24 +239,35 @@ class SynthesisText(SynthesisBase):
                 if c_offset[1] < y_offset:
                     y_offset = c_offset[1]
 
-        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max)) if np.random.rand() < self.conf.random_space else 0
         width += (char_space_width * (len(s) - 1))
         height -= y_offset
 
-        c_x, c_y = self.font_offset
+        self.s_width = width
+        self.s_height = height
 
+        c_x, c_y = self.font_offset
+        c_y -= y_offset
+
+        if not is_vertical and not is_random_space:
+            if is_border:
+                x = c_x
+                y = c_y
+                for j in [x-1,x+1,x]:
+                    for k in [y-1,y+1,y]:
+                        self.draw.text((j, k), s, font=font, fill=shadowcolor)
+            self.draw.text((c_x, c_y), s, fillcolor, font=font)
+            return
+
+        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max))
         for i, c in enumerate(s):
             if is_border:
                 x = c_x
-                y = c_y - y_offset
+                y = c_y
                 for j in [x-1,x+1,x]:
                     for k in [y-1,y+1,y]:
                         self.draw.text((j, k), c, font=font, fill=shadowcolor)
-            self.draw.text((c_x, c_y - y_offset), c, fillcolor, font=font)
+            self.draw.text((c_x, c_y), c, fillcolor, font=font)
             c_x += (chars_size[i][0] + char_space_width)
-
-        self.s_width = width
-        self.s_height = height
 
     def dumpTextImg(self,i):
         crop_offset = int(self.current_font_size / self.crop_scale)
