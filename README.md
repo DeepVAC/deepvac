@@ -409,5 +409,40 @@ config.coreml_mode = 'classifier'
 - 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
 ### 启用自动混合精度训练
 ### 启用量化
+目前PyTorch有三种量化方式，详情参考[PyTorch的量化](https://zhuanlan.zhihu.com/p/299108528):
+- 动态量化
+- 静态量化
+- 量化感知训练
+
+一次训练任务中只能开启一种。
+
+#### 动态量化
+要开启动态量化，你需要设置如下的配置：
+```python
+config.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+```
+
+#### 静态量化
+要开启静态量化，你需要设置如下配置：
+```python
+config.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+
+# backend 为可选，默认为fbgemm
+config.quantize_backend = <'fbgemm' | 'qnnpack'>
+```
+
+#### 量化感知训练(QAT)
+开启QAT后，整个训练任务的Net就会转变为量化模型，也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。要开启QAT，你需要设置如下配置：
+```python
+config.qat_dir = <your_quantize_model_output_dir_only4smoketest>
+
+# backend 为可选，默认为fbgemm
+config.quantize_backend = <'fbgemm' | 'qnnpack'>
+```
+
+注意：
+- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
+- <your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+
 
 

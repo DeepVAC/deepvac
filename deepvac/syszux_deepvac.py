@@ -50,8 +50,11 @@ class Deepvac(object):
         
         if self.branch.startswith('PROTO_'):
             return
+        
+        if self.branch in ['master','main']:
+            return
 
-        LOG.logE('According to deepvac standard, git branch name should start from LTS_ or PROTO_: {}'.format(self.branch), exit=True)
+        LOG.logE('According to deepvac standard, git branch name should be master or main, or start from LTS_ or PROTO_: {}'.format(self.branch), exit=True)
 
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
@@ -75,6 +78,11 @@ class Deepvac(object):
         for name in self._mandatory_member_name:
             if name not in self._mandatory_member:
                 LOG.logE("Error! self.{} must be definded in your subclass.".format(name),exit=True)
+        
+        l = [self.conf.static_quantize_dir, self.conf.dynamic_quantize_dir,self.conf.qat_dir]
+        l2 = [x for x in l if x]
+        if len(l2) > 1:
+            LOG.logE("Error: [static_quantize_dir, dynamic_quantize_dir, qat_dir] are exclusive for each other. You can only enable one of them in a train task.")
 
     def getConf(self):
         return self.conf
@@ -109,6 +117,8 @@ class Deepvac(object):
         self.initDevice()
         #init self.net
         self.initNetWithCode()
+        #init quantize stuff
+        self.initNetWithQuantize()
         #init self.model_dict
         self.initStateDict()
         #just load model after audit
@@ -123,6 +133,15 @@ class Deepvac(object):
     def initDevice(self):
         #to determine CUDA device, different in DDP
         self.device = torch.device(self.conf.device)
+
+    def initNetWithQuantize(self):
+        self.dynamic_quantized_net = None
+        self.static_quantized_net = None
+        self.static_quantized_net_prepared = None
+        self.qat_net_prepared = None
+        self.qat_net = None
+        if self.conf.qat_dir:
+            self.exportQAT(prepare=True)
 
     def initNetWithCode(self):
         self.net = None
@@ -188,6 +207,17 @@ class Deepvac(object):
             
         return self.getOutput()
 
+    def saveModel4Libtorch(self, input_net, output_file, mode='trace', input_sample=None):
+        LOG.logI("saveModel4Libtorch: {} ...".format(output_file))
+        with torch.no_grad():
+            if mode == 'trace':
+                ts = torch.jit.trace(input_net.eval(), input_sample)
+            elif mode == 'script':
+                ts = torch.jit.script(input_net.eval())
+            else:
+                raise Exception('Invalid mode parameter: {}'.format(mode))
+        ts.save(output_file)
+
     def exportTorchViaTrace(self, sample=None, output_trace_file=None):
         if not self.conf.trace_model_dir:
             return
@@ -199,13 +229,18 @@ class Deepvac(object):
         
         if output_trace_file is None:
             output_trace_file = self.conf.trace_model_dir
+        
+        LOG.logI("config.trace_model_dir found, save trace model to {}...".format(output_trace_file))
+        saveModel4Libtorch(self.net, output_trace_file, 'trace', self.sample)
+        #trace quantized model
+        if self.dynamic_quantized_net:
+            saveModel4Libtorch(self.dynamic_quantized_net, output_trace_file + ".dynamic_quantized", 'trace', self.sample)
+        
+        if self.static_quantized_net:
+            saveModel4Libtorch(self.static_quantized_net, output_trace_file + ".static_quantized", 'trace', self.sample)
 
-        with torch.no_grad():
-            self.net.eval()
-            ts = torch.jit.trace(self.net, self.sample)
-            ts.save(output_trace_file)
-
-        LOG.logI("config.trace_model_dir found, save to {}...".format(output_trace_file))
+        if self.qat_net:
+            saveModel4Libtorch(self.qat_net, output_trace_file + ".qat_quantized", 'trace', self.sample)
 
     def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
@@ -213,13 +248,18 @@ class Deepvac(object):
 
         if output_script_file is None:
             output_script_file = self.conf.script_model_dir
+        
+        LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
+        saveModel4Libtorch(self.net, output_script_file, 'script')
+        #script quantized model
+        if self.dynamic_quantized_net:
+            saveModel4Libtorch(self.dynamic_quantized_net, output_script_file + ".dynamic_quantized", 'script')
 
-        with torch.no_grad():
-            self.net.eval()
-            ts = torch.jit.script(self.net)
-            ts.save(output_script_file)
+        if self.static_quantized_net:
+            saveModel4Libtorch(self.static_quantized_net, output_script_file + ".static_quantized", 'script')
 
-        LOG.logI("config.script_model_dir found, save to {}...".format(output_script_file))
+        if self.qat_net:
+            saveModel4Libtorch(self.qat_net, output_script_file + ".qat_quantized", 'script')
     
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
@@ -299,6 +339,86 @@ class Deepvac(object):
         torch.onnx._export(self.net, self.sample, output_onnx_file, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
 
+    def exportDynamicQuant(self, output_quant_file=None):
+        if not self.conf.dynamic_quantize_dir:
+            return
+        
+        if output_quant_file is None:
+            output_quant_file = self.conf.dynamic_quantize_dir
+
+        self.dynamic_quantized_net = torch.quantization.quantize_dynamic(self.net)
+        self.dynamic_quantized_net.eval()
+        torch.save(self.dynamic_quantized_net.state_dict(), output_quant_file)
+        LOG.logI("Pytorch model dynamic quantize succeed, save model in {}".format(output_quant_file))
+
+    def exportStaticQuant(self, output_quant_file=None, prepare=False):
+        if not self.conf.static_quantize_dir:
+            return
+        
+        if prepare:
+            LOG.logI("You have enabled static quantization, this step is only for prepare.")
+
+            if self.static_quantized_net_prepared:
+                LOG.logE("Error: You have already prepared the model for static quantization.", exit=True)
+
+            backend = 'fbgemm'
+            if self.conf.quantize_backend:
+                backend = self.conf.quantize_backend
+
+            self.static_quantized_net_prepared = torch.quantization.fuse_modules(self.net)
+            self.static_quantized_net_prepared.qconfig = torch.quantization.get_default_qconfig(backend)
+            torch.quantization.prepare(self.static_quantized_net_prepared, inplace=True)
+            self.static_quantized_net_prepared.eval()
+            return
+            
+        if self.static_quantized_net_prepared is None:
+            LOG.logE("Error: You haven't prepared the model for static quantization. call exportStaticQuant(prepare=True) first.",exit=True)
+
+        if output_quant_file is None:
+            output_quant_file = self.conf.static_quantize_dir
+
+        self.static_quantized_net = torch.quantization.convert(self.static_quantized_net_prepared)
+        LOG.logI("Pytorch model static quantize succeed, save model in {}".format(output_quant_file))
+        torch.save(self.static_quantized_net.state_dict(), output_quant_file)
+
+    def exportQAT(self, output_quant_file=None, prepare=False):
+        if not self.conf.qat_dir:
+            return
+        
+        if prepare:
+            LOG.logI("You have enabled QAT, this step is only for prepare.")
+        
+            if self.qat_net_prepared:
+                LOG.logE("Error: You have already prepared the model for QAT.", exit=True)
+
+            backend = 'fbgemm'
+            if self.conf.quantize_backend:
+                backend = self.conf.quantize_backend
+            
+            self.qat_net_prepared = torch.quantization.fuse_modules(self.net)
+            self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
+            torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)
+            #after this, train net will be transfered to QAT !
+            self.net = self.qat_net_prepared
+            return
+        
+        if self.qat_net_prepared is None:
+            LOG.logE("Error: You haven't prepared the model for QAT. call exportQAT(prepare=True) first.",exit=True)
+
+        if output_quant_file is None:
+            output_quant_file = self.conf.qat_dir
+
+        is_train = self.net.training
+        #to eval mode temporary
+        if is_train:
+            self.net.eval()
+        self.qat_net = torch.quantization.convert(self.net)
+        LOG.logI("Pytorch model QAT quantize succeed, save model in {}".format(output_quant_file))
+        torch.save(self.qat_net.state_dict(), output_quant_file)
+        #back to train mode.
+        if is_train:
+            self.net.train()
+
     def loadDB(self, db_path):
         self.xb = torch.load(db_path).to(self.device)
 
@@ -336,6 +456,8 @@ class DeepvacTrain(Deepvac):
         self.loader = self.train_loader
         self.batch_size = self.conf.train.batch_size
         self.net.train()
+        if self.qat_net_prepared:
+            self.qat_net_prepared.train()
 
     def setValContext(self):
         self.is_train = False
@@ -345,6 +467,8 @@ class DeepvacTrain(Deepvac):
         self.loader = self.val_loader
         self.batch_size = self.conf.val.batch_size
         self.net.eval()
+        if self.qat_net_prepared:
+            self.qat_net_prepared.eval()
 
     def initTrainContext(self):
         self.scheduler = None
@@ -474,7 +598,8 @@ class DeepvacTrain(Deepvac):
         self.exportTorchViaTrace()
         #compile pytorch state dict to TorchScript
         self.exportTorchViaScript()
-        self.setTrainContext()
+        self.exportDynamicQuant()
+        self.exportStaticQuant(prepare=True)
 
     def earlyIter(self):
         start = time.time()
@@ -503,6 +628,11 @@ class DeepvacTrain(Deepvac):
 
     def doForward(self):
         self.output = self.net(self.sample)
+    
+    def doCalibrate(self):
+        if self.static_quantized_net_prepared is None:
+            return
+        self.static_quantized_net_prepared(self.sample)
 
     def doLoss(self):
         self.loss = self.criterion(self.output, self.target)
@@ -531,6 +661,9 @@ class DeepvacTrain(Deepvac):
         output_onnx_file = '{}/onnx__{}.onnx'.format(self.output_dir, file_partial_name)
         output_ncnn_file = '{}/ncnn__{}.bin'.format(self.output_dir, file_partial_name)
         output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.output_dir, file_partial_name)
+        output_dynamic_quant_file = '{}/squant__{}.pt'.format(self.output_dir, file_partial_name)
+        output_static_quant_file = '{}/dquant__{}.pt'.format(self.output_dir, file_partial_name)
+        output_qat_file = '{}/qat__{}.pt'.format(self.output_dir, file_partial_name)
         #save state_dict
         torch.save(self.net.state_dict(), state_file)
         #save checkpoint
@@ -538,7 +671,11 @@ class DeepvacTrain(Deepvac):
             'optimizer': self.optimizer.state_dict(),
             'epoch': self.epoch,
             'scheduler': self.scheduler.state_dict() if self.scheduler else None},  checkpoint_file)
-        #save onnx
+
+        #convert for quantize, must before trace and script!!!
+        self.exportDynamicQuant(output_dynamic_quant_file)
+        self.exportStaticQuant(output_quant_file=output_static_quant_file)
+        self.exportQAT(output_quant_file=output_qat_file)
         #save pt via trace
         self.exportTorchViaTrace(self.sample, output_trace_file)
         #save pt vida script
@@ -584,9 +721,6 @@ class DeepvacTrain(Deepvac):
             self.doLog()
             self.postIter()
             self.train_time.update(time.time() - start)
-            if self.step == 0:
-                self.smokeTestForExport3rd()
-
             if self.step in self.save_list:
                 self.processVal()
                 self.setTrainContext()
@@ -601,7 +735,7 @@ class DeepvacTrain(Deepvac):
         if self.scheduler:
             self.scheduler.step()
 
-    def processVal(self):
+    def processVal(self, smoke=False):
         self.setValContext()
         LOG.logI('Phase {} started...'.format(self.phase))
         with torch.no_grad():
@@ -612,9 +746,14 @@ class DeepvacTrain(Deepvac):
                 self.preIter()
                 self.earlyIter()
                 self.doForward()
+                #calibrate only for quantization.
+                self.doCalibrate()
                 self.doLoss()
+                self.smokeTestForExport3rd()
                 LOG.logI('{}: [{}][{}/{}]'.format(self.phase, self.epoch, i, len(self.loader)))
                 self.postIter()
+                if smoke:
+                    break
             self.postEpoch()
         self.saveState(self.getTime())
 
@@ -622,8 +761,10 @@ class DeepvacTrain(Deepvac):
         self.setValContext()
 
     def process(self):
+        self.auditConfig()
         self.iter = 0
         epoch_start = self.epoch
+        self.processVal(smoke=True)
         for epoch in range(epoch_start, self.conf.epoch_num):
             self.epoch = epoch
             LOG.logI('Epoch {} started...'.format(self.epoch))
@@ -631,8 +772,7 @@ class DeepvacTrain(Deepvac):
             self.processVal()
             self.processAccept()
 
-    def __call__(self,input):
-        self.auditConfig()
+    def __call__(self):
         self.process()
 
 class DeepvacDDP(DeepvacTrain):
