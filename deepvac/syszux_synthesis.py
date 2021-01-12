@@ -184,7 +184,7 @@ class SynthesisText(SynthesisBase):
                 self.draw.text((i, j), text, font=font, fill=shadowcolor)
         self.draw.text((x,y),text,fillcolor,font=font)
     
-    def draw_text(self, font, fillcolor, s):
+    def draw_text_ori(self, font, fillcolor, s):
         word_size = self.get_word_size(font, s)
         self.s_height = word_size[1]
         self.s_width = word_size[0] 
@@ -198,7 +198,26 @@ class SynthesisText(SynthesisBase):
         else:
             self.draw.text((x,y),s,fillcolor,font=font)
 
-    def draw_text_with_random_space(self, font, fillcolor, s):
+    def draw_text(self, font, fillcolor, s):
+        # vertical font
+        is_vertical = False
+        if np.random.rand() < self.conf.vertical_ratio:
+            font = ImageFont.TransposedFont(font, orientation=Image.ROTATE_90)
+            is_vertical = True
+
+        # border
+        is_border = False
+        if np.random.rand() < self.conf.border_ratio:
+            shadowcolor = 'black' if fillcolor==(255,255,255) else 'white'
+            is_border = True
+
+        # random_space
+        is_random_space = False
+        char_space_width = 0
+        if np.random.rand() < self.conf.random_space_ratio:
+            is_random_space = True
+
+
         chars_size = []
         width = 0
         height = 0
@@ -211,17 +230,33 @@ class SynthesisText(SynthesisBase):
             if size[1] > height:
                 height = size[1]
 
-            c_offset = font.getoffset(c)
-            if c_offset[1] < y_offset:
-                y_offset = c_offset[1]
-
-        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max))
-        width += (char_space_width * (len(s) - 1))
+            if is_vertical:
+                c_offset = font.font.getoffset(c)
+                if c_offset[0] < y_offset:
+                    y_offset = c_offset[0]
+            else:
+                c_offset = font.getoffset(c)
+                if c_offset[1] < y_offset:
+                    y_offset = c_offset[1]
 
         c_x, c_y = self.font_offset
+        c_y -= y_offset
+
+        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max)) if is_random_space else 0
+        width += (char_space_width * (len(s) - 1))
+        height -= y_offset
+
+        if not is_vertical and not is_random_space:
+            s = [s]
 
         for i, c in enumerate(s):
-            self.draw.text((c_x, c_y - y_offset), c, fillcolor, font=font)
+            if is_border:
+                x = c_x
+                y = c_y
+                for j in [x-1,x+1,x]:
+                    for k in [y-1,y+1,y]:
+                        self.draw.text((j, k), c, font=font, fill=shadowcolor)
+            self.draw.text((c_x, c_y), c, fillcolor, font=font)
             c_x += (chars_size[i][0] + char_space_width)
 
         self.s_width = width
@@ -272,10 +307,7 @@ class SynthesisTextPure(SynthesisText):
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.fg_color[i%self.fg_color_len]
-        if np.random.rand() < self.is_border:
-            self.draw_text_border(font,"white",fillcolor,s)
-        else:
-            self.draw_text(font,fillcolor,s)
+        self.draw_text(font,fillcolor,s)
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
@@ -322,12 +354,8 @@ class SynthesisTextFromVideo(SynthesisText):
 
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
-        if np.random.rand() < self.is_border:
-            fillcolor = self.fg_color[i%self.fg_color_len]
-            self.draw_text_border(font,"white",fillcolor,s)
-        else:
-            fillcolor = self.pickFgColor(i, s)
-            self.draw_text(font,fillcolor,s)
+        fillcolor = self.pickFgColor(i, s)
+        self.draw_text(font,fillcolor,s)
 
 class SynthesisTextFromImage(SynthesisText):
     def __init__(self, deepvac_config):
@@ -358,9 +386,5 @@ class SynthesisTextFromImage(SynthesisText):
 
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
-        if np.random.rand() < self.is_border:
-            fillcolor = self.fg_color[i%self.fg_color_len]
-            self.draw_text_border(font,"white",fillcolor,s)
-        else:
-            fillcolor = self.pickFgColor(i, s)
-            self.draw_text(font,fillcolor,s)
+        fillcolor = self.pickFgColor(i, s)
+        self.draw_text(font,fillcolor,s)
