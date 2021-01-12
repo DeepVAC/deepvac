@@ -5,6 +5,8 @@ import argparse
 import torch
 import torch.optim as optim
 import torch.distributed as dist
+from torch.cuda.amp import autocast
+from torch.cuda.amp import GradScaler
 import time
 import subprocess
 import tempfile
@@ -75,14 +77,21 @@ class Deepvac(object):
         del self._mandatory_member[name]
 
     def auditConfig(self):
+        #audit for arch
         for name in self._mandatory_member_name:
             if name not in self._mandatory_member:
                 LOG.logE("Error! self.{} must be definded in your subclass.".format(name),exit=True)
         
+        #audit for quantize
         l = [self.conf.static_quantize_dir, self.conf.dynamic_quantize_dir,self.conf.qat_dir]
         l2 = [x for x in l if x]
         if len(l2) > 1:
             LOG.logE("Error: [static_quantize_dir, dynamic_quantize_dir, qat_dir] are exclusive for each other. You can only enable one of them in a train task.")
+
+        #audit for amp
+        if self.conf.amp and self.device.type != 'cuda':
+            LOG.logE("Error: amp can only be enabled when using cuda device", exit=True)
+        
 
     def getConf(self):
         return self.conf
@@ -488,6 +497,8 @@ class DeepvacTrain(Deepvac):
         self.epoch = 0
         self.step = 0
         self.iter = 0
+        # Creates a GradScaler once at the beginning of training.
+        self.scaler = GradScaler()
         self.train_time = AverageMeter()
         self.load_data_time = AverageMeter()
         self.data_cpu2gpu_time = AverageMeter()
@@ -531,6 +542,14 @@ class DeepvacTrain(Deepvac):
         self.optimizer.load_state_dict(state_dict['optimizer'])
         if self.scheduler:
             self.scheduler.load_state_dict(state_dict['scheduler'])
+        if self.conf.amp:
+            LOG.logI("Will load scaler from checkpoint since you enabled amp, make sure the checkpoint was saved with amp enabled.")
+            try:
+                self.scaler.load_state_dict(state_dict["scaler"])
+            except:
+                LOG.logI("checkpoint was saved without amp enabled, so use fresh GradScaler instead.")
+                self.scaler = GradScaler()
+
         self.epoch = state_dict['epoch']
 
     def initScheduler(self):
@@ -638,10 +657,17 @@ class DeepvacTrain(Deepvac):
         self.loss = self.criterion(self.output, self.target)
 
     def doBackward(self):
-        self.loss.backward()
+        if self.conf.amp:
+            self.scaler.scale(self.loss).backward()
+        else:
+            self.loss.backward()
 
     def doOptimize(self):
-        self.optimizer.step()
+        if self.conf.amp:
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            self.optimizer.step()
 
     def doLog(self):
         if self.step % self.conf.log_every != 0:
@@ -670,7 +696,8 @@ class DeepvacTrain(Deepvac):
         torch.save({
             'optimizer': self.optimizer.state_dict(),
             'epoch': self.epoch,
-            'scheduler': self.scheduler.state_dict() if self.scheduler else None},  checkpoint_file)
+            'scheduler': self.scheduler.state_dict() if self.scheduler else None,
+            'scaler': self.scaler.state_dict() if self.conf.amp else None},  checkpoint_file)
 
         #convert for quantize, must before trace and script!!!
         self.exportDynamicQuant(output_dynamic_quant_file)
@@ -714,8 +741,9 @@ class DeepvacTrain(Deepvac):
             self.preIter()
             self.earlyIter()
             self.optimizer.zero_grad()
-            self.doForward()
-            self.doLoss()
+            with autocast(enabled=self.conf.amp if self.conf.amp else False):
+                self.doForward()
+                self.doLoss()
             self.doBackward()
             self.doOptimize()
             self.doLog()
