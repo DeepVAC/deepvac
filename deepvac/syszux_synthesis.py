@@ -239,26 +239,16 @@ class SynthesisText(SynthesisBase):
                 if c_offset[1] < y_offset:
                     y_offset = c_offset[1]
 
-        width += (char_space_width * (len(s) - 1))
-        height -= y_offset
-
-        self.s_width = width
-        self.s_height = height
-
         c_x, c_y = self.font_offset
         c_y -= y_offset
 
-        if not is_vertical and not is_random_space:
-            if is_border:
-                x = c_x
-                y = c_y
-                for j in [x-1,x+1,x]:
-                    for k in [y-1,y+1,y]:
-                        self.draw.text((j, k), s, font=font, fill=shadowcolor)
-            self.draw.text((c_x, c_y), s, fillcolor, font=font)
-            return
+        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max)) if is_random_space else 0
+        width += (char_space_width * (len(s) - 1))
+        height -= y_offset
 
-        char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max))
+        if not is_vertical and not is_random_space:
+            s = [s]
+
         for i, c in enumerate(s):
             if is_border:
                 x = c_x
@@ -268,6 +258,9 @@ class SynthesisText(SynthesisBase):
                         self.draw.text((j, k), c, font=font, fill=shadowcolor)
             self.draw.text((c_x, c_y), c, fillcolor, font=font)
             c_x += (chars_size[i][0] + char_space_width)
+
+        self.s_width = width
+        self.s_height = height
 
     def dumpTextImg(self,i):
         crop_offset = int(self.current_font_size / self.crop_scale)
