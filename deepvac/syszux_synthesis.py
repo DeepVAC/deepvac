@@ -71,8 +71,8 @@ class SynthesisText(SynthesisBase):
         if self.font_num == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
         self.current_font_size = 50
-        self.max_font = 60
-        self.min_font = 25
+        self.max_font = 60 if self.conf.max_font is None else self.conf.max_font 
+        self.min_font = 15 if self.conf.min_font is None else self.conf.min_font 
         self.crop_scale = 8
         self.scene_hw = (1080,1920)
         self.gb18030_font_file_list = []
@@ -198,7 +198,12 @@ class SynthesisText(SynthesisBase):
         else:
             self.draw.text((x,y),s,fillcolor,font=font)
 
-    def draw_text(self, font, fillcolor, s):
+    def shuffle_str(self, s):
+        str_list = list(s)
+        random.shuffle(str_list)
+        return ''.join(str_list)
+
+    def draw_text(self, font_offset, font, fillcolor, s, recursion=False):
         # vertical font
         is_vertical = False
         if np.random.rand() < self.conf.vertical_ratio:
@@ -239,7 +244,9 @@ class SynthesisText(SynthesisBase):
                 if c_offset[1] < y_offset:
                     y_offset = c_offset[1]
 
-        c_x, c_y = self.font_offset
+        c_x, c_y = font_offset
+        c_x_ori = c_x
+        c_y_ori = c_y
         c_y -= y_offset
 
         char_space_width = int(height * np.random.uniform(self.conf.random_space_min, self.conf.random_space_max)) if is_random_space else 0
@@ -259,14 +266,30 @@ class SynthesisText(SynthesisBase):
             self.draw.text((c_x, c_y), c, fillcolor, font=font)
             c_x += (chars_size[i][0] + char_space_width)
 
+        if recursion:
+            return
+
+        self.is_chars_disturb = False
+        if np.random.rand() < self.conf.chars_disturb_ratio:
+            self.is_chars_disturb = True
+            if is_vertical:
+                font = font.font
+            self.draw_text((c_x_ori, c_y_ori-(1.2*height)), font, fillcolor, self.shuffle_str(s), True)
+            self.draw_text((c_x_ori, c_y_ori+(1.2*height)), font, fillcolor, self.shuffle_str(s), True)
+
         self.s_width = width
         self.s_height = height
 
     def dumpTextImg(self,i):
-        crop_offset = int(self.current_font_size / self.crop_scale)
         #crop_list = [np.random.randint(-crop_offset, crop_offset+1) for _ in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
-        img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[1]+self.s_height + np.random.randint(-crop_offset, crop_offset+1),
+        crop_offset = int(self.current_font_size / self.crop_scale)
+        if self.is_chars_disturb:
+            crop_offset_disturb = int(self.current_font_size / 3)
+            img_crop = cv2_text_im[self.font_offset[1]-crop_offset_disturb:self.font_offset[1]+self.s_height+crop_offset_disturb,
+                self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.s_width+np.random.randint(-crop_offset, crop_offset+1)]
+        else:
+            img_crop = cv2_text_im[self.font_offset[1]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[1]+self.s_height + np.random.randint(-crop_offset, crop_offset+1),
                 self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.s_width+np.random.randint(-crop_offset, crop_offset+1)]
         image_name = '{}_{}.jpg'.format(self.dump_prefix,str(i).zfill(6))
         self.dumpImgToPath(image_name,img_crop)
@@ -307,7 +330,7 @@ class SynthesisTextPure(SynthesisText):
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.fg_color[i%self.fg_color_len]
-        self.draw_text(font,fillcolor,s)
+        self.draw_text(self.font_offset,font,fillcolor,s)
 
 class SynthesisTextFromVideo(SynthesisText):
     def __init__(self, deepvac_config):
@@ -355,7 +378,7 @@ class SynthesisTextFromVideo(SynthesisText):
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.pickFgColor(i, s)
-        self.draw_text(font,fillcolor,s)
+        self.draw_text(self.font_offset,font,fillcolor,s)
 
 class SynthesisTextFromImage(SynthesisText):
     def __init__(self, deepvac_config):
@@ -387,4 +410,4 @@ class SynthesisTextFromImage(SynthesisText):
     def buildTextWithScene(self, i):
         s, font = self.setCurrentFontSizeAndGetFont(i)
         fillcolor = self.pickFgColor(i, s)
-        self.draw_text(font,fillcolor,s)
+        self.draw_text(self.font_offset,font,fillcolor,s)
