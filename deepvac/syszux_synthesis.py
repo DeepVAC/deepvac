@@ -71,8 +71,8 @@ class SynthesisText(SynthesisBase):
         if self.font_num == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
         self.current_font_size = 50
-        self.max_font = self.conf.max_font
-        self.min_font = self.conf.min_font
+        self.max_font = 60 if self.conf.max_font is None else self.conf.max_font 
+        self.min_font = 15 if self.conf.min_font is None else self.conf.min_font 
         self.crop_scale = 8
         self.scene_hw = (1080,1920)
         self.gb18030_font_file_list = []
