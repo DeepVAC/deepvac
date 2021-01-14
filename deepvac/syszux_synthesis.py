@@ -71,8 +71,8 @@ class SynthesisText(SynthesisBase):
         if self.font_num == 0:
             raise Exception("No font was found in {}!".format(self.fonts_dir))
         self.current_font_size = 50
-        self.max_font = 60
-        self.min_font = 25
+        self.max_font = self.conf.max_font
+        self.min_font = self.conf.min_font
         self.crop_scale = 8
         self.scene_hw = (1080,1920)
         self.gb18030_font_file_list = []
@@ -269,9 +269,9 @@ class SynthesisText(SynthesisBase):
         if recursion:
             return
 
-        self.chars_disturb = False
+        self.is_chars_disturb = False
         if np.random.rand() < self.conf.chars_disturb_ratio:
-            self.chars_disturb = True
+            self.is_chars_disturb = True
             if is_vertical:
                 font = font.font
             self.draw_text((c_x_ori, c_y_ori-(1.2*height)), font, fillcolor, self.shuffle_str(s), True)
@@ -284,7 +284,7 @@ class SynthesisText(SynthesisBase):
         #crop_list = [np.random.randint(-crop_offset, crop_offset+1) for _ in range(3)]
         cv2_text_im = cv2.cvtColor(np.array(self.pil_img),cv2.COLOR_RGB2BGR)
         crop_offset = int(self.current_font_size / self.crop_scale)
-        if self.chars_disturb:
+        if self.is_chars_disturb:
             crop_offset_disturb = int(self.current_font_size / 3)
             img_crop = cv2_text_im[self.font_offset[1]-crop_offset_disturb:self.font_offset[1]+self.s_height+crop_offset_disturb,
                 self.font_offset[0]+np.random.randint(-crop_offset, crop_offset+1):self.font_offset[0]+self.s_width+np.random.randint(-crop_offset, crop_offset+1)]
