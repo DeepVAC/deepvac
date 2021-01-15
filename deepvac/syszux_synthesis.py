@@ -200,6 +200,7 @@ class SynthesisText(SynthesisBase):
 
     def shuffle_str(self, s):
         if isinstance(s, list):
+            assert len(s)==1, '{} length must be 1.'.format(s)
             s = s[0]
         str_list = list(s)
         random.shuffle(str_list)
