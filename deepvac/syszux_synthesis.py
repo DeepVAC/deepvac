@@ -199,6 +199,8 @@ class SynthesisText(SynthesisBase):
             self.draw.text((x,y),s,fillcolor,font=font)
 
     def shuffle_str(self, s):
+        if isinstance(s, list):
+            s = s[0]
         str_list = list(s)
         random.shuffle(str_list)
         return ''.join(str_list)
