@@ -240,16 +240,16 @@ class Deepvac(object):
             output_trace_file = self.conf.trace_model_dir
         
         LOG.logI("config.trace_model_dir found, save trace model to {}...".format(output_trace_file))
-        saveModel4Libtorch(self.net, output_trace_file, 'trace', self.sample)
+        self.saveModel4Libtorch(self.net, output_trace_file, 'trace', self.sample)
         #trace quantized model
         if self.dynamic_quantized_net:
-            saveModel4Libtorch(self.dynamic_quantized_net, output_trace_file + ".dynamic_quantized", 'trace', self.sample)
+            self.saveModel4Libtorch(self.dynamic_quantized_net, output_trace_file + ".dynamic_quantized", 'trace', self.sample)
         
         if self.static_quantized_net:
-            saveModel4Libtorch(self.static_quantized_net, output_trace_file + ".static_quantized", 'trace', self.sample)
+            self.saveModel4Libtorch(self.static_quantized_net, output_trace_file + ".static_quantized", 'trace', self.sample)
 
         if self.qat_net:
-            saveModel4Libtorch(self.qat_net, output_trace_file + ".qat_quantized", 'trace', self.sample)
+            self.saveModel4Libtorch(self.qat_net, output_trace_file + ".qat_quantized", 'trace', self.sample)
 
     def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
@@ -259,16 +259,16 @@ class Deepvac(object):
             output_script_file = self.conf.script_model_dir
         
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
-        saveModel4Libtorch(self.net, output_script_file, 'script')
+        self.saveModel4Libtorch(self.net, output_script_file, 'script')
         #script quantized model
         if self.dynamic_quantized_net:
-            saveModel4Libtorch(self.dynamic_quantized_net, output_script_file + ".dynamic_quantized", 'script')
+            self.saveModel4Libtorch(self.dynamic_quantized_net, output_script_file + ".dynamic_quantized", 'script')
 
         if self.static_quantized_net:
-            saveModel4Libtorch(self.static_quantized_net, output_script_file + ".static_quantized", 'script')
+            self.saveModel4Libtorch(self.static_quantized_net, output_script_file + ".static_quantized", 'script')
 
         if self.qat_net:
-            saveModel4Libtorch(self.qat_net, output_script_file + ".qat_quantized", 'script')
+            self.saveModel4Libtorch(self.qat_net, output_script_file + ".qat_quantized", 'script')
     
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
