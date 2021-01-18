@@ -10,9 +10,9 @@ class SELayer(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Linear(channel, makeDivisible(channel // reduction, 8)),
-            nn.ReLU(inplace=False),
+            nn.ReLU(inplace=True),
             nn.Linear(makeDivisible(channel // reduction, 8), channel),
-            hsigmoid(inplace=False)
+            hsigmoid(inplace=True)
         )
 
     def forward(self, x):
@@ -28,7 +28,7 @@ class Conv2dBNReLU(nn.Sequential):
         super(Conv2dBNReLU, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
             nn.BatchNorm2d(out_planes, momentum=0.1),
-            nn.ReLU(inplace=False)
+            nn.ReLU(inplace=True)
         )
 
 def initWeights(civilnet):
@@ -80,7 +80,7 @@ class Conv2dBNHswish(nn.Sequential):
         super(Conv2dBNHswish, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
             nn.BatchNorm2d(out_planes, momentum=0.1),
-            hswish(inplace=False)
+            hswish(inplace=True)
         )
 
 class InvertedResidual(nn.Module):
@@ -101,7 +101,7 @@ class InvertedResidual(nn.Module):
             # dw
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, padding, groups=hidden_dim, bias=False),
             nn.BatchNorm2d(hidden_dim),
-            hswish() if use_hs else nn.ReLU(inplace=False),
+            hswish() if use_hs else nn.ReLU(inplace=True),
             # Squeeze-and-Excite
             SELayer(hidden_dim) if use_se else nn.Identity(),
             # pw-linear
@@ -117,7 +117,59 @@ class InvertedResidual(nn.Module):
             return self.conv(x)
 # mobilenet series END
 
+# introduced by resnet begin
+class BasicBlock(nn.Module):
+    expansion: int = 1
+    def __init__(self, inplanes: int, outplanes: int, stride: int = 1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = Conv2dBNReLU(in_planes=inplanes, out_planes=outplanes, kernel_size=3, stride=stride)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(outplanes, outplanes, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(outplanes)
+        self.downsample = None
+        if stride != 1 or inplanes != outplanes:
+            self.downsample = nn.Sequential(nn.Conv2d(inplanes, outplanes, kernel_size=1, stride=stride, bias=False), nn.BatchNorm2d(outplanes))
 
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.bn2(out)
 
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out += identity
+        return self.relu(out)
 
+#resnet v1.5
+class Bottleneck(nn.Module):
+    expansion: int = 4
+    def __init__(self, inplanes: int, outplanes: int, stride: int = 1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = Conv2dBNReLU(in_planes=inplanes, out_planes=outplanes, kernel_size=1)
+        self.conv2 = Conv2dBNReLU(in_planes=outplanes, out_planes=outplanes, kernel_size=3, stride=stride)
 
+        outplanes_after_expansion = outplanes * self.expansion
+        self.conv3 = nn.Conv2d(outplanes, outplanes_after_expansion, kernel_size=1)
+        self.bn3 = nn.BatchNorm2d(outplanes_after_expansion)
+        self.relu = nn.ReLU(inplace=True)
+
+        self.stride = stride
+        self.downsample = None
+
+        if stride != 1 or inplanes != outplanes_after_expansion:
+            self.downsample = nn.Sequential(nn.Conv2d(inplanes, outplanes_after_expansion, kernel_size=1, stride=stride, bias=False), nn.BatchNorm2d(outplanes_after_expansion))
+
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        return self.relu(out)
+# introduced by resnet end

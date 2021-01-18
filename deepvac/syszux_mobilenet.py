@@ -1,5 +1,4 @@
 import torch.nn as nn
-import math
 from .syszux_modules import makeDivisible,hswish,Conv2dBNHswish,InvertedResidual,initWeights
 
 class MobileNetV3(nn.Module):
