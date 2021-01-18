@@ -89,7 +89,7 @@ class InvertedResidual(nn.Module):
         if padding == -1:
             padding = (kernel_size - 1) // 2
         hidden_dim = makeDivisible(inp * expand_ratio, 8)
-        #assert stride in [1, 2]
+        assert stride in [1, 2, (2, 1)]
         assert kernel_size in [3,5]
 
         self.use_res_connect = stride == 1 and inp == oup

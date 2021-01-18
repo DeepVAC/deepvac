@@ -112,6 +112,6 @@ class MobileNetV3Ocr(MobileNetV3):
         b, c, h, w = x.size()
         assert h == 1, "the height of conv must be 1"
 
-        x = x.squeeze(2)
-        x = x.permute(2, 0, 1)
+        x = x.squeeze(2)        # b *c * width
+        x = x.permute(2, 0, 1)    # [w, b, c]
         return x
