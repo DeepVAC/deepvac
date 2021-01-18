@@ -74,7 +74,7 @@ class hsigmoid(nn.Module):
         return out
 
 class Conv2dBNHswish(nn.Sequential):
-    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, groups=1):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, groups=1, padding=-1):
         if padding == -1:
             padding = (kernel_size - 1) // 2
         super(Conv2dBNHswish, self).__init__(
@@ -84,10 +84,12 @@ class Conv2dBNHswish(nn.Sequential):
         )
 
 class InvertedResidual(nn.Module):
-    def __init__(self, inp, oup, kernel_size, stride, expand_ratio, use_se, use_hs):
+    def __init__(self, inp, oup, kernel_size, stride, expand_ratio, use_se, use_hs, padding=-1):
         super(InvertedResidual, self).__init__()
+        if padding == -1:
+            padding = (kernel_size - 1) // 2
         hidden_dim = makeDivisible(inp * expand_ratio, 8)
-        assert stride in [1, 2]
+        assert stride in [1, 2, (2, 1)]
         assert kernel_size in [3,5]
 
         self.use_res_connect = stride == 1 and inp == oup
@@ -97,7 +99,7 @@ class InvertedResidual(nn.Module):
         
         layers.extend([
             # dw
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, groups=hidden_dim, bias=False),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, padding, groups=hidden_dim, bias=False),
             nn.BatchNorm2d(hidden_dim),
             hswish() if use_hs else nn.ReLU(inplace=False),
             # Squeeze-and-Excite
