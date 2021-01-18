@@ -89,7 +89,7 @@ class MobileNetV3Ocr(MobileNetV3):
         self.last_output_channel = 1024
         self.cfgs = [
             # k, t, c, SE, HS, s 
-            [3,    1,  16, True, False, (2,1)],
+            [3,    1,  16, True, False, 1],
             [3,  4.5,  24, False, False, (2,1)],
             [3, 3.67,  24, False, False, 1],
             [5,    4,  40, True, True, (2,1)],
@@ -102,4 +102,16 @@ class MobileNetV3Ocr(MobileNetV3):
             [5,    6,  96, True, True, 1],
         ]
     def initFc(self):
-        pass
+        self.pool = nn.MaxPool2d(2)
+
+    def forward(self,x):
+        x = self.features(x)
+        x = self.conv(x)
+        x = self.pool(x)
+
+        b, c, h, w = x.size()
+        assert h == 1, "the height of conv must be 1"
+
+        x = x.squeeze(2)
+        x = x.permute(2, 0, 1)
+        return x
