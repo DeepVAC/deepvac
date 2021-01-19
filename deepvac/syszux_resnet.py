@@ -78,7 +78,7 @@ class ResNet50(ResNet18):
             [512,  3,  2]
         ]
 
-def ResNet101(ResNet18):
+class ResNet101(ResNet18):
     def __init__(self,class_num: int = 1000):
         super(ResNet101, self).__init__(class_num)
 
@@ -92,7 +92,7 @@ def ResNet101(ResNet18):
             [512,  3,  2]
         ]
 
-def ResNet152(ResNet18):
+class ResNet152(ResNet18):
     def __init__(self,class_num: int = 1000):
         super(ResNet152, self).__init__(class_num)
 
@@ -106,7 +106,7 @@ def ResNet152(ResNet18):
             [512,  3,  2]
         ]
 
-def ResNet18OCR(ResNet18):
+class ResNet18OCR(ResNet18):
     def __init__(self):
         super(ResNet18OCR, self).__init__()
         self.conv1 = nn.Sequential(
@@ -115,8 +115,17 @@ def ResNet18OCR(ResNet18):
             Conv2dBNReLU(in_planes=32, out_planes=64, kernel_size=3, stride=1)
         )
 
-    def initFc(self, x):
-        pass
+    def auditConfig(self):
+        self.block = BasicBlock
+        self.cfgs = [
+            [64,   2,  1],
+            [128,  2,  (2,1)],
+            [256,  2,  (2,1)],
+            [512,  2,  (2,1)]
+        ]
+
+    def initFc(self):
+        self.avgpool = nn.MaxPool2d(kernel_size=2,stride=2)
     
     def forward_cls(self, x):
         b, c, h, w = x.size()
