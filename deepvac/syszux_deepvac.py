@@ -640,11 +640,7 @@ class DeepvacTrain(Deepvac):
         pass
 
     def postIter(self):
-        if self.is_val:
-            return
-        if self.step in self.save_list:
-            self.processVal()
-            self.setTrainContext()
+        pass
 
     def preEpoch(self):
         pass
@@ -670,12 +666,13 @@ class DeepvacTrain(Deepvac):
             self.loss.backward()
 
     def doOptimize(self):
-        if (self.iter - 1) % self.conf.accumulate == 0:
-            if self.conf.amp:
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-            else:
-                self.optimizer.step()
+        if self.iter % self.conf.nominal_batch_factor != 0:
+            return
+        if self.conf.amp:
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            self.optimizer.step()
         self.optimizer.zero_grad()
 
     def doLog(self):
@@ -745,7 +742,6 @@ class DeepvacTrain(Deepvac):
         for i, (sample, target) in enumerate(self.loader):
             self.load_data_time.update(time.time() - start)
             self.step = i
-            self.iter += 1
             self.target = target
             self.sample = sample
             self.preIter()
@@ -757,7 +753,11 @@ class DeepvacTrain(Deepvac):
             self.doOptimize()
             self.doLog()
             self.postIter()
+            self.iter += 1
             self.train_time.update(time.time() - start)
+            if self.step in self.save_list:
+                self.processVal()
+                self.setTrainContext()
             start = time.time()
 
         self.addScalar('{}/TrainTime(hours/epoch)'.format(self.phase), round(self.train_time.sum / 3600, 2), self.epoch)

@@ -6,7 +6,6 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-# from torch._C import R
 from .syszux_helper import WarpMLS, apply_perspective_transform, Remaper, Liner, apply_emboss, reverse_img
 
 class AugBase(object):
