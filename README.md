@@ -1,21 +1,27 @@
 # DeepVAC
 DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一目标，DeepVAC包含了：
-- 项目组织规范
-- 代码规范
-- deepvac库
+- 项目组织规范：[项目组织规范](./arch.md)；
+- 代码规范：[代码规范](./code_standard.md)；
+- deepvac库：[deepvac库](./lib.md)。
 
 诸多PyTorch AI项目的内在逻辑都大同小异，因此DeepVAC致力于把更通用的逻辑剥离出来，从而使得工程代码的准确性、易读性、可维护性上更具优势。
 
-## 项目组织规范
-请访问: [项目组织规范](./arch.md)
+如果想使得AI项目符合DeepVAC规范，需要仔细阅读[DeepVAC标准](./deepvac_standard.md)。
 
-## 代码规范
-请访问: [代码规范](./code_standard.md)
 
-## deepvac库
-请访问: [deepvac库](./lib.md)
+# 如何基于DeepVAC构建自己的PyTorch AI项目
 
-## 环境准备
+## 1. 阅读[DeepVAC标准](./deepvac_standard.md)
+可以粗略阅读，建立起第一印象。
+
+## 2. 环境准备
+DeepVAC的依赖有：
+- Python3。不支持Python2，其已被废弃；
+- 依赖包：torch, torchvision, tensorboard, scipy, numpy, cv2, Pillow；
+- 字体文件（可选）：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
+
+这些依赖使用pip命令（或者git clone）自行安装，不再赘述。
+
 在DeepVAC内部，我们尽量使用最新版的PyTorch版本，并且使用Docker容器（实际上是基于Docker的更复杂的MLab2.0系统）进行训练和发布。我们为用户提供了构建好的Docker镜像，帮助用户省掉不必要的环境配置：
 ```bash
 #只使用cpu
@@ -24,19 +30,9 @@ docker run -it gemfield/pytorch:1.6.0-devel bash
 docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
 ```
 该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev)
+  
 
-## 项目依赖
-- Python3。不支持Python2，其已被废弃；
-- 依赖包：torch, torchvision, tensorboard, scipy, numpy, cv2, Pillow；
-- 字体文件（可选）：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
-
-
-# 如何基于DeepVAC构建自己的PyTorch AI项目
-
-## 1. 安装依赖
-参考[项目依赖](#项目依赖)  
-
-## 2. 安装deepvac库
+## 3. 安装deepvac库
 可以使用pip来进行安装：  
 ```pip3 install deepvac```   
 或者  
@@ -53,12 +49,12 @@ import sys
 sys.path.append('/home/gemfield/github/deepvac')
 ```
 
-## 3. 创建自己的PyTorch项目
+## 4. 创建自己的PyTorch项目
 - 初始化自己项目的git仓库；
 - 在仓库中创建第一个研究分支，比如分支名为 LTS_b1_aug9_movie_video_plate_130w；
 - 切换到上述的LTS_b1分支中，开始coding；
 
-## 4. 编写配置文件
+## 5. 编写配置文件
 配置文件的文件名均为 config.py，在代码开始处添加```from deepvac.syszux_config import *```；  
 所有用户的配置都存放在这个文件里。 有些配置是全局唯一的，则直接配置如下：
 
@@ -97,11 +93,11 @@ print(conf.log_dir)
 print(self.conf.train.batch_size)
 ```
 
-## 5. 编写synthesis/synthesis.py
+## 6. 编写synthesis/synthesis.py
 编写该文件，用于产生数据集和data/train.txt，data/val.txt
 （待完善）
 
-## 6. 编写aug/aug.py
+## 7. 编写aug/aug.py
 编写该文件，用于实现数据增强策略；
 继承syszux_executor模块中的Executor类体系，比如：
 ```python
@@ -117,7 +113,7 @@ class MyAugExecutor(Executor):
 ```
 （待完善）
 
-## 7. 编写Dataset类
+## 8. 编写Dataset类
 代码编写在train.py文件中。  继承syszux_loader模块中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
 ```bash
 #train.txt，第一列为图片路径，第二列为label
@@ -153,7 +149,7 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
         super(NSFWTrainDataset, self).__init__(nsfw_config)
 ```
 
-## 8. 编写训练和验证脚本
+## 9. 编写训练和验证脚本
 代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
 
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
@@ -184,7 +180,7 @@ def initTrainLoader(self):
 
 ```   
 
-## 9. 编写测试脚本
+## 10. 编写测试脚本
 代码写在test.py文件中，继承syszux_deepvac模块中的Deepvac类。和train.py中的train/val的本质不同在于：
 - 舍弃train/val上下文；
 - 不再使用DataLoader装载数据，开始使用OpenCV等三方库来直接读取图片样本；
@@ -201,7 +197,7 @@ def initTrainLoader(self):
  
 一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
 
-## 10. 再谈配置文件
+# 再谈配置文件
 基于deepvac的PyTorch项目，可以通过在config.py中添加一些配置项来自动实现特定的功能。
 
 ### 通用配置
