@@ -11,6 +11,7 @@ import time
 import subprocess
 import tempfile
 from enum import Enum
+from types import FunctionType
 from .syszux_annotation import *
 from .syszux_log import LOG,getCurrentGitBranch
 from .syszux_helper import AverageMeter
@@ -43,16 +44,16 @@ class Deepvac(object):
         self.branch = getCurrentGitBranch()
         if self.branch is None:
             LOG.logE('According to deepvac standard, you must working in a git repo.', exit=True)
-        
+
         if len(self.branch) < 6:
             LOG.logE('According to deepvac standard, your git branch name is too short: {}'.format(self.branch), exit=True)
 
         if self.branch.startswith('LTS_'):
             return
-        
+
         if self.branch.startswith('PROTO_'):
             return
-        
+
         if self.branch in ['master','main']:
             return
 
@@ -81,7 +82,7 @@ class Deepvac(object):
         for name in self._mandatory_member_name:
             if name not in self._mandatory_member:
                 LOG.logE("Error! self.{} must be definded in your subclass.".format(name),exit=True)
-        
+
         #audit for quantize
         l = [self.conf.static_quantize_dir, self.conf.dynamic_quantize_dir,self.conf.qat_dir]
         l2 = [x for x in l if x]
@@ -91,7 +92,7 @@ class Deepvac(object):
         #audit for amp
         if self.conf.amp and self.device.type != 'cuda':
             LOG.logE("Error: amp can only be enabled when using cuda device", exit=True)
-        
+
 
     def getConf(self):
         return self.conf
@@ -99,7 +100,7 @@ class Deepvac(object):
     def setInput(self, input):
         if not isinstance(input, list):
             input = [input]
- 
+
         self.input_output['input'].extend(input)
         self.input_output['output'].clear()
 
@@ -134,7 +135,7 @@ class Deepvac(object):
         self.loadStateDict()
         #just print model parameters info
         self._parametersInfo()
-    
+
     def initNetPost(self):
         self.xb = torch.Tensor().to(self.device)
         self.sample = None
@@ -207,13 +208,13 @@ class Deepvac(object):
     def __call__(self, input=None):
         if not self.state_dict:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
-        
+
         if input:
             self.setInput(input)
 
         with torch.no_grad():
             self.process()
-            
+
         return self.getOutput()
 
     def saveModel4Libtorch(self, input_net, output_file, mode='trace', input_sample=None):
@@ -235,16 +236,16 @@ class Deepvac(object):
 
         if sample is not None:
             self.sample = sample
-        
+
         if output_trace_file is None:
             output_trace_file = self.conf.trace_model_dir
-        
+
         LOG.logI("config.trace_model_dir found, save trace model to {}...".format(output_trace_file))
         self.saveModel4Libtorch(self.net, output_trace_file, 'trace', self.sample)
         #trace quantized model
         if self.dynamic_quantized_net:
             self.saveModel4Libtorch(self.dynamic_quantized_net, output_trace_file + ".dynamic_quantized", 'trace', self.sample)
-        
+
         if self.static_quantized_net:
             self.saveModel4Libtorch(self.static_quantized_net, output_trace_file + ".static_quantized", 'trace', self.sample)
 
@@ -257,7 +258,7 @@ class Deepvac(object):
 
         if output_script_file is None:
             output_script_file = self.conf.script_model_dir
-        
+
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
         self.saveModel4Libtorch(self.net, output_script_file, 'script')
         #script quantized model
@@ -269,7 +270,7 @@ class Deepvac(object):
 
         if self.qat_net:
             self.saveModel4Libtorch(self.qat_net, output_script_file + ".qat_quantized", 'script')
-    
+
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
             return
@@ -286,13 +287,13 @@ class Deepvac(object):
             from onnxsim import simplify
         except:
             LOG.logE("You must install onnx and onnxsim package if you want to convert pytorch to ncnn.")
-        
+
         if not self.conf.onnx_model_dir:
             f = tempfile.NamedTemporaryFile()
             self.conf.onnx_model_dir = f.name
 
         self.exportONNX()
-        
+
         cmd = self.conf.onnx2ncnn + " " + self.conf.onnx_model_dir + " " + self.conf.ncnn_arch_dir + " " + output_ncnn_file
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
@@ -306,7 +307,7 @@ class Deepvac(object):
             subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if pd.stderr.read() != b"":
                 LOG.logE(pd.stderr.read() + b". we can't guarantee generate model is right")
-        
+
         LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_arch_dir, output_ncnn_file))
 
     def exportCoreML(self, output_coreml_file=None):
@@ -351,7 +352,7 @@ class Deepvac(object):
     def exportDynamicQuant(self, output_quant_file=None):
         if not self.conf.dynamic_quantize_dir:
             return
-        
+
         if output_quant_file is None:
             output_quant_file = self.conf.dynamic_quantize_dir
 
@@ -363,7 +364,7 @@ class Deepvac(object):
     def exportStaticQuant(self, output_quant_file=None, prepare=False):
         if not self.conf.static_quantize_dir:
             return
-        
+
         if prepare:
             LOG.logI("You have enabled static quantization, this step is only for prepare.")
 
@@ -379,7 +380,7 @@ class Deepvac(object):
             torch.quantization.prepare(self.static_quantized_net_prepared, inplace=True)
             self.static_quantized_net_prepared.eval()
             return
-            
+
         if self.static_quantized_net_prepared is None:
             LOG.logE("Error: You haven't prepared the model for static quantization. call exportStaticQuant(prepare=True) first.",exit=True)
 
@@ -393,24 +394,24 @@ class Deepvac(object):
     def exportQAT(self, output_quant_file=None, prepare=False):
         if not self.conf.qat_dir:
             return
-        
+
         if prepare:
             LOG.logI("You have enabled QAT, this step is only for prepare.")
-        
+
             if self.qat_net_prepared:
                 LOG.logE("Error: You have already prepared the model for QAT.", exit=True)
 
             backend = 'fbgemm'
             if self.conf.quantize_backend:
                 backend = self.conf.quantize_backend
-            
+
             self.qat_net_prepared = torch.quantization.fuse_modules(self.net)
             self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
             torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)
             #after this, train net will be transfered to QAT !
             self.net = self.qat_net_prepared
             return
-        
+
         if self.qat_net_prepared is None:
             LOG.logE("Error: You haven't prepared the model for QAT. call exportQAT(prepare=True) first.",exit=True)
 
@@ -527,7 +528,7 @@ class DeepvacTrain(Deepvac):
             LOG.logI('Tensorboard at {} '.format(url))
         except Exception as e:
             LOG.logE(e.msg)
-        
+
     def initCriterion(self):
         self.criterion = torch.nn.CrossEntropyLoss()
         LOG.logW("You should reimplement initCriterion() to initialize self.criterion, unless CrossEntropyLoss() is exactly what you need")
@@ -555,6 +556,8 @@ class DeepvacTrain(Deepvac):
     def initScheduler(self):
         if isinstance(self.conf.lr_step, list):
             self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
+        elif isinstance(self.conf.lr_step, FunctionType):
+            self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.conf.lr_step)
         else:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
         LOG.logW("You should reimplement initScheduler() to initialize self.scheduler, unless lr_scheduler.StepLR() or lr_scheduler.MultiStepLR() is exactly what you need")
@@ -586,7 +589,7 @@ class DeepvacTrain(Deepvac):
         )
         for group in self.optimizer.param_groups:
             group.setdefault('initial_lr', group['lr'])
-    
+
     def initRmspropOptimizer(self):
         self.optimizer = optim.RMSprop(
             self.net.parameters(),
@@ -596,13 +599,13 @@ class DeepvacTrain(Deepvac):
             # alpha=self.conf.rmsprop_alpha,
             # centered=self.conf.rmsprop_centered
         )
-    
+
     def addScalar(self, tag, value, step):
         self.writer.add_scalar(tag, value, step)
-    
+
     def addImage(self, tag, image, step):
         self.writer.add_image(tag, image, step)
-    
+
     @syszux_once
     def addGraph(self, input):
         self.writer.add_graph(self.net, input)
@@ -637,7 +640,11 @@ class DeepvacTrain(Deepvac):
         pass
 
     def postIter(self):
-        pass
+        if self.is_val:
+            return
+        if self.step in self.save_list:
+            self.processVal()
+            self.setTrainContext()
 
     def preEpoch(self):
         pass
@@ -647,7 +654,7 @@ class DeepvacTrain(Deepvac):
 
     def doForward(self):
         self.output = self.net(self.sample)
-    
+
     def doCalibrate(self):
         if self.static_quantized_net_prepared is None:
             return
@@ -663,11 +670,13 @@ class DeepvacTrain(Deepvac):
             self.loss.backward()
 
     def doOptimize(self):
-        if self.conf.amp:
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-        else:
-            self.optimizer.step()
+        if (self.iter - 1) % self.conf.accumulate == 0:
+            if self.conf.amp:
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                self.optimizer.step()
+        self.optimizer.zero_grad()
 
     def doLog(self):
         if self.step % self.conf.log_every != 0:
@@ -691,7 +700,8 @@ class DeepvacTrain(Deepvac):
         output_static_quant_file = '{}/dquant__{}.pt'.format(self.output_dir, file_partial_name)
         output_qat_file = '{}/qat__{}.pt'.format(self.output_dir, file_partial_name)
         #save state_dict
-        torch.save(self.net.state_dict(), state_file)
+        model = self.ema.ema if self.conf.ema else self.net
+        torch.save(model.state_dict(), state_file)
         #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
@@ -730,7 +740,7 @@ class DeepvacTrain(Deepvac):
         self.train_time.reset()
         self.load_data_time.reset()
         self.data_cpu2gpu_time.reset()
-        
+
         start = time.time()
         for i, (sample, target) in enumerate(self.loader):
             self.load_data_time.update(time.time() - start)
@@ -740,7 +750,6 @@ class DeepvacTrain(Deepvac):
             self.sample = sample
             self.preIter()
             self.earlyIter()
-            self.optimizer.zero_grad()
             with autocast(enabled=self.conf.amp if self.conf.amp else False):
                 self.doForward()
                 self.doLoss()
@@ -749,9 +758,6 @@ class DeepvacTrain(Deepvac):
             self.doLog()
             self.postIter()
             self.train_time.update(time.time() - start)
-            if self.step in self.save_list:
-                self.processVal()
-                self.setTrainContext()
             start = time.time()
 
         self.addScalar('{}/TrainTime(hours/epoch)'.format(self.phase), round(self.train_time.sum / 3600, 2), self.epoch)
@@ -793,6 +799,7 @@ class DeepvacTrain(Deepvac):
         self.iter = 0
         epoch_start = self.epoch
         self.processVal(smoke=True)
+        self.optimizer.zero_grad()
         for epoch in range(epoch_start, self.conf.epoch_num):
             self.epoch = epoch
             LOG.logI('Epoch {} started...'.format(self.epoch))
@@ -821,7 +828,7 @@ class DeepvacDDP(DeepvacTrain):
 
         #os.environ["CUDA_VISIBLE_DEVICES"] = "{}".format(self.args.gpu)
         torch.cuda.set_device(self.args.gpu)
-            
+
     def initDDP(self):
         LOG.logI("Start dist.init_process_group {} {}@{} on {}".format(self.conf.dist_url, self.args.rank, self.conf.world_size - 1, self.args.gpu))
         dist.init_process_group(backend='nccl', init_method=self.conf.dist_url, world_size=self.conf.world_size, rank=self.args.rank)
@@ -832,7 +839,7 @@ class DeepvacDDP(DeepvacTrain):
     def initTrainContext(self):
         self.initDDP()
         super(DeepvacDDP,self).initTrainContext()
-    
+
     def initSummaryWriter(self):
         if self.args.rank != 0:
             return
@@ -855,12 +862,12 @@ class DeepvacDDP(DeepvacTrain):
         if self.args.rank != 0:
             return
         super(DeepvacDDP, self).addScalar(tag, value, step)
-    
+
     def addImage(self, tag, image, step):
         if self.args.rank != 0:
             return
         super(DeepvacDDP, self).addImage(tag, image, step)
-        
+
     @syszux_once
     def addGraph(self, input):
         if self.args.rank != 0:
