@@ -697,8 +697,7 @@ class DeepvacTrain(Deepvac):
         output_static_quant_file = '{}/dquant__{}.pt'.format(self.output_dir, file_partial_name)
         output_qat_file = '{}/qat__{}.pt'.format(self.output_dir, file_partial_name)
         #save state_dict
-        model = self.ema.ema if self.conf.ema else self.net
-        torch.save(model.state_dict(), state_file)
+        torch.save(self.net.state_dict(), state_file)
         #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
