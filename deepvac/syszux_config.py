@@ -34,6 +34,7 @@ config.weight_decay = None
 
 ## -------------------- loader ------------------
 config.num_workers = 3
+config.nominal_batch_factor = 1
 
 ## ------------------- train ------------------
 config.train.batch_size = 128
