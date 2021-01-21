@@ -137,7 +137,9 @@ class OcrAugExecutor(Executor):
 class YoloAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(YoloAugExecutor, self).__init__(deepvac_config)
-        ac = AugChain(f"YoloPerspectiveAug => HSVAug => YoloNormalizeAug => HFlipAug@{deepvac_config.hflip}", deepvac_config)
+        if deepvac_config.hflip is None:
+            deepvac_config.hflip = 0.5
+        ac = AugChain("YoloPerspectiveAug => HSVAug => YoloNormalizeAug => HFlipAug@{}".format(deepvac_config.hflip), deepvac_config)
         self.addAugChain("ac", ac)
 
 
