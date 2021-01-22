@@ -389,6 +389,8 @@ class Deepvac(object):
             output_quant_file = self.conf.static_quantize_dir
 
         self.static_quantized_net = torch.quantization.convert(self.static_quantized_net_prepared)
+        #important to recover to None
+        self.static_quantized_net_prepared = None
         LOG.logI("Pytorch model static quantize succeed, save model in {}".format(output_quant_file))
         torch.save(self.static_quantized_net.state_dict(), output_quant_file)
 
@@ -622,7 +624,7 @@ class DeepvacTrain(Deepvac):
         #compile pytorch state dict to TorchScript
         self.exportTorchViaScript()
         self.exportDynamicQuant()
-        self.exportStaticQuant(prepare=True)
+        self.exportStaticQuant()
 
     def earlyIter(self):
         start = time.time()
@@ -653,8 +655,11 @@ class DeepvacTrain(Deepvac):
         self.output = self.net(self.sample)
 
     def doCalibrate(self):
-        if self.static_quantized_net_prepared is None:
+        if not self.conf.static_quantize_dir:
             return
+        if self.static_quantized_net_prepared is None:
+            LOG.logE("Error: You haven't prepared the model for static quantization. call exportStaticQuant(prepare=True) first.",exit=True)
+
         self.static_quantized_net_prepared(self.sample)
 
     def doLoss(self):
@@ -772,6 +777,8 @@ class DeepvacTrain(Deepvac):
     def processVal(self, smoke=False):
         self.setValContext()
         LOG.logI('Phase {} started...'.format(self.phase))
+        #prepare the static quant
+        self.exportStaticQuant(prepare=True)
         with torch.no_grad():
             self.preEpoch()
             for i, (sample, target) in enumerate(self.loader):
