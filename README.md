@@ -1,17 +1,17 @@
 # DeepVAC
 DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一目标，DeepVAC包含了：
-- 项目组织规范：[项目组织规范](./arch.md)；
-- 代码规范：[代码规范](./code_standard.md)；
-- deepvac库：[deepvac库](./lib.md)。
+- 项目组织规范：[项目组织规范](./docs/arch.md)；
+- 代码规范：[代码规范](./docs/code_standard.md)；
+- deepvac库：[deepvac库](./docs/lib.md)。
 
 诸多PyTorch AI项目的内在逻辑都大同小异，因此DeepVAC致力于把更通用的逻辑剥离出来，从而使得工程代码的准确性、易读性、可维护性上更具优势。
 
-如果想使得AI项目符合DeepVAC规范，需要仔细阅读[DeepVAC标准](./deepvac_standard.md)。
+如果想使得AI项目符合DeepVAC规范，需要仔细阅读[DeepVAC标准](./docs/deepvac_standard.md)。
 
 
 # 如何基于DeepVAC构建自己的PyTorch AI项目
 
-## 1. 阅读[DeepVAC标准](./deepvac_standard.md)
+## 1. 阅读[DeepVAC标准](./docs/deepvac_standard.md)
 可以粗略阅读，建立起第一印象。
 
 ## 2. 环境准备
