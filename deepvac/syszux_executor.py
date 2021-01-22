@@ -20,8 +20,8 @@ class Chain(object):
         self.op_list = []
 
     def __call__(self, img):
-        return self.func_dict[self.chain_kind](img) 
-    
+        return self.func_dict[self.chain_kind](img)
+
     def addOp(self, op, p=1):
         self.op_list.append(op)
         self.p_list.append(p)
@@ -111,9 +111,9 @@ class Executor(object):
     def __call__(self, img):
         for k in self._graph:
             if random.random() < self._graph_p[k]:
-                img = self._graph[k](img)  
-        return img   
-              
+                img = self._graph[k](img)
+        return img
+
 class FaceAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(FaceAugExecutor, self).__init__(deepvac_config)
@@ -123,7 +123,7 @@ class FaceAugExecutor(Executor):
 
         self.addAugChain('ac1', ac1, 1)
         self.addAugChain('ac2', ac2, 0.5)
-        
+
 class OcrAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(OcrAugExecutor, self).__init__(deepvac_config)
@@ -133,6 +133,15 @@ class OcrAugExecutor(Executor):
 
         self.addAugChain('ac1', ac1, 0.2)
         self.addAugChain('ac2', ac2, 0.9)
+
+class YoloAugExecutor(Executor):
+    def __init__(self, deepvac_config):
+        super(YoloAugExecutor, self).__init__(deepvac_config)
+        if deepvac_config.hflip is None:
+            deepvac_config.hflip = 0.5
+        ac = AugChain("YoloPerspectiveAug => HSVAug => YoloNormalizeAug => HFlipAug@{}".format(deepvac_config.hflip), deepvac_config)
+        self.addAugChain("ac", ac)
+
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")
