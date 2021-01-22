@@ -679,8 +679,6 @@ class HSVAug(AugBase):
         x = np.arange(0, 256, dtype=np.int16)
         # r: [r_hue, r_sat, r_val]
         r = self.r
-        print(">>> deepvac/deepvac/syszux_aug.py +649 r changed!")
-        r = np.array([1.00618586, 0.50223649, 1.03560612])
         lut_hue = ((x * r[0]) % 180).astype(dtype)
         lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
         lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
@@ -764,8 +762,6 @@ class YoloPerspectiveAug(AugBase):
         T[1, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * height
         # Combined rotation matrix
         M = T @ S @ R @ P @ C
-        print(">>> deepvac/deepvac/syszux_aug.py +708 M changed!")
-        M = np.array([[1.07618871, 0., -239.85686143], [0., 1.07618871, -270.33414585], [0., 0., 1.]])
         # img augment and resize to img_size
         if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():
             if self.perspective:
