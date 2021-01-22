@@ -1,31 +1,36 @@
 # Code Standard
-deepvac项目中的代码规范。使用的是C++举例，Java、Python也遵守。代码理念如下：
+deepvac项目中的代码规范。使用的是C++举例，Java、Python也遵守。
+
+## 代码理念
+代码理念和Python之禅一致，如下所示：
 ```python
 >>> import this
-The Zen of Python, by Tim Peters
+The Zen of DeepVAC, by Gemfield
 
-Beautiful is better than ugly.
-Explicit is better than implicit.
-Simple is better than complex.
-Complex is better than complicated.
-Flat is better than nested.
-Sparse is better than dense.
-Readability counts.
-Special cases aren't special enough to break the rules.
-Although practicality beats purity.
-Errors should never pass silently.
-Unless explicitly silenced.
-In the face of ambiguity, refuse the temptation to guess.
-There should be one-- and preferably only one --obvious way to do it.
-Although that way may not be obvious at first unless you're Dutch.
-Now is better than never.
-Although never is often better than *right* now.
-If the implementation is hard to explain, it's a bad idea.
-If the implementation is easy to explain, it may be a good idea.
-Namespaces are one honking great idea -- let's do more of those!
+漂亮胜于一切；
+明了胜于晦涩；
+简洁胜于复杂；
+复杂胜于凌乱；
+扁平胜于嵌套；
+多行短代码胜于一行长代码；
+可读性很重要；
+不要以特殊理由逃避上述规则；
+不要放过任何Error，除非有明确意图；
+不容易实现的想法就不是好想法；
+不容易解释的实现就不是好实现；
+容易解释的代码才可能是好代码；
+命名空间是个绝妙的设计；
 ```
+需要特别指出的：
+- 变量名即是注释;
+- 善用容器和巧妙的算法来重构冗长的逻辑；
+- 圈复杂度，超过3层嵌套就要保持警惕了；
+- 模块化，注意设计模式；
+- if分支尽量重构为table driven，写if前三思；
+- Python的话要善用list conprehension;
 
-## 通用代码规范
+## 代码规范
+
 - file name (文件名)
 ```bash
 syszux_msg.h
@@ -93,12 +98,4 @@ switch( level ){
         resip::Log::setLevel( resip::Log::None);
         break;
 }
-
-- 善用容器和巧妙的算法来重构冗长的逻辑；
-- 圈复杂度，超过3层嵌套就要保持警惕了；
-- 模块化，注意设计模式；
-- if分支尽量重构为table driven，写if前三思；
 ```
-
-## Python代码规范
-- 善用list conprehension；
