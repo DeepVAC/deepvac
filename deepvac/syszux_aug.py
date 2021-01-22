@@ -19,12 +19,17 @@ class AugBase(object):
         raise Exception("Not implemented!")
 
     @staticmethod
-    def inputCheck(img):
-        label = np.empty((0, 5))
-        if isinstance(img, (list, tuple)):
-            assert len(img) == 2, "img_list must be [image, labels]"
-            img, label = img
-            assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
+    def auditInput(img, has_label=False):
+        if not has_label:
+            assert isinstance(img, np.ndarray) and img.ndim == 3, "image must be cv2 image"
+            return
+
+        if not isinstance(img, (list, tuple)):
+            assert False, "parameter img must be [image, labels]"
+            return
+
+        assert len(img) == 2, "parameter img must be [image, labels]"
+        img, label = img
         assert isinstance(img, np.ndarray) and img.ndim == 3, "image must be cv2 image"
         return img, label
 
@@ -50,6 +55,7 @@ class SpeckleAug(AugBase):
         self.severity = np.random.uniform(0, 0.6*255)
 
     def __call__(self, img):
+        self.auditInput(img)
         blur = ndimage.gaussian_filter(np.random.randn(*img.shape) * self.severity, 1)
         img_speck = (img + blur)
         img_speck[img_speck > 255] = 255
@@ -69,6 +75,7 @@ class AffineAug(AugBase):
         self.shear_y = 1
 
     def __call__(self, img):
+        self.auditInput(img)
         rows,cols=img.shape[:2]
         shear_x = float(np.random.randint(-self.shear_x,self.shear_x+1))/100
         shear_y = float(np.random.randint(-self.shear_y,self.shear_y+1))/100
@@ -92,6 +99,7 @@ class PerspectAug(AugBase):
         self.sw_upper = 31
 
     def __call__(self, img):
+        self.auditInput(img)
         h,w=img.shape[:2]
         scale_h = np.random.randint(self.sh_lower ,self.sh_upper)
         scale_w = np.random.randint(self.sw_lower ,self.sw_upper)
@@ -116,6 +124,7 @@ class GaussianAug(AugBase):
         self.ks = [9,11,13,15,17]
 
     def __call__(self, img):
+        self.auditInput(img)
         ks = self.ks[np.random.randint(0,len(self.ks))]
         img_gaussian = cv2.GaussianBlur(img,(ks, ks), 0)
         return img_gaussian
@@ -134,11 +143,11 @@ class HorlineAug(AugBase):
         self.thickness = 1
 
     def __call__(self, img):
-        img_horline = img.copy()
+        self.auditInput(img)
         img_h, img_w = img.shape[:2]
         for i in range(0,img_h,self.space):
-            cv2.line(img_horline, (0, i), (img_w, i), self.color, self.thickness)
-        return img_horline
+            cv2.line(img, (0, i), (img_w, i), self.color, self.thickness)
+        return img
 
 # 添加竖线增强
 class VerlineAug(AugBase):
@@ -154,11 +163,11 @@ class VerlineAug(AugBase):
         self.thickness = 1
 
     def __call__(self, img):
-        img_verline = img.copy()
+        self.auditInput(img)
         img_h, img_w = img.shape[:2]
         for i in range(0,img_w,self.space):
-            cv2.line(img_verline, (i, 0), (i, img_h), self.color, self.thickness)
-        return img_verline
+            cv2.line(img, (i, 0), (i, img_h), self.color, self.thickness)
+        return img
 
 # 左右运动模糊
 class LRmotionAug(AugBase):
@@ -169,6 +178,7 @@ class LRmotionAug(AugBase):
         self.ks = [3,5,7,9]
 
     def __call__(self,img):
+        self.auditInput(img)
         ks = self.ks[np.random.randint(0,len(self.ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[int((ks - 1) / 2), :] = np.ones(ks)
@@ -185,6 +195,7 @@ class UDmotionAug(AugBase):
         self.ks = [3,5,7,9]
 
     def __call__(self, img):
+        self.auditInput(img)
         ks = self.ks[np.random.randint(0,len(self.ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[:, int((ks - 1) / 2)] = np.ones(ks)
@@ -202,6 +213,7 @@ class NoisyAug(AugBase):
         self.sigma = 1
 
     def __call__(self, img):
+        self.auditInput(img)
         row, col = img.shape[:2]
         gauss = np.random.normal(self.mean, self.sigma, (row, col,3))
         gauss = gauss.reshape(row, col,3)
@@ -218,6 +230,7 @@ class DistortAug(AugBase):
         self.segment = 4
 
     def __call__(self, img):
+        self.auditInput(img)
         img_h, img_w = img.shape[:2]
         cut = img_w // self.segment
         thresh = cut // 3
@@ -259,6 +272,7 @@ class StretchAug(AugBase):
         self.segment = 4
 
     def __call__(self, img):
+        self.auditInput(img)
         img_h, img_w = img.shape[:2]
 
         cut = img_w // self.segment
@@ -301,6 +315,7 @@ class PerspectiveAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         img_h, img_w = img.shape[:2]
 
         thresh = img_h // 2
@@ -334,6 +349,7 @@ class MotionAug(AugBase):
         self.angle = 45
 
     def __call__(self, img):
+        self.auditInput(img)
         m = cv2.getRotationMatrix2D((self.degree / 2, self.degree / 2), self.angle, 1)
         motion_blur_kernel = np.diag(np.ones(self.degree))
         motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.degree, self.degree))
@@ -354,6 +370,7 @@ class DarkAug(AugBase):
         self.gamma = 3
 
     def __call__(self, img):
+        self.auditInput(img)
         is_gray = img.ndim == 2 or img.shape[1] == 1
         if is_gray:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -379,6 +396,7 @@ class HalfDarkAug(AugBase):
         self.gamma = 1.5
 
     def __call__(self, img):
+        self.auditInput(img)
         h, w, _ = img.shape
         is_gray = img.ndim == 2 or img.shape[1] == 1
         if is_gray:
@@ -406,6 +424,7 @@ class IPCFaceAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         half_dark = HalfDarkAug(self.deepvac_config)
         half_dark.auditConfig()
         half_darked = half_dark(img)
@@ -425,6 +444,7 @@ class RandomCropDarkAug(AugBase):
         self.gamma = 1.2
 
     def __call__(self, img):
+        self.auditInput(img)
         height, width, _ = img.shape
         w = np.random.uniform(0.3 * width, width)
         h = np.random.uniform(0.3 * height, height)
@@ -462,6 +482,7 @@ class RandomColorJitterAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         random.seed()
         change_image = random.randint(0, 1)
         if not change_image:
@@ -486,6 +507,7 @@ class MosaicAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         neighbor = self.neighbor
         h, w = img.shape[0], img.shape[1]
         for i in range(0, h - neighbor -1, neighbor):
@@ -506,15 +528,11 @@ class RandomRotateFacialKpListAug(AugBase):
     def auditConfig(self):
         pass
 
-    # img_list: include 2 element
-    # img_list[0] -> img
-    # img_list[1] -> keypoint info (scale to 0-1)
-    def __call__(self, img_list):
-        assert isinstance(img_list, list), 'input must be a list'
-        assert len(img_list) == 2, 'img_list length must be two'
-
-        img = img_list[0]
-        landmarks = img_list[1]
+    # img: include 2 element
+    # img[0] -> img
+    # img[1] -> keypoint info (scale to 0-1)
+    def __call__(self, img):
+        img,landmarks = self.auditInput(img, has_label=True)
         angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
         h, w, _ = img.shape
         M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
@@ -548,15 +566,11 @@ class RandomFilpFacialKpListAug(AugBase):
                 dest_landmark.append(src_landmark[i])
         return dest_landmark
 
-    # img_list: include 2 element
-    # img_list[0] -> img
-    # img_list[1] -> keypoint info(scale to 0-1)
-    def __call__(self, img_list):
-        assert isinstance(img_list, list), 'input must be a list'
-        assert len(img_list) == 2, 'img_list length must be two'
-
-        img = img_list[0]
-        landmarks = img_list[1]
+    # img: include 2 element
+    # img[0] -> img
+    # img[1] -> keypoint info(scale to 0-1)
+    def __call__(self, img):
+        img,landmarks = self.auditInput(img, has_label=True)
         h, w, _ = img.shape
         random.seed()
 
@@ -594,6 +608,7 @@ class TextRendererPerspectiveAug(AugBase):
         self.max_z = 5
 
     def __call__(self, img):
+        self.auditInput(img)
         return apply_perspective_transform(img, self.max_x, self.max_y, self.max_z)
 
 class TextRendererCurveAug(AugBase):
@@ -604,6 +619,7 @@ class TextRendererCurveAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         h, w = img.shape[:2]
         re_img, text_box_pnts = Remaper().apply(img, [[0,0],[w,0],[w,h],[0,h]])
         return re_img
@@ -616,6 +632,7 @@ class TextRendererLineAug(AugBase):
         self.offset = 5
 
     def __call__(self, img):
+        self.auditInput(img)
         h, w = img.shape[:2]
         pos = [[self.offset,self.offset],[w-self.offset,self.offset],[w-self.offset,h-self.offset],[self.offset,h-self.offset]]
         re_img, text_box_pnts = Liner().apply(img, pos)
@@ -629,6 +646,7 @@ class TextRendererEmbossAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         return apply_emboss(img)
 
 class TextRendererReverseAug(AugBase):
@@ -639,6 +657,7 @@ class TextRendererReverseAug(AugBase):
         pass
 
     def __call__(self, img):
+        self.auditInput(img)
         return reverse_img(img)
 
 
@@ -653,12 +672,15 @@ class HSVAug(AugBase):
         self.r = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1
 
     def __call__(self, img):
-        img, label = self.inputCheck(img)
+        img, label = self.auditInput(img, has_label=True)
+        assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
         dtype = img.dtype
         x = np.arange(0, 256, dtype=np.int16)
         # r: [r_hue, r_sat, r_val]
         r = self.r
+        print(">>> deepvac/deepvac/syszux_aug.py +649 r changed!")
+        r = np.array([1.00618586, 0.50223649, 1.03560612])
         lut_hue = ((x * r[0]) % 180).astype(dtype)
         lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
         lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
@@ -686,7 +708,8 @@ class YoloPerspectiveAug(AugBase):
         return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr) & (ar < ar_thr)
 
     def __call__(self, img):
-        img, label = self.inputCheck(img)
+        img, label = self.auditInput(img, has_label=True)
+        assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
 
         border = self.border
         h, w, c = img.shape
@@ -741,6 +764,8 @@ class YoloPerspectiveAug(AugBase):
         T[1, 2] = random.uniform(0.5 - self.translate, 0.5 + self.translate) * height
         # Combined rotation matrix
         M = T @ S @ R @ P @ C
+        print(">>> deepvac/deepvac/syszux_aug.py +708 M changed!")
+        M = np.array([[1.07618871, 0., -239.85686143], [0., 1.07618871, -270.33414585], [0., 0., 1.]])
         # img augment and resize to img_size
         if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():
             if self.perspective:
@@ -792,7 +817,8 @@ class YoloNormalizeAug(AugBase):
             1. [cls, x1, y1, x2, y2] -> [cls, cx, cy, w, h]
             2. cx, w normalized by img width, cy, h normalized by img height
         '''
-        img, label = self.inputCheck(img)
+        img, label = self.auditInput(img, has_label=True)
+        assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         if not label.size:
             return img, label
         label[:, [3, 4]] -= label[:, [1, 2]]
@@ -810,12 +836,12 @@ class HFlipAug(AugBase):
         pass
 
     def __call__(self, img):
-        img, label = self.inputCheck(img)
+        img, label = self.auditInput(img, has_label=True)
+        assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.fliplr(img)
         if label.size:
             label[:, 1] = 1 - label[:, 1]
         return img, label
-
 
 class VFlipAug(AugBase):
     def __init__(self, deepvac_config):
@@ -825,7 +851,8 @@ class VFlipAug(AugBase):
         pass
 
     def __call__(self, img):
-        img, label = self.inputCheck(img)
+        img, label = self.auditInput(img, has_label=True)
+        assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.flipud(img)
         if label.size:
             label[:, 2] = 1 - label[:, 2]
