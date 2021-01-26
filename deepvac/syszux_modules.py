@@ -31,6 +31,16 @@ class Conv2dBNReLU(nn.Sequential):
             nn.ReLU(inplace=True)
         )
 
+class Conv2dBNPReLU(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        super(Conv2dBNPReLU, self).__init__(
+            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
+            nn.BatchNorm2d(out_planes, momentum=0.1),
+            nn.PReLU(out_planes)
+        )
+
 def initWeights(civilnet):
     for m in civilnet.modules():
         if isinstance(m, nn.Conv2d):
@@ -244,3 +254,44 @@ class Bottleneck(nn.Module):
         out += identity
         return self.relu(out)
 # introduced by resnet end
+
+
+class BottleneckIR(nn.Module):
+    def __init__(self, inplanes: int, outplanes: int, stride: int):
+        super(BottleneckIR, self).__init__()
+
+        self.shortcut_layer = nn.MaxPool2d(kernel_size=1, stride=stride) if inplanes == outplanes else nn.Sequential(
+                nn.Conv2d(inplanes, outplanes, kernel_size=1, stride=stride ,bias=False), nn.BatchNorm2d(outplanes))
+
+        self.res_layer = nn.Sequential(
+            nn.BatchNorm2d(inplanes),
+            nn.Conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1 ,bias=False),
+            nn.PReLU(outplanes),
+            nn.Conv2d(outplanes, outplanes, kernel_size=3, stride=stride, padding=1 ,bias=False),
+            nn.BatchNorm2d(outplanes)
+        )
+
+    def forward(self, x):
+        shortcut = self.shortcut_layer(x)
+        res = self.res_layer(x)
+        return res + shortcut
+
+
+class DepthWiseConv2d(nn.Module):
+    def __init__(self, inplanes: int, outplanes: int, kernel_size: int, stride: int, padding: int, groups: int, residual: bool=False):
+        super(DepthWiseConv2d, self).__init__()
+        self.conv1 = Conv2dBNPReLU(inplanes, groups, kernel_size=1, stride=1, padding=0)
+        self.conv2 = Conv2dBNPReLU(groups, groups, kernel_size, stride, padding, groups)
+        self.conv3 = nn.Conv2d(groups, outplanes, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn = nn.BatchNorm2d(outplanes)
+        self.residual = residual
+
+    def forward(self, x):
+        identity = x
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.bn(x)
+        if self.residual:
+            x = identity + x
+        return x
