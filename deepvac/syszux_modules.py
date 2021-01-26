@@ -50,14 +50,15 @@ class Conv2dBNHardswish(nn.Sequential):
             padding = (kernel_size - 1) // 2
         super(Conv2dBNHardswish, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
-            nn.BatchNorm2d(out_planes, momentum=0.1),
+            nn.BatchNorm2d(out_planes, eps=1e-3, momentum=0.03),
             nn.Hardswish()
         )
+
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
     def __init__(self, in_planes, out_planes, groups=1, shortcut=True, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
-        super(Bottleneck, self).__init__()
+        super(BottleneckStd, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
         self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1)
         self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, groups=groups)
@@ -74,7 +75,7 @@ class BottleneckCSP(nn.Module):
         self.conv2 = nn.Conv2d(in_planes, hidden_planes, 1, 1, bias=False)
         self.conv3 = nn.Conv2d(hidden_planes, hidden_planes, 1, 1, bias=False)
         self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1)
-        self.bn = nn.BatchNorm2d(2 * hidden_planes)  # applied to cat(conv2, conv3)
+        self.bn = nn.BatchNorm2d(2 * hidden_planes, eps=1e-3, momentum=0.03)  # applied to cat(conv2, conv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
         self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0) for _ in range(bottle_std_num)])
 
@@ -166,7 +167,7 @@ class InvertedResidual(nn.Module):
         layers = []
         if expand_ratio != 1:
             layers.append(Conv2dBNHswish(inp, hidden_dim, kernel_size=1))  # pw
-        
+
         layers.extend([
             # dw
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, padding, groups=hidden_dim, bias=False),
