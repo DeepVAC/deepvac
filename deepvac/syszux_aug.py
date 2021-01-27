@@ -474,6 +474,45 @@ class RandomCropDarkAug(AugBase):
         return img
 
 # 随机颜色扰动
+class ColorJitterAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(ColorJitterAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        self.auditInput(img)
+        img = self.cv2pillow(img)
+        img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
+        return self.pillow2cv(img)
+
+class BrightnessJitterAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(BrightnessJitterAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        self.auditInput(img)
+        img = self.cv2pillow(img)
+        img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
+        return self.pillow2cv(img)
+
+class ContrastJitterAug(AugBase):
+    def __init__(self, deepvac_config):
+        super(ContrastJitterAug, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, img):
+        self.auditInput(img)
+        img = self.cv2pillow(img)
+        img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
+        return self.pillow2cv(img)
+
 class RandomColorJitterAug(AugBase):
     def __init__(self, deepvac_config):
         super(RandomColorJitterAug, self).__init__(deepvac_config)
@@ -483,20 +522,14 @@ class RandomColorJitterAug(AugBase):
 
     def __call__(self, img):
         self.auditInput(img)
-        random.seed()
-        change_image = random.randint(0, 1)
-        if not change_image:
-            return img
-        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        img = self.cv2pillow(img)
         if random.randint(0, 1):
             img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
         if random.randint(0, 1):
             img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
         if random.randint(0, 1):
             img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
-
-        return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
-
+        return self.pillow2cv(img)
 
 class MosaicAug(AugBase):
     def __init__(self, deepvac_config):
@@ -572,11 +605,6 @@ class RandomFilpFacialKpListAug(AugBase):
     def __call__(self, img):
         img,landmarks = self.auditInput(img, has_label=True)
         h, w, _ = img.shape
-        random.seed()
-
-        if random.randint(0, 1) == 0:
-            return [img, landmarks]
-
         dest_img = cv2.flip(img, 1)
         flip_landmarks = []
         for i in range(len(landmarks)):
@@ -585,7 +613,6 @@ class RandomFilpFacialKpListAug(AugBase):
             flip_landmarks.append([curlandmark_x, curlandmark_y])
 
         dest_landmarks = []
-
         # 重新排列关键点顺序
         flip_landmarks_list = [[0, 32], [38, 42], [33, 37]]
         dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
