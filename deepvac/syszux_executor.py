@@ -114,6 +114,19 @@ class Executor(object):
                 img = self._graph[k](img)
         return img
 
+class DiceExecutor(Executor):
+    def __call__(self, img):
+        i = random.randrange(len(self._graph_p))
+        return self._graph[i](img)
+
+class PickOneExecutor(Executor):
+    def __call__(self, img):
+        for k in self._graph:
+            if random.random() >= self._graph_p[k]:
+                continue
+            return self._graph[k](img)
+        return self._graph[k](img)
+
 class FaceAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(FaceAugExecutor, self).__init__(deepvac_config)
