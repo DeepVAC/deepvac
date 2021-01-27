@@ -353,26 +353,20 @@ class FPN(nn.Module):
         self.conv4 = Conv2dBNLeakyReLU(out_planes, out_planes, padding=1)
         self.conv5 = Conv2dBNLeakyReLU(out_planes, out_planes, padding=1)
 
-        #self.interpolate2 = nn.Upsample(size=[40, 40], mode="nearest")
-        #self.interpolate1 = nn.Upsample(size=[80, 80], mode="nearest")
+        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
 
     def forward(self, input):
-        names = list(input.keys())
         input = list(input.values())
 
         output1 = self.conv1(input[0])
         output2 = self.conv2(input[1])        
         output3 = self.conv3(input[2])
 
-        #up3 = self.interpolate(output3, size=[output2.size(2), output2.size(3)], mode="nearest")
-        self.interpolate2 = nn.Upsample(size=[output2.size(2), output2.size(3)], mode="nearest")
-        up3 = self.interpolate2(output3)
+        up3 = self.upsample(output3)
         output2 = output2 + up3        
         output2 = self.conv5(output2)
 
-        #up2 = self.interpolate(output2, size=[output1.size(2), output1.size(3)], mode="nearest")
-        self.interpolate1 = nn.Upsample(size=[output1.size(2), output1.size(3)], mode="nearest")
-        up2 = self.interpolate1(output2)
+        up2 = self.upsample(output2)
         output1 = output1 + up2
         output1 = self.conv4(output1)
         out = [output1, output2, output3]
