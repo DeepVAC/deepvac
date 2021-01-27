@@ -605,11 +605,6 @@ class RandomFilpFacialKpListAug(AugBase):
     def __call__(self, img):
         img,landmarks = self.auditInput(img, has_label=True)
         h, w, _ = img.shape
-        random.seed()
-
-        if random.randint(0, 1) == 0:
-            return [img, landmarks]
-
         dest_img = cv2.flip(img, 1)
         flip_landmarks = []
         for i in range(len(landmarks)):
@@ -618,7 +613,6 @@ class RandomFilpFacialKpListAug(AugBase):
             flip_landmarks.append([curlandmark_x, curlandmark_y])
 
         dest_landmarks = []
-
         # 重新排列关键点顺序
         flip_landmarks_list = [[0, 32], [38, 42], [33, 37]]
         dest_landmarks = self.flipLandmark(dest_landmarks, flip_landmarks, flip_landmarks_list)
