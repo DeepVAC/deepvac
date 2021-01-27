@@ -156,15 +156,15 @@ class YoloAugExecutor(Executor):
         self.addAugChain("ac", ac)
 
 
-class RetinaAugExecutor(Executor):
+class RetinaAugExecutor(PickOneExecutor):
     def __init__(self, deepvac_config):
-        super(FaceDetectAugExecutor, self).__init__(deepvac_config)
-        ac1 = AugChain('CropFacialWithBoxesAndLmksAug => BrightDistortFacialAug@0.5 => ContrastDistortFacialAug@0.5 => SaturationDistortFacialAug@0.5 
+        super(RetinaAugExecutor, self).__init__(deepvac_config)
+        ac1 = AugChain('CropFacialWithBoxesAndLmksAug => BrightDistortFacialAug@0.5 => ContrastDistortFacialAug@0.5 => SaturationDistortFacialAug@0.5 \
                 => HueDistortFacialAug@0.5 => Pad2SquareFacialAug => MirrorFacialAug@0.5 => ResizeSubtractMeanFacialAug', deepvac_config)
-        ac2 = AugChain('CropFacialWithBoxesAndLmksAug => BrightDistortFacialAug@0.5 => SaturationDistortFacialAug@0.5 => HueDistortFacialAug@0.5 
+        ac2 = AugChain('CropFacialWithBoxesAndLmksAug => BrightDistortFacialAug@0.5 => SaturationDistortFacialAug@0.5 => HueDistortFacialAug@0.5 \
         => ContrastDistortFacialAug@0.5 => Pad2SquareFacialAug => MirrorFacialAug@0.5 => ResizeSubtractMeanFacialAug', deepvac_config)
-        self.addAugChain("ac1", ac1)
-        self.addAugChain("ac2", ac2)
+        self.addAugChain("ac1", ac1, 0.5)
+        self.addAugChain("ac2", ac2, 0.5)
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")
