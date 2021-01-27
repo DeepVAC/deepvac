@@ -1,5 +1,5 @@
 import torch.nn as nn
-from .syszux_modules import makeDivisible,hswish,Conv2dBNHswish,InvertedResidual,initWeights
+from .syszux_modules import makeDivisible,hswish,Conv2dBNHswish,InvertedResidual,initWeightsKaiming
 
 class MobileNetV3(nn.Module):
     def __init__(self, class_num=1000, width_mult=1.):
@@ -23,7 +23,7 @@ class MobileNetV3(nn.Module):
         self.conv = Conv2dBNHswish(input_channel, exp_size, kernel_size=1)
         self.fc_inp = exp_size
         self.initFc()
-        initWeights(self)
+        initWeightsKaiming(self)
 
     def forward(self, x):
         x = self.features(x)

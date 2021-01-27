@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .syszux_modules import initWeights, BasicBlock, Bottleneck, Conv2dBNReLU
+from .syszux_modules import initWeightsKaiming, BasicBlock, Bottleneck, Conv2dBNReLU
 
 class ResNet18(nn.Module):
     def __init__(self, class_num: int = 1000):
@@ -23,7 +23,7 @@ class ResNet18(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.initFc()
-        initWeights(self)
+        initWeightsKaiming(self)
 
     def forward(self, x):
         x = self.conv1(x)

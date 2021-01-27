@@ -41,7 +41,7 @@ class Conv2dBNPReLU(nn.Sequential):
             nn.PReLU(out_planes)
         )
 
-def initWeights(civilnet):
+def initWeightsKaiming(civilnet):
     for m in civilnet.modules():
         if isinstance(m, nn.Conv2d):
             nn.init.kaiming_normal_(m.weight, mode='fan_out')
@@ -54,13 +54,15 @@ def initWeights(civilnet):
             nn.init.normal_(m.weight, 0, 0.01)
             nn.init.zeros_(m.bias)
 
-def initWeightsNormal(m):
-    classname = m.__class__.__name__
-    if classname=='Conv2d':
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname=='BatchNorm2d':
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
+def initWeightsNormal(civilnet):
+    for m in civilnet.modules():
+        if isinstance(m, nn.Conv2d):
+            nn.init.normal_(m.weight, 0, 0.02)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.BatchNorm2d):
+            nn.init.normal_(m.weight, 1.0, 0.02)
+            nn.init.zeros_(m.bias)
 
 class Conv2dBNHardswish(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
