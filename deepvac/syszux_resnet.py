@@ -109,11 +109,6 @@ class ResNet152(ResNet18):
 class ResNet18OCR(ResNet18):
     def __init__(self):
         super(ResNet18OCR, self).__init__()
-        self.conv1 = nn.Sequential(
-            Conv2dBNReLU(in_planes=3, out_planes=32, kernel_size=3, stride=1),
-            Conv2dBNReLU(in_planes=32, out_planes=32, kernel_size=3, stride=1),
-            Conv2dBNReLU(in_planes=32, out_planes=64, kernel_size=3, stride=1)
-        )
 
     def auditConfig(self):
         self.block = BasicBlock
@@ -125,9 +120,12 @@ class ResNet18OCR(ResNet18):
         ]
 
     def initFc(self):
-        self.avgpool = nn.MaxPool2d(kernel_size=2,stride=2)
+        self.avgpool = nn.AvgPool2d((2,2))
     
-    def forward_cls(self, x):
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.layer(x)
+        x = self.avgpool(x)
         b, c, h, w = x.size()
         assert h == 1, "the height of conv must be 1"
         x = x.squeeze(2) # b *512 * width

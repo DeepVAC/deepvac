@@ -54,6 +54,14 @@ def initWeights(civilnet):
             nn.init.normal_(m.weight, 0, 0.01)
             nn.init.zeros_(m.bias)
 
+def initWeightsNormal(m):
+    classname = m.__class__.__name__
+    if classname=='Conv2d':
+        m.weight.data.normal_(0.0, 0.02)
+    elif classname=='BatchNorm2d':
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
+
 class Conv2dBNHardswish(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
         if padding is None:
