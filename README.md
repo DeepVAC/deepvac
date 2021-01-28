@@ -25,11 +25,11 @@ DeepVAC的依赖有：
 在DeepVAC内部，我们尽量使用最新版的PyTorch版本，并且使用Docker容器（实际上是基于Docker的更复杂的MLab2.0系统）进行训练和发布。我们为用户提供了构建好的Docker镜像，帮助用户省掉不必要的环境配置：
 ```bash
 #只使用cpu
-docker run -it gemfield/pytorch:1.6.0-devel bash
+docker run -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
 #使用GPU的话
-docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
+docker run --gpus all -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
 ```
-该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev)
+该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)
   
 
 ## 3. 安装deepvac库
