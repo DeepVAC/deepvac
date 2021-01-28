@@ -46,12 +46,14 @@ class Detect(nn.Module):
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 
 
-class Yolov5(nn.Module):
+class Yolov5S(nn.Module):
     '''
         yolov5s
     '''
+    #     eps   momentum
+    bn = [1e-3, 0.03]
     def __init__(self, class_num: int = 80):
-        super(Yolov5, self).__init__()
+        super(Yolov5S, self).__init__()
         self.class_num = class_num
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.cat = Concat(1)
@@ -66,6 +68,7 @@ class Yolov5(nn.Module):
         layers = []
         #init the 4 layers
         for m, args in cfgs:
+            args += self.bn
             layers.append(m(*args))
         return nn.Sequential(*layers)
 
@@ -98,18 +101,18 @@ class Yolov5(nn.Module):
 
     def initBlock1(self):
         cfgs = [
-            [Focus, [3, 32, 3] ],
+            [Focus, [3, 32, 3, 1] ],
             [Conv2dBNHardswish, [32, 64, 3, 2] ],
-            [BottleneckCSP, [64, 64, 1] ],
+            [BottleneckCSP, [64, 64, 1, True] ],
             [Conv2dBNHardswish, [64, 128, 3, 2] ],
-            [BottleneckCSP, [128, 128, 3] ]
+            [BottleneckCSP, [128, 128, 3, True] ]
         ]
         self.block1 = self.buildBlock(cfgs)
 
     def initBlock2(self):
         cfgs = [
             [Conv2dBNHardswish, [128, 256, 3, 2] ],
-            [BottleneckCSP, [256, 256, 3] ]
+            [BottleneckCSP, [256, 256, 3, True] ]
         ]
         self.block2 = self.buildBlock(cfgs)
 
@@ -130,12 +133,65 @@ class Yolov5(nn.Module):
         self.block4 = self.buildBlock(cfgs)
 
     def initBlock5(self):
-        self.csp1 = BottleneckCSP(256, 128, 1, False)
-        self.conv1 = Conv2dBNHardswish(128, 128, 3, 2)
-        self.csp2 = BottleneckCSP(256, 256, 1, False)
-        self.conv2 = Conv2dBNHardswish(256, 256, 3, 2)
-        self.csp3 = BottleneckCSP(512, 512, 1, False)
+        self.csp1 = self.buildBlock([[BottleneckCSP, [256, 128, 3, False]],])
+        self.conv1 = self.buildBlock([[Conv2dBNHardswish, [128, 128, 3, 2]],])
+        self.csp2 = self.buildBlock([[BottleneckCSP, [256, 256, 3, False]],])
+        self.conv2 = self.buildBlock([[Conv2dBNHardswish, [256, 256, 3, 2]],])
+        self.csp3 = self.buildBlock([[BottleneckCSP, [512, 512, 3, False]],])
 
     def initDetect(self):
         #initial anchors
         self.detect = Detect(self.class_num, [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]], [128, 256, 512])
+
+
+class Yolov5L(Yolov5S):
+    '''
+        yolov5-L
+    '''
+    def __init__(self, deepvac_config):
+        self.class_num = deepvac_config.class_num
+        super(Yolov5L, self).__init__(self.class_num)
+
+    def initBlock1(self):
+        cfgs = [
+            [Focus, [3, 64, 3, 1] ],
+            [Conv2dBNHardswish, [64, 128, 3, 2] ],
+            [BottleneckCSP, [128, 128, 3, True] ],
+            [Conv2dBNHardswish, [128, 256, 3, 2] ],
+            [BottleneckCSP, [256, 256, 9, True] ]
+        ]
+        self.block1 = self.buildBlock(cfgs)
+
+    def initBlock2(self):
+        cfgs = [
+            [Conv2dBNHardswish, [256, 512, 3, 2] ],
+            [BottleneckCSP, [512, 512, 9, True] ]
+        ]
+        self.block2 = self.buildBlock(cfgs)
+
+    def initBlock3(self):
+        cfgs = [
+            [Conv2dBNHardswish, [512, 1024, 3, 2] ],
+            [SPP, [1024, 1024, [5, 9, 13]] ],
+            [BottleneckCSP, [1024, 1024, 3, False] ],
+            [Conv2dBNHardswish, [1024, 512, 1, 1] ]
+        ]
+        self.block3 = self.buildBlock(cfgs)
+
+    def initBlock4(self):
+        cfgs = [
+            [BottleneckCSP, [1024, 512, 3, False] ],
+            [Conv2dBNHardswish, [512, 256, 1, 1] ],
+        ]
+        self.block4 = self.buildBlock(cfgs)
+
+    def initBlock5(self):
+        self.csp1 = self.buildBlock([[BottleneckCSP, [512, 256, 3, False]],])
+        self.conv1 = self.buildBlock([[Conv2dBNHardswish, [256, 256, 3, 2]],])
+        self.csp2 = self.buildBlock([[BottleneckCSP, [512, 512, 3, False]],])
+        self.conv2 = self.buildBlock([[Conv2dBNHardswish, [512, 512, 3, 2]],])
+        self.csp3 = self.buildBlock([[BottleneckCSP, [1024, 1024, 3, False]],])
+
+    def initDetect(self):
+        #initial anchors
+        self.detect = Detect(self.class_num, [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]], [256, 512, 1024])

@@ -121,7 +121,7 @@ class CocoCVDataset(Dataset):
         # pytorch offical transform for PIL Image or numpy
         if self.transform is not None:
             # rewrite method: '_buildSample' first
-            img = self.transform(img)
+            sample = self.transform(sample)
         # post process
         img, label = self._buildSample(sample, label)
         return img, label
@@ -144,7 +144,7 @@ class CocoCVDataset(Dataset):
     def loadImgs(self, index):
         file_name = self.coco.loadImgs(self.ids[index])[0]['file_name']
         img = cv2.imread(os.path.join(self.img_folder, file_name), 1)
-        assert img is not None, f"Image {file_name} not found!"
+        assert img is not None, "Image {} not found!".format(file_name)
         return img
 
     def loadAnns(self, index):
