@@ -117,7 +117,7 @@ class Executor(object):
 class DiceExecutor(Executor):
     def __call__(self, img):
         i = random.randrange(len(self._graph_p))
-        return self._graph[i](img)
+        return list(self._graph.values())[i]
 
 class PickOneExecutor(Executor):
     def __call__(self, img):
