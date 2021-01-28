@@ -68,7 +68,7 @@ class FileLineDataset(Dataset):
 
 class FileLineCvStrDataset(FileLineDataset):
     def _buildLabelFromLine(self, line):
-        line = line.strip().split(" ")
+        line = line.strip().split(" ", 1)
         return [line[0], line[1]]
 
     def _buildSampleFromPath(self, abs_path):
@@ -154,28 +154,3 @@ class CocoCVDataset(Dataset):
         boxes = np.array([i["bbox"] for i in anns], dtype=np.float)
         masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
         return category_ids, boxes, masks
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
