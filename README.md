@@ -158,7 +158,7 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
 ## 9. 编写训练和验证脚本
 代码写在train.py文件中，必须继承DeepvacTrain类：
 ```python
-from deepvac import DeepvacTrain
+from deepvac import DeepvacTrain, is_ddp
 
 class MyTrain(DeepvacTrain):
     pass
@@ -185,13 +185,24 @@ class MyTrain(DeepvacTrain):
 
  
 一个train.py的例子 [train.py](./examples/a_resnet_project/train.py)。            
-如果使用了DDP，那么除了继承自DeepvacDDP类外，还需要在initTrainLoader中初始化self.train_sampler：
+如果开启了DDP功能，那么注意需要在MyTrain类的initTrainLoader中初始化self.train_sampler：
 ```python
-def initTrainLoader(self):
-    self.train_dataset = FaceDataset(self.conf)
-    self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
-    self.train_loader = DataLoader(self.train_dataset, batch_size=self.conf.train_batch_size, shuffle=(self.train_sampler is None), pin_memory=True, num_workers=self.conf.num_workers,sampler=self.train_sampler)
+from deepvac import DeepvacTrain, is_ddp
 
+class MyTrain(DeepvacTrain):
+    ...
+    def initTrainLoader(self):
+        self.train_dataset = ClsDataset(self.conf.train)
+        if is_ddp:
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
+        self.train_loader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.conf.train.batch_size,
+            shuffle=False if is_ddp else self.conf.train.shuffle,
+            num_workers=self.conf.workers,
+            pin_memory=self.conf.pin_memory,
+            sampler=self.train_sampler if is_ddp else None
+        )
 ```   
 
 ## 10. 编写测试脚本
@@ -216,7 +227,7 @@ def initTrainLoader(self):
 
 ### 通用配置
 ```python
-#单卡训练和测试所使用的device，多卡请使用DeepvacDDP
+#单卡训练和测试所使用的device，多卡请开启Deepvac的DDP功能
 config.device = "cuda"
 #是否禁用git branch约束
 config.disable_git = False
@@ -271,7 +282,27 @@ config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 ```
 
 ### DDP（分布式训练）
-要启用分布式训练，你的类需要继承DeepvacDDP，并且进行如下配置：
+要启用分布式训练，需要确保3点： 
+- MyTrain类的initTrainLoader中初始化了self.train_sampler。举例：
+```python
+from deepvac import DeepvacTrain, is_ddp
+
+class MyTrain(DeepvacTrain):
+    ...
+    def initTrainLoader(self):
+        self.train_dataset = ClsDataset(self.conf.train)
+        if is_ddp:
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
+        self.train_loader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.conf.train.batch_size,
+            shuffle=False if is_ddp else self.conf.train.shuffle,
+            num_workers=self.conf.workers,
+            pin_memory=self.conf.pin_memory,
+            sampler=self.train_sampler if is_ddp else None
+        )
+```   
+- config.py需要进行如下配置：
 ```python
 #dist_url，单机多卡无需改动，多机训练一定要修改
 config.dist_url = "tcp://localhost:27030"
@@ -279,8 +310,7 @@ config.dist_url = "tcp://localhost:27030"
 #rank的数量，一定要修改
 config.world_size = 3
 ```
-
-以下两个配置为命令行参数，不是config.py中的配置:
+- 命令行传递如下两个参数(不在config.py中配置)：
 ```bash
 #从0开始
 --rank <rank_idx>
