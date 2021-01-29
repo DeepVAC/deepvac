@@ -1,5 +1,5 @@
 import os
-from deepvac.syszux_config import *
+from deepvac import config
 ##########classifier report########
 config.cls = AttrDict()
 config.cls.class_num = 90219  # numbers of idx

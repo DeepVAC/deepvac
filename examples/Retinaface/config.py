@@ -1,5 +1,5 @@
 import torch 
-from deepvac.syszux_config import *
+from deepvac import config
 from torchvision import transforms
 
 # global

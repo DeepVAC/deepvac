@@ -25,11 +25,11 @@ DeepVAC的依赖有：
 在DeepVAC内部，我们尽量使用最新版的PyTorch版本，并且使用Docker容器（实际上是基于Docker的更复杂的MLab2.0系统）进行训练和发布。我们为用户提供了构建好的Docker镜像，帮助用户省掉不必要的环境配置：
 ```bash
 #只使用cpu
-docker run -it gemfield/pytorch:1.6.0-devel bash
+docker run -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
 #使用GPU的话
-docker run --gpus all -it gemfield/pytorch:1.6.0-devel bash
+docker run --gpus all -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
 ```
-该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev)
+该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)
   
 
 ## 3. 安装deepvac库
@@ -55,7 +55,7 @@ sys.path.append('/home/gemfield/github/deepvac')
 - 切换到上述的LTS_b1分支中，开始coding；
 
 ## 5. 编写配置文件
-配置文件的文件名均为 config.py，在代码开始处添加```from deepvac.syszux_config import *```；  
+配置文件的文件名均为 config.py，在代码开始处添加```from deepvac import config```；  
 所有用户的配置都存放在这个文件里。 有些配置是全局唯一的，则直接配置如下：
 
 ```bash
@@ -94,13 +94,15 @@ print(self.conf.train.batch_size)
 ```
 
 ## 6. 编写synthesis/synthesis.py
-编写该文件，用于产生数据集和data/train.txt，data/val.txt
-（待完善）
+编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
+这一步为可选，如果有需要的话，可以参考Deepvac组织下其它项目的实现。
 
 ## 7. 编写aug/aug.py
-编写该文件，用于实现数据增强策略；
-继承syszux_executor模块中的Executor类体系，比如：
+编写该文件，用于实现数据增强策略。数据增强逻辑一般写在aug/aug.py中，或者（如果简单的话）写在train.py中。
+数据增强的逻辑要封装在Executor子类中，具体来说就是继承Executor基类，比如：
 ```python
+from deepvac import Executor
+
 class MyAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(MyAugExecutor, self).__init__(deepvac_config)
@@ -111,10 +113,10 @@ class MyAugExecutor(Executor):
         self.addAugChain('ac1', ac1, 1)
         self.addAugChain('ac2', ac2, 0.5)
 ```
-（待完善）
+
 
 ## 8. 编写Dataset类
-代码编写在train.py文件中。  继承syszux_loader模块中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
+代码编写在train.py文件中。  继承Deepvac中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
 ```bash
 #train.txt，第一列为图片路径，第二列为label
 img0/1.jpg 0
@@ -127,6 +129,8 @@ img2/0.jpg 2
 ```
 有时第二列是字符串，并且想把FileLineDataset中使用Image读取图片对方式替换为cv2，那么可以通过如下的继承方式来重新实现：
 ```python
+from deepvac import FileLineDataset
+
 class FileLineCvStrDataset(FileLineDataset):
     def _buildLabelFromLine(self, line):
         line = line.strip().split(" ")
@@ -139,18 +143,28 @@ class FileLineCvStrDataset(FileLineDataset):
             sample = self.transform(sample)
         return sample
 ```
-哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
+哦，FileLineCvStrDataset也已经是Deepvac中提供的类了。  
 
 再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac库中的ImageFolderWithTransformDataset类：
 
 ```python
+from deepvac import ImageFolderWithTransformDataset
+
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
     def __init__(self, nsfw_config):
         super(NSFWTrainDataset, self).__init__(nsfw_config)
 ```
 
 ## 9. 编写训练和验证脚本
-代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
+代码写在train.py文件中，必须继承DeepvacTrain类：
+```python
+from deepvac import DeepvacTrain, is_ddp
+
+class MyTrain(DeepvacTrain):
+    pass
+```
+
+继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
 
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
@@ -171,17 +185,28 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
 
  
 一个train.py的例子 [train.py](./examples/a_resnet_project/train.py)。            
-如果使用了DDP，那么除了继承自DeepvacDDP类外，还需要在initTrainLoader中初始化self.train_sampler：
+如果开启了DDP功能，那么注意需要在MyTrain类的initTrainLoader中初始化self.train_sampler：
 ```python
-def initTrainLoader(self):
-    self.train_dataset = FaceDataset(self.conf)
-    self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
-    self.train_loader = DataLoader(self.train_dataset, batch_size=self.conf.train_batch_size, shuffle=(self.train_sampler is None), pin_memory=True, num_workers=self.conf.num_workers,sampler=self.train_sampler)
+from deepvac import DeepvacTrain, is_ddp
 
+class MyTrain(DeepvacTrain):
+    ...
+    def initTrainLoader(self):
+        self.train_dataset = ClsDataset(self.conf.train)
+        if is_ddp:
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
+        self.train_loader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.conf.train.batch_size,
+            shuffle=False if is_ddp else self.conf.train.shuffle,
+            num_workers=self.conf.workers,
+            pin_memory=self.conf.pin_memory,
+            sampler=self.train_sampler if is_ddp else None
+        )
 ```   
 
 ## 10. 编写测试脚本
-代码写在test.py文件中，继承syszux_deepvac模块中的Deepvac类。和train.py中的train/val的本质不同在于：
+代码写在test.py文件中，继承Deepvac类。和train.py中的train/val的本质不同在于：
 - 舍弃train/val上下文；
 - 不再使用DataLoader装载数据，开始使用OpenCV等三方库来直接读取图片样本；
 - 网络不再使用autograd上下文；
@@ -202,7 +227,7 @@ def initTrainLoader(self):
 
 ### 通用配置
 ```python
-#单卡训练和测试所使用的device，多卡请使用DeepvacDDP
+#单卡训练和测试所使用的device，多卡请开启Deepvac的DDP功能
 config.device = "cuda"
 #是否禁用git branch约束
 config.disable_git = False
@@ -257,7 +282,27 @@ config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 ```
 
 ### DDP（分布式训练）
-要启用分布式训练，你的类需要继承DeepvacDDP，并且进行如下配置：
+要启用分布式训练，需要确保3点： 
+- MyTrain类的initTrainLoader中初始化了self.train_sampler。举例：
+```python
+from deepvac import DeepvacTrain, is_ddp
+
+class MyTrain(DeepvacTrain):
+    ...
+    def initTrainLoader(self):
+        self.train_dataset = ClsDataset(self.conf.train)
+        if is_ddp:
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
+        self.train_loader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.conf.train.batch_size,
+            shuffle=False if is_ddp else self.conf.train.shuffle,
+            num_workers=self.conf.workers,
+            pin_memory=self.conf.pin_memory,
+            sampler=self.train_sampler if is_ddp else None
+        )
+```   
+- config.py需要进行如下配置：
 ```python
 #dist_url，单机多卡无需改动，多机训练一定要修改
 config.dist_url = "tcp://localhost:27030"
@@ -265,8 +310,7 @@ config.dist_url = "tcp://localhost:27030"
 #rank的数量，一定要修改
 config.world_size = 3
 ```
-
-以下两个配置为命令行参数，不是config.py中的配置:
+- 命令行传递如下两个参数(不在config.py中配置)：
 ```bash
 #从0开始
 --rank <rank_idx>

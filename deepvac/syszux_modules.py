@@ -3,6 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 
+#fuse model
+def fuse4deepvac(civilnet):
+    for m in civilnet.modules():
+        if not hasattr(m, 'fuse4deepvac'):
+            continue
+        m.fuse4deepvac()
+
 # introduced by enhanced CNN BEGIN
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=4):
@@ -66,38 +73,39 @@ def initWeightsNormal(civilnet):
             nn.init.zeros_(m.bias)
 
 class Conv2dBNHardswish(nn.Sequential):
-    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
         if padding is None:
             padding = (kernel_size - 1) // 2
         super(Conv2dBNHardswish, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
-            nn.BatchNorm2d(out_planes, momentum=0.1),
+            nn.BatchNorm2d(out_planes, eps=eps, momentum=momentum),
             nn.Hardswish()
         )
 
+
 class BottleneckStd(nn.Module):
     # Standard bottleneck
-    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
-        super(Bottleneck, self).__init__()
+    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, eps=1e-5, momentum=0.1, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
+        super(BottleneckStd, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1)
-        self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, groups=groups)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
+        self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, eps, momentum, groups=groups)
         self.add = shortcut and in_planes == out_planes
 
     def forward(self, x):
         return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
 
 class BottleneckCSP(nn.Module):
-    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, eps=1e-5, momentum=0.1, groups=1, expansion=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(BottleneckCSP, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
         self.conv2 = nn.Conv2d(in_planes, hidden_planes, 1, 1, bias=False)
         self.conv3 = nn.Conv2d(hidden_planes, hidden_planes, 1, 1, bias=False)
-        self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1)
-        self.bn = nn.BatchNorm2d(2 * hidden_planes)  # applied to cat(conv2, conv3)
+        self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1, eps, momentum)
+        self.bn = nn.BatchNorm2d(2 * hidden_planes, eps=eps, momentum=momentum)  # applied to cat(conv2, conv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
-        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0) for _ in range(bottle_std_num)])
+        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, eps=eps, momentum=momentum, expansion=1.0) for _ in range(bottle_std_num)])
 
     def forward(self, x):
         y1 = self.conv3(self.std_bottleneck_list(self.conv1(x)))
@@ -106,11 +114,11 @@ class BottleneckCSP(nn.Module):
 
 class SPP(nn.Module):
     # Spatial pyramid pooling layer used in YOLOv3-SPP
-    def __init__(self, in_planes, out_planes, pool_kernel_size=(5, 9, 13)):
+    def __init__(self, in_planes, out_planes, pool_kernel_size=(5, 9, 13), eps=1e-5, momentum=0.1):
         super(SPP, self).__init__()
         hidden_planes = in_planes // 2  # hidden channels
-        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1)
-        self.conv2 = Conv2dBNHardswish(hidden_planes * (len(pool_kernel_size) + 1), out_planes, 1, 1)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
+        self.conv2 = Conv2dBNHardswish(hidden_planes * (len(pool_kernel_size) + 1), out_planes, 1, 1, eps, momentum)
         self.pool_list = nn.ModuleList([nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2) for k in pool_kernel_size])
 
     def forward(self, x):
@@ -119,9 +127,9 @@ class SPP(nn.Module):
 
 class Focus(nn.Module):
     # Focus wh information into c-space
-    def __init__(self, in_planes, out_planes, kernel_size=1, stride=1, padding=None, groups=1):
+    def __init__(self, in_planes, out_planes, kernel_size=1, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
         super(Focus, self).__init__()
-        self.conv = Conv2dBNHardswish(in_planes * 4, out_planes, kernel_size, stride, padding, groups)
+        self.conv = Conv2dBNHardswish(in_planes * 4, out_planes, kernel_size, stride, eps, momentum, padding, groups)
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
         return self.conv(torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1))
@@ -187,7 +195,7 @@ class InvertedResidual(nn.Module):
         layers = []
         if expand_ratio != 1:
             layers.append(Conv2dBNHswish(inp, hidden_dim, kernel_size=1))  # pw
-        
+
         layers.extend([
             # dw
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, padding, groups=hidden_dim, bias=False),
@@ -275,9 +283,9 @@ class BottleneckIR(nn.Module):
 
         self.res_layer = nn.Sequential(
             nn.BatchNorm2d(inplanes),
-            nn.Conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1 ,bias=False), 
+            nn.Conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1 ,bias=False),
             nn.PReLU(outplanes),
-            nn.Conv2d(outplanes, outplanes, kernel_size=3, stride=stride, padding=1 ,bias=False), 
+            nn.Conv2d(outplanes, outplanes, kernel_size=3, stride=stride, padding=1 ,bias=False),
             nn.BatchNorm2d(outplanes)
         )
 
@@ -295,7 +303,7 @@ class DepthWiseConv2d(nn.Module):
         self.conv3 = nn.Conv2d(groups, outplanes, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(outplanes)
         self.residual = residual
-    
+
     def forward(self, x):
         identity = x
         x = self.conv1(x)
@@ -306,5 +314,79 @@ class DepthWiseConv2d(nn.Module):
             x = identity + x
         return x
 
+class Conv2dBNLeakyReLU(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, leaky=0):
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        #leaky = 0.1 if out_planes <= 64 else 0
+        super(Conv2dBNLeakyReLU, self).__init__(
+            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, bias=False),
+            nn.BatchNorm2d(out_planes),
+            nn.LeakyReLU(negative_slope=leaky, inplace=True)
+        )
 
+class Conv2dBN(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        super(Conv2dBN, self).__init__(
+            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, bias=False),
+            nn.BatchNorm2d(out_planes)
+        )
 
+class SSH(nn.Module):
+    def __init__(self, in_planes: int, out_planes: int):
+        super(SSH, self).__init__()
+        assert  out_planes % 4 == 0
+        leaky = 0.1 if out_planes <= 64 else 0
+        self.conv3X3 = Conv2dBN(in_planes, out_planes//2, padding=1)
+
+        self.conv5X5_1 = Conv2dBNLeakyReLU(in_planes, out_planes//4, padding=1, leaky=leaky)
+        self.conv5X5_2 = Conv2dBN(out_planes//4, out_planes//4, padding=1)
+
+        self.conv7X7_2 = Conv2dBNLeakyReLU(out_planes//4, out_planes//4, padding=1, leaky=leaky)
+        self.conv7x7_3 = Conv2dBN(out_planes//4, out_planes//4, padding=1)
+
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, input):
+        conv3X3 = self.conv3X3(input)
+
+        conv5X5_1 = self.conv5X5_1(input)
+        conv5X5 = self.conv5X5_2(conv5X5_1)
+
+        conv7X7_2 = self.conv7X7_2(conv5X5_1)
+        conv7X7 = self.conv7x7_3(conv7X7_2)
+
+        out = torch.cat([conv3X3, conv5X5, conv7X7], dim=1)
+        out = self.relu(out)
+        return out
+
+class FPN(nn.Module):
+    def __init__(self, in_planes: list, out_planes: int):
+        super(FPN,self).__init__()
+
+        leaky = 0.1 if out_planes <= 64 else 0
+        self.conv1 = Conv2dBNLeakyReLU(in_planes[0], out_planes, kernel_size=1, padding=0, leaky=leaky)
+        self.conv2 = Conv2dBNLeakyReLU(in_planes[1], out_planes, kernel_size=1, padding=0, leaky=leaky)
+        self.conv3 = Conv2dBNLeakyReLU(in_planes[2], out_planes, kernel_size=1, padding=0, leaky=leaky)
+
+        self.conv4 = Conv2dBNLeakyReLU(out_planes, out_planes, padding=1, leaky=leaky)
+        self.conv5 = Conv2dBNLeakyReLU(out_planes, out_planes, padding=1, leaky=leaky)
+
+    def forward(self, input):
+        input = list(input.values())
+
+        output1 = self.conv1(input[0])
+        output2 = self.conv2(input[1])
+        output3 = self.conv3(input[2])
+
+        up3 = F.interpolate(output3, size=[output2.size(2), output2.size(3)], mode="nearest")
+        output2 = output2 + up3
+        output2 = self.conv5(output2)
+
+        up2 = F.interpolate(output2, size=[output1.size(2), output1.size(3)], mode="nearest")
+        output1 = output1 + up2
+        output1 = self.conv4(output1)
+        out = [output1, output2, output3]
+        return out

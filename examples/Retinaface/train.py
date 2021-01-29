@@ -10,8 +10,8 @@ import time
 import numpy as np
 import os
 
-from deepvac.syszux_log import LOG
-from deepvac.syszux_deepvac import DeepvacTrain
+from deepvac import LOG
+from deepvac import DeepvacTrain
 
 from modules.model import RetinaFace, MultiBoxLoss
 from modules.utils_prior_box import PriorBox
