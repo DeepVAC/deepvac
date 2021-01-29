@@ -1149,3 +1149,69 @@ class ResizeSubtractMeanFacialAug(AugBase):
         
         return image.transpose(2, 0, 1), [boxes, landms, labels]
 
+
+class RandomHorizontalFlipDet(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomHorizontalFlipDet, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        pass
+
+    def __call__(self, imgs):
+        for i in range(len(imgs)):
+            imgs[i] = np.flip(imgs[i], axis=1).copy()
+        return imgs
+
+class RandomRotateDet(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomRotateDet, self).__init__(deepvac_config)
+
+    def auditConfig(self):
+        self.max_angle = 10
+
+    def __call__(self, imgs):
+        angle = random.random() * 2 * self.max_angle - self.max_angle
+        for i in range(len(imgs)):
+            img = imgs[i]
+            w, h = img.shape[:2]
+            rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
+            img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w))
+            imgs[i] = img_rotation
+        return imgs
+
+class RandomCropDet(AugBase):
+    def __init__(self, deepvac_config):
+        super(RandomCropDet, self).__init__(deepvac_config)
+        self.conf = deepvac_config
+
+    def auditConfig(self):
+        self.p = 3.0 / 8.0
+
+    def __call__(self, imgs):
+        img_size = (self.conf.img_size, self.conf.img_size)
+        h, w = imgs[0].shape[0:2]
+        th, tw = img_size
+        if w == tw and h == th:
+            return imgs
+
+        if random.random() > self.p and np.max(imgs[1]) > 0:
+            tl = np.min(np.where(imgs[1] > 0), axis = 1) - img_size
+            tl[tl < 0] = 0
+            br = np.max(np.where(imgs[1] > 0), axis = 1) - img_size
+            br[br < 0] = 0
+            br[0] = min(br[0], h - th)
+            br[1] = min(br[1], w - tw)
+
+            i = random.randint(tl[0], br[0])
+            j = random.randint(tl[1], br[1])
+        else:
+            i = random.randint(0, h - th)
+            j = random.randint(0, w - tw)
+
+        # return i, j, th, tw
+        for idx in range(len(imgs)):
+            if len(imgs[idx].shape) == 3:
+                imgs[idx] = imgs[idx][i:i + th, j:j + tw, :]
+            else:
+                imgs[idx] = imgs[idx][i:i + th, j:j + tw]
+        return imgs
