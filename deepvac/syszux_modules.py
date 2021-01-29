@@ -55,8 +55,9 @@ def initWeightsKaiming(civilnet):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
         elif isinstance(m, nn.BatchNorm2d):
-            nn.init.ones_(m.weight)
-            nn.init.zeros_(m.bias)
+            if m.affine:
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
             nn.init.normal_(m.weight, 0, 0.01)
             if m.bias is not None:
@@ -69,8 +70,9 @@ def initWeightsNormal(civilnet):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
         elif isinstance(m, nn.BatchNorm2d):
-            nn.init.normal_(m.weight, 1.0, 0.02)
-            nn.init.zeros_(m.bias)
+            if m.affine:
+                nn.init.normal_(m.weight, 1.0, 0.02)
+                nn.init.zeros_(m.bias)
 
 class Conv2dBNHardswish(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
