@@ -1,12 +1,12 @@
 import torch
 from torch import nn
 from torch import optim
-from deepvac.syszux_log import LOG
+from deepvac import LOG
 from modules.model import model
 from torch.utils.data import DataLoader
-from deepvac.syszux_deepvac import DeepvacTrain
+from deepvac import DeepvacTrain
 from torchvision.datasets import ImageFolder
-from deepvac.syszux_loader import ImageFolderWithTransformDataset
+from deepvac import ImageFolderWithTransformDataset
 
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
     def __init__(self, nsfw_config):

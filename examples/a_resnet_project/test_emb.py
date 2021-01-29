@@ -1,6 +1,6 @@
 from test import *
-from deepvac.syszux_aug import AugBase
-from deepvac.syszux_log import LOG
+from deepvac import AugBase
+from deepvac import LOG
 
 class DeepvacNSFWEmb(DeepvacNSFW):
     def process(self):

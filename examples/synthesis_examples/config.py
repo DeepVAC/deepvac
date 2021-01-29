@@ -1,5 +1,5 @@
 import os
-from deepvac.syszux_config import *
+from deepvac import config, AttrDict
 ##########text synthesis########
 config.text = AttrDict()
 config.text.total_num = 189956

@@ -55,7 +55,7 @@ sys.path.append('/home/gemfield/github/deepvac')
 - 切换到上述的LTS_b1分支中，开始coding；
 
 ## 5. 编写配置文件
-配置文件的文件名均为 config.py，在代码开始处添加```from deepvac.syszux_config import *```；  
+配置文件的文件名均为 config.py，在代码开始处添加```from deepvac import config```；  
 所有用户的配置都存放在这个文件里。 有些配置是全局唯一的，则直接配置如下：
 
 ```bash
@@ -94,13 +94,15 @@ print(self.conf.train.batch_size)
 ```
 
 ## 6. 编写synthesis/synthesis.py
-编写该文件，用于产生数据集和data/train.txt，data/val.txt
-（待完善）
+编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
+这一步为可选，如果有需要的话，可以参考Deepvac组织下其它项目的实现。
 
 ## 7. 编写aug/aug.py
-编写该文件，用于实现数据增强策略；
-继承syszux_executor模块中的Executor类体系，比如：
+编写该文件，用于实现数据增强策略。数据增强逻辑一般写在aug/aug.py中，或者（如果简单的话）写在train.py中。
+数据增强的逻辑要封装在Executor子类中，具体来说就是继承Executor基类，比如：
 ```python
+from deepvac import Executor
+
 class MyAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(MyAugExecutor, self).__init__(deepvac_config)
@@ -111,10 +113,10 @@ class MyAugExecutor(Executor):
         self.addAugChain('ac1', ac1, 1)
         self.addAugChain('ac2', ac2, 0.5)
 ```
-（待完善）
+
 
 ## 8. 编写Dataset类
-代码编写在train.py文件中。  继承syszux_loader模块中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
+代码编写在train.py文件中。  继承Deepvac中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
 ```bash
 #train.txt，第一列为图片路径，第二列为label
 img0/1.jpg 0
@@ -127,6 +129,8 @@ img2/0.jpg 2
 ```
 有时第二列是字符串，并且想把FileLineDataset中使用Image读取图片对方式替换为cv2，那么可以通过如下的继承方式来重新实现：
 ```python
+from deepvac import FileLineDataset
+
 class FileLineCvStrDataset(FileLineDataset):
     def _buildLabelFromLine(self, line):
         line = line.strip().split(" ")
@@ -139,18 +143,28 @@ class FileLineCvStrDataset(FileLineDataset):
             sample = self.transform(sample)
         return sample
 ```
-哦，FileLineCvStrDataset也已经是syszux_loader模块中提供的类了。  
+哦，FileLineCvStrDataset也已经是Deepvac中提供的类了。  
 
 再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac库中的ImageFolderWithTransformDataset类：
 
 ```python
+from deepvac import ImageFolderWithTransformDataset
+
 class NSFWTrainDataset(ImageFolderWithTransformDataset):
     def __init__(self, nsfw_config):
         super(NSFWTrainDataset, self).__init__(nsfw_config)
 ```
 
 ## 9. 编写训练和验证脚本
-代码写在train.py文件中，继承syszux_deepvac模块中的DeepvacTrain类，或者DeepvacDDP类（用于分布式训练）。继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
+代码写在train.py文件中，必须继承DeepvacTrain类：
+```python
+from deepvac import DeepvacTrain
+
+class MyTrain(DeepvacTrain):
+    pass
+```
+
+继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
 
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
@@ -181,7 +195,7 @@ def initTrainLoader(self):
 ```   
 
 ## 10. 编写测试脚本
-代码写在test.py文件中，继承syszux_deepvac模块中的Deepvac类。和train.py中的train/val的本质不同在于：
+代码写在test.py文件中，继承Deepvac类。和train.py中的train/val的本质不同在于：
 - 舍弃train/val上下文；
 - 不再使用DataLoader装载数据，开始使用OpenCV等三方库来直接读取图片样本；
 - 网络不再使用autograd上下文；

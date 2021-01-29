@@ -21,6 +21,29 @@ try:
 except ImportError:
     LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
+from torch.quantization import QuantStub, DeQuantStub
+#fuse model
+def fuse4deepvac(civilnet):
+    for m in civilnet.modules():
+        if not hasattr(m, 'fuse4deepvac'):
+            continue
+        m.fuse4deepvac()
+    if hasattr(civilnet, 'fuse4deepvac'):
+        civilnet.fuse4deepvac()
+
+class DeepvacQAT(torch.nn.Module):
+    def __init__(self, net2qat):
+        super(DeepvacQAT, self).__init__()
+        self.quant = QuantStub()
+        self.net2qat = fuse4deepvac(net2qat)
+        self.dequant = DeQuantStub()
+
+    def forward(self, x):
+        x = self.quant(x)
+        x = self.net2qat(x)
+        x = self.dequant(x)
+        return x
+
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
