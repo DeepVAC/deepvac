@@ -52,7 +52,8 @@ def initWeightsKaiming(civilnet):
             nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
             nn.init.normal_(m.weight, 0, 0.01)
-            nn.init.zeros_(m.bias)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
 
 def initWeightsNormal(civilnet):
     for m in civilnet.modules():

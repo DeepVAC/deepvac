@@ -863,7 +863,7 @@ class DeepvacDDP(DeepvacTrain):
     def saveState(self, time):
         if self.args.rank != 0:
             return
-        super(DeepvacDDP, self).saveState(self.getTime())
+        super(DeepvacDDP, self).saveState(time)
 
     def addScalar(self, tag, value, step):
         if self.args.rank != 0:
