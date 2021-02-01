@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import torch.distributed as dist
 
 class LossBase(object):
     def __init__(self, deepvac_config):
@@ -122,7 +123,7 @@ class ArcFace(nn.Module):
 
 
 class CurricularFace(nn.Module):
-    def __init__(self, embedding_size, class_num, s=64.0, m=0.50):
+    def __init__(self, embedding_size, class_num, world_size=1, s=64.0, m=0.50):
         super(CurricularFace, self).__init__()
         self.in_features = embedding_size
         self.out_features = class_num
@@ -132,6 +133,7 @@ class CurricularFace(nn.Module):
         self.sin_m = math.sin(m)
         self.threshold = math.cos(math.pi - m)
         self.mm = math.sin(math.pi - m) * m
+        self.world_size = world_size
         self.kernel = nn.Parameter(torch.Tensor(self.in_features, self.out_features))
         self.register_buffer('t', torch.zeros(1))
         nn.init.normal_(self.kernel, std=0.01)
@@ -147,6 +149,9 @@ class CurricularFace(nn.Module):
         hard_example = cos_theta[mask]
         with torch.no_grad():
             self.t = target_logit.mean() * 0.01 + (1 - 0.01) * self.t
+            if self.world_size != 1:
+                dist.all_reduce(self.t, dist.ReduceOp.SUM)
+            self.t = self.t / self.world_size
         cos_theta[mask] = hard_example * (self.t + hard_example)
         cos_theta.scatter_(1, label.view(-1, 1).long(), final_target_logit)
         output = cos_theta * self.s
