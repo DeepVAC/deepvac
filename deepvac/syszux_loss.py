@@ -189,7 +189,7 @@ class Yolov5Loss(LossBase):
         # normalized to gridspace gain
         gain = torch.ones(7, device=self.device)
         # targets: (N, 6) -> (3, N, 7), at last append anchor index
-        target = [torch.cat([target, i.repeat(target_num).view(target_num, -1)], dim=1) for i in torch.arange(self.anchor_num, device=self.device)]
+        target = [torch.cat([target, i.repeat(target_num).view(target_num, 1)], dim=1) for i in torch.arange(self.anchor_num, device=self.device)]
         target = torch.stack(target, dim=0)
 
         off = torch.tensor([[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]], device=self.device) * 0.5
@@ -221,7 +221,7 @@ class Yolov5Loss(LossBase):
                 offsets = (torch.zeros_like(cxcy.unsqueeze(dim=0)) + off.unsqueeze(dim=1))[cx_index]
                 # offsets = (torch.zeros_like(cxcy)[None] + off[:, None])[cx_index]
             else:
-                t = targets[0]
+                t = target[0]
                 offsets = 0
 
             img_id, cls = t[:, :2].long().T
@@ -237,47 +237,55 @@ class Yolov5Loss(LossBase):
             tcls.append(cls)
         return tcls, tbox, indices, anch
 
+    def compute_loss(self, p, tcls, tbox, indices, anchors, balance):
+        img_id, anchor_index, cy_index, cx_index = indices
+        tobj = torch.zeros_like(p[..., 0], device=self.device)
+        target_num = img_id.size(0)
+        if not target_num:
+            lobj = self.BCEobj(p[..., 4], tobj) * balance
+            balance = balance * 0.9999 + 0.0001 / lobj.detach().item() if self.autobalance else balance
+            return 0, 0, lobj
+        # p: [px, py, pw, ph, conf, cls] ...
+        ps = p[img_id, anchor_index, cy_index, cx_index]
+        # Regression
+        pcxcy = ps[:, :2].sigmoid() * 2. - 0.5
+        pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors
+        pbox = torch.cat((pcxcy, pwh), 1)
+        iou = self.bbox_iou(pbox.T, tbox, x1y1x2y2=False, CIou=True)
+        lbox = (1.0 - iou).mean()
+        # Objectness
+        # tobj[img_id, anchor_index, cy_index, cx_index] = (1.0 - self.gr) + self.gr * iou.detach().clamp(0).type(tobj.dtype)
+        for x in range(len(img_id)):
+            tobj[img_id[x], anchor_index[x], cy_index[x], cx_index[x]] = (1.0 - self.gr) + self.gr * iou[x].detach().clamp(0).type(tobj.dtype)
+        lobj = self.BCEobj(p[..., 4], tobj) * balance
+        balance = balance * 0.9999 + 0.0001 / lobj.detach().item() if self.autobalance else balance
+        # Classification
+        if self.class_num <= 1:
+            return lbox, 0, lobj
+        t = torch.full_like(ps[:, 5:], self.cn, device=self.device)
+        t[range(target_num), tcls] = self.cp
+        lcls = self.BCEcls(ps[:, 5:], t)
+        return lbox, lcls, lobj
+
     def __call__(self, pred, target):
         lcls, lbox, lobj = torch.zeros(1, device=self.device), torch.zeros(1, device=self.device), torch.zeros(1, device=self.device)
         tcls, tbox, indices, anchors = self.build_target(pred, target)
-
         # pred: [(n, c, h1, w1, 9), (n, c, h2, w2, 9), (n, c, h3, w3, 9)]
         for i, p in enumerate(pred):
-            img_id, anchor_index, cy_index, cx_index = indices[i]
-            tobj = torch.zeros_like(p[..., 0], device=self.device)
-            target_num = img_id.size(0)
-            if target_num:
-                # p: [px, py, pw, ph, conf, cls] ...
-                ps = p[img_id, anchor_index, cy_index, cx_index]
-                # Regression
-                pcxcy = ps[:, :2].sigmoid() * 2. - 0.5
-                pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
-                pbox = torch.cat((pcxcy, pwh), 1)
-                iou = self.bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)
-                lbox += (1.0 - iou).mean()
-                # Objectness
-                tobj[img_id, anchor_index, cy_index, cx_index] = (1.0 - self.gr) + self.gr * iou.detach().clamp(0).type(tobj.dtype)
-                # Classification
-                if self.class_num > 1:
-                    t = torch.full_like(ps[:, 5:], self.cn, device=self.device)
-                    t[range(target_num), tcls[i]] = self.cp
-                    lcls += self.BCEcls(ps[:, 5:], t)  # BCE
-            lobj += self.BCEobj(p[..., 4], tobj) * self.balance[i]
-            if self.autobalance:
-                self.balance[i] = self.balance[i] * 0.9999 + 0.0001 / lobj.detach().item()
-
-        if self.autobalance:
-            self.balance = [x / self.balance[self.ssi] for x in self.balance]
+            libox, licls, liobj = self.compute_loss(p, tcls[i], tbox[i], indices[i], anchors[i], self.balance[i])
+            lbox += libox
+            lcls += licls
+            lobj += liobj
+        self.balance = [x / self.balance[self.ssi] for x in self.balance] if self.autobalance else self.balance
         lbox *= self.box
         lobj *= self.obj
         lcls *= self.cls
-        bs = tobj.shape[0]
-
+        bs = pred[0].size(0)
         loss = lbox + lobj + lcls
         return loss * bs, torch.cat((lbox, lobj, lcls, loss)).detach()
 
     @staticmethod
-    def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=1e-9):
+    def bbox_iou(box1, box2, x1y1x2y2=True, GIou=False, DIou=False, CIou=False, eps=1e-9):
         box2 = box2.T
         if x1y1x2y2:
             b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
@@ -289,29 +297,50 @@ class Yolov5Loss(LossBase):
             b2_y1, b2_y2 = box2[1] - box2[3] / 2, box2[1] + box2[3] / 2
         inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
                 (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
+        coords = (b1_x1, b1_x2, b1_y1, b1_y2, b2_x1, b2_x2, b2_y1, b2_y2)
         w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + eps
         w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + eps
+        whs = (w1, h1, w2, h2)
         union = w1 * h1 + w2 * h2 - inter + eps
         iou = inter / union
-        if GIoU or DIoU or CIoU:
-            cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)
-            ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)
-            if CIoU or DIoU:
-                c2 = cw ** 2 + ch ** 2 + eps
-                rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 +
-                        (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4
-                if DIoU:
-                    return iou - rho2 / c2
-                elif CIoU:
-                    v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
-                    with torch.no_grad():
-                        alpha = v / ((1 + eps) - iou + v)
-                    return iou - (rho2 / c2 + v * alpha)
-            else:
-                c_area = cw * ch + eps
-                return iou - (c_area - union) / c_area
-        else:
+
+        if not GIou and not DIou and not CIou:
             return iou
+        elif GIou:
+            return Yolov5Loss.compute_GIou(iou, coords, union)[-1]
+        elif DIou:
+            return Yolov5Loss.compute_DIou(iou, coords, union)[-1]
+        elif CIou:
+            return Yolov5Loss.compute_CIou(iou, coords, whs, union)
+
+    @staticmethod
+    def compute_GIou(iou, coords, union, eps=1e-9):
+        b1_x1, b1_x2, b1_y1, b1_y2, b2_x1, b2_x2, b2_y1, b2_y2 = coords
+        cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)
+        ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)
+        c_area = cw * ch + eps
+        giou = iou - (c_area - union) / c_area
+        return cw, ch, giou
+
+    @staticmethod
+    def compute_DIou(iou, coords, union, eps=1e-9):
+        cw, ch, _ = Yolov5Loss.compute_GIou(iou, coords, union)
+        c2 = cw ** 2 + ch ** 2 + eps
+        b1_x1, b1_x2, b1_y1, b1_y2, b2_x1, b2_x2, b2_y1, b2_y2 = coords
+        rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 + (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4
+        diou = iou - rho2 / c2
+        return c2, rho2, diou
+
+    @staticmethod
+    def compute_CIou(iou, coords, whs, union, eps=1e-9):
+        cw, ch, _ = Yolov5Loss.compute_GIou(iou, coords, union)
+        c2, rho2, _ = Yolov5Loss.compute_DIou(iou, coords, union)
+        w1, h1, w2, h2 = whs
+        v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
+        with torch.no_grad():
+            alpha = v / ((1 + eps) - iou + v)
+        ciou = iou - (rho2 / c2 + v * alpha)
+        return ciou
 
     @staticmethod
     def smoothBCE(eps=0.1):
