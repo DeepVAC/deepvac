@@ -790,8 +790,6 @@ class DeepvacTrain(Deepvac):
 
         self.postEpoch()
         if self.scheduler:
-            lr = [x['lr'] for x in self.optimizer.param_groups]
-            print(">>> lr: ", lr)
             self.scheduler.step()
 
     def processVal(self, smoke=False):
