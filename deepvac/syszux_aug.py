@@ -1150,26 +1150,32 @@ class ResizeSubtractMeanFacialAug(AugBase):
         return image.transpose(2, 0, 1), [boxes, landms, labels]
 
 
-class RandomHorizontalFlipDet(AugBase):
+class ImageWithMasksRandomHorizontalFlipAug(AugBase):
     def __init__(self, deepvac_config):
-        super(RandomHorizontalFlipDet, self).__init__(deepvac_config)
+        super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
         pass
 
     def __call__(self, imgs):
+        img, label = self.auditInput(imgs, has_label=True)
+        imgs = [img]
+        imgs.extend(label)
         for i in range(len(imgs)):
-            imgs[i] = np.flip(imgs[i], axis=1).copy()
-        return imgs
+            imgs[i] = np.flip(imgs[i], axis=1)
+        return [imgs[0],imgs[1:]]
 
-class RandomRotateDet(AugBase):
+class ImageWithMasksRandomRotateAug(AugBase):
     def __init__(self, deepvac_config):
-        super(RandomRotateDet, self).__init__(deepvac_config)
+        super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
         self.max_angle = 10
 
     def __call__(self, imgs):
+        img, label = self.auditInput(imgs, has_label=True)
+        imgs = [img]
+        imgs.extend(label)
         angle = random.random() * 2 * self.max_angle - self.max_angle
         for i in range(len(imgs)):
             img = imgs[i]
@@ -1177,17 +1183,20 @@ class RandomRotateDet(AugBase):
             rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
             img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w))
             imgs[i] = img_rotation
-        return imgs
+        return [imgs[0],imgs[1:]]
 
-class RandomCropDet(AugBase):
+class ImageWithMasksRandomCropAug(AugBase):
     def __init__(self, deepvac_config):
-        super(RandomCropDet, self).__init__(deepvac_config)
+        super(ImageWithMasksRandomCropAug, self).__init__(deepvac_config)
         self.conf = deepvac_config
 
     def auditConfig(self):
         self.p = 3.0 / 8.0
 
     def __call__(self, imgs):
+        img, label = self.auditInput(imgs, has_label=True)
+        imgs = [img]
+        imgs.extend(label)
         img_size = (self.conf.img_size, self.conf.img_size)
         h, w = imgs[0].shape[0:2]
         th, tw = img_size
@@ -1214,4 +1223,4 @@ class RandomCropDet(AugBase):
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw, :]
             else:
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw]
-        return imgs
+        return [imgs[0],imgs[1:]]
