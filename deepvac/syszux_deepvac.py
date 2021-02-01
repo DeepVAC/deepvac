@@ -778,9 +778,9 @@ class DeepvacTrain(Deepvac):
             self.postIter()
             self.iter += 1
             self.train_time.update(time.time() - start)
-            # if self.step in self.save_list:
-            #     self.processVal()
-            #     self.setTrainContext()
+            if self.step in self.save_list:
+                self.processVal()
+                self.setTrainContext()
             start = time.time()
 
         self.addScalar('{}/TrainTime(hours/epoch)'.format(self.phase), round(self.train_time.sum / 3600, 2), self.epoch)

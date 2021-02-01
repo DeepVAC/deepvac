@@ -1,6 +1,7 @@
 import torch
 
-from torch import nn
+from torch import nn, Tensor
+from typing import List, Tuple
 from .syszux_modules import Conv2dBNHardswish, BottleneckStd, BottleneckCSP, SPP, Focus, Concat
 
 
@@ -18,10 +19,10 @@ class Detect(nn.Module):
         self.register_buffer('anchor_grid', anchor_t.clone().view(self.detect_layer_num, 1, -1, 1, 1, 2))  # shape(detect_layer_num,1, anchor_num,1,1,2)
         self.conv_list = nn.ModuleList(nn.Conv2d(x, self.output_num_per_anchor * self.anchor_num, 1) for x in in_planes_list)
 
-    def forward(self, x):
-        inference_result = []
-        for i in range(self.detect_layer_num):
-            x[i] = self.conv_list[i](x[i])  # conv
+    def forward(self, x: List[Tensor]) -> Tuple[Tensor, Tensor, Tensor]:
+        inference_result: List[Tensor] = []
+        for i, layer in enumerate(self.conv_list):
+            x[i] = layer(x[i])
             bs, _, ny, nx = x[i].shape
             #x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.anchor_num, self.output_num_per_anchor, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
@@ -36,14 +37,14 @@ class Detect(nn.Module):
                 inference_result.append(y.view(bs, -1, self.output_num_per_anchor))
 
         if self.is_training:
-            return x
+            return (x[0], x[1], x[2])
 
-        return (torch.cat(inference_result, 1), x)
+        return (torch.cat(inference_result, 1), torch.empty(0), torch.empty(0))
 
     @staticmethod
-    def makeGrid(nx=20, ny=20):
+    def makeGrid(nx: int=20, ny: int=20) -> Tensor:
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
-        return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
+        return torch.stack((xv, yv), 2).view(1, 1, ny, nx, 2).float()
 
 
 class Yolov5S(nn.Module):
@@ -97,7 +98,7 @@ class Yolov5S(nn.Module):
         x = self.cat([x,x3])
         c3 = self.csp3(x)
 
-        return self.detect([c1,c2,c3])
+        return self.detect([c1, c2, c3])
 
     def initBlock1(self):
         cfgs = [

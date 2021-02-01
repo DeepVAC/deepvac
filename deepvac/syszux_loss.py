@@ -259,9 +259,7 @@ class Yolov5Loss(LossBase):
         iou = self.bbox_iou(pbox.T, tbox, x1y1x2y2=False, CIou=True)
         lbox = (1.0 - iou).mean()
         # Objectness
-        # tobj[img_id, anchor_index, cy_index, cx_index] = (1.0 - self.gr) + self.gr * iou.detach().clamp(0).type(tobj.dtype)
-        for x in range(len(img_id)):
-            tobj[img_id[x], anchor_index[x], cy_index[x], cx_index[x]] = (1.0 - self.gr) + self.gr * iou[x].detach().clamp(0).type(tobj.dtype)
+        tobj[img_id, anchor_index, cy_index, cx_index] = (1.0 - self.gr) + self.gr * iou.detach().clamp(0).type(tobj.dtype)
         lobj = self.BCEobj(p[..., 4], tobj) * balance
         balance = balance * 0.9999 + 0.0001 / lobj.detach().item() if self.autobalance else balance
         # Classification
