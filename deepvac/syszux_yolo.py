@@ -151,8 +151,7 @@ class Yolov5L(Yolov5S):
         yolov5-L
     '''
     def __init__(self, deepvac_config):
-        self.class_num = deepvac_config.class_num
-        super(Yolov5L, self).__init__(self.class_num)
+        super(Yolov5L, self).__init__(deepvac_config)
 
     def initBlock1(self):
         cfgs = [
