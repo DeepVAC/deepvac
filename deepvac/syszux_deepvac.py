@@ -430,7 +430,7 @@ class Deepvac(object):
             backend = 'fbgemm'
             if self.conf.quantize_backend:
                 backend = self.conf.quantize_backend
-            
+
             self.qat_net_prepared = self.net if self.conf.modules_to_fuse is None else torch.quantization.fuse_modules(self.net, self.conf.modules_to_fuse)
             self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
             torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)

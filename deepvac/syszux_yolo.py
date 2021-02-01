@@ -53,7 +53,7 @@ class Yolov5S(nn.Module):
     '''
     #     eps   momentum
     bn = [1e-3, 0.03]
-    def __init__(self, class_num: int = 80):
+    def __init__(self, class_num=80, strides=[8, 16, 32]):
         super(Yolov5S, self).__init__()
         self.class_num = class_num
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
@@ -64,6 +64,7 @@ class Yolov5S(nn.Module):
         self.initBlock4()
         self.initBlock5()
         self.initDetect()
+        self.detect.stride = torch.Tensor(strides)
 
     def buildBlock(self, cfgs):
         layers = []
@@ -149,9 +150,8 @@ class Yolov5L(Yolov5S):
     '''
         yolov5-L
     '''
-    def __init__(self, deepvac_config):
-        self.class_num = deepvac_config.class_num
-        super(Yolov5L, self).__init__(self.class_num)
+    def __init__(self, class_num=80, strides=[8, 16, 32]):
+        super(Yolov5L, self).__init__(class_num, strides)
 
     def initBlock1(self):
         cfgs = [
