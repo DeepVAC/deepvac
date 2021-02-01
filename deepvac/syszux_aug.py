@@ -1153,12 +1153,14 @@ class ResizeSubtractMeanFacialAug(AugBase):
 class ImageWithMasksRandomHorizontalFlipAug(AugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
+        self.conf = deepvac_config
 
     def auditConfig(self):
         pass
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
+        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
         imgs = [img]
         imgs.extend(label)
         for i in range(len(imgs)):
@@ -1168,12 +1170,14 @@ class ImageWithMasksRandomHorizontalFlipAug(AugBase):
 class ImageWithMasksRandomRotateAug(AugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
+        self.conf = deepvac_config
 
     def auditConfig(self):
         self.max_angle = 10
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
+        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
         imgs = [img]
         imgs.extend(label)
         angle = random.random() * 2 * self.max_angle - self.max_angle
@@ -1195,6 +1199,7 @@ class ImageWithMasksRandomCropAug(AugBase):
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
+        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
         imgs = [img]
         imgs.extend(label)
         img_size = (self.conf.img_size, self.conf.img_size)
