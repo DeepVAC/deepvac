@@ -3,12 +3,12 @@ import numpy as np
 import torch
 from torch import nn
 from torchvision import models
-from deepvac.syszux_log import LOG
+from deepvac import LOG
 from modules.model import model
-from deepvac.syszux_deepvac import Deepvac
-from deepvac.syszux_loader import OsWalkerLoader
-from deepvac.syszux_report import ClassifierReport
-from deepvac.syszux_aug import AugBase
+from deepvac import Deepvac
+from deepvac import OsWalkerLoader
+from deepvac import ClassifierReport
+from deepvac import AugBase
 from PIL import Image
 
 class NSFWTestDataset(OsWalkerLoader):

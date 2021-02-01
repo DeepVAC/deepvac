@@ -22,7 +22,6 @@ class Detect(nn.Module):
         inference_result = []
         for i in range(self.detect_layer_num):
             x[i] = self.conv_list[i](x[i])  # conv
-
             bs, _, ny, nx = x[i].shape
             #x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.anchor_num, self.output_num_per_anchor, ny, nx).permute(0, 1, 3, 4, 2).contiguous()

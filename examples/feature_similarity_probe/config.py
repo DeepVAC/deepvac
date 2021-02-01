@@ -1,5 +1,5 @@
 import os
-from deepvac.syszux_config import *
+from deepvac import config, AttrDict
 ##########classifier report########
 config.repeat = AttrDict()
 config.repeat.input_path = '/ your input file path /'

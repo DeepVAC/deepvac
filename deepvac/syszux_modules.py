@@ -3,6 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 
+#fuse model
+def fuse4deepvac(civilnet):
+    for m in civilnet.modules():
+        if not hasattr(m, 'fuse4deepvac'):
+            continue
+        m.fuse4deepvac()
+
 # introduced by enhanced CNN BEGIN
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=4):
