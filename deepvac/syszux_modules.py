@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from typing import List
 from torch.nn import init
 
 #fuse model
@@ -142,7 +144,7 @@ class Concat(nn.Module):
         super(Concat, self).__init__()
         self.d = dimension
 
-    def forward(self, x):
+    def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         return torch.cat(x, self.d)
 # enhanced CNN END
 
