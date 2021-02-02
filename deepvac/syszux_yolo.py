@@ -32,7 +32,7 @@ class Detect(nn.Module):
                     self.grid[i] = self.makeGrid(nx, ny).to(x[i].device)
 
                 y = x[i].sigmoid()
-                y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i].to(x[i].device)) * self.stride[i]  # xy
+                y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i].to(x[i].device)) * self.strides[i]  # xy
                 y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
                 inference_result.append(y.view(bs, -1, self.output_num_per_anchor))
 
@@ -64,7 +64,7 @@ class Yolov5S(nn.Module):
         self.initBlock4()
         self.initBlock5()
         self.initDetect()
-        self.detect.stride = torch.Tensor(strides)
+        self.detect.strides = torch.Tensor(strides)
 
     def buildBlock(self, cfgs):
         layers = []
