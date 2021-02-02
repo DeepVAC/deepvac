@@ -514,6 +514,11 @@ class Deepvac(object):
     def prepareQAT(self):
         if not self.conf.qat_dir:
             return
+
+        if self.conf.is_forward_only:
+            LOG.logI("You are in forward_only mode, omit the parepareQAT()")
+            return
+
         LOG.logI("You have enabled QAT, this step is only for prepare.")
 
         if self.qat_net_prepared:
