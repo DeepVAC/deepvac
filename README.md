@@ -46,7 +46,7 @@ docker run --gpus all -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04
 ```python
 import sys
 #replace with your local deepvac directory
-sys.path.append('/home/gemfield/github/deepvac')
+sys.path.insert(0,'/home/gemfield/github/deepvac')
 ```
 
 ## 4. 创建自己的PyTorch项目
@@ -265,6 +265,9 @@ config.train.batch_size = 128
 config.epoch_num = 30
 #一个Epoch中保存多少次模型和Checkpoint文件
 config.save_num = 5
+
+#加载预训练模型。注意，如果指定了checkpoint_suffix，则该配置无意义。
+config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 #checkpoint_suffix一旦配置，则启动train.py的时候将加载output/<git_branch>/checkpoint:<checkpoint_suffix>
 #训练将会从Epoch10重新开始
 #不配置或者配置为空字符串，表明从头开始训练

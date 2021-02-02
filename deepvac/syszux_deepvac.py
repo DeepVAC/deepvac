@@ -4,10 +4,12 @@ import sys
 from datetime import datetime
 import argparse
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 from torch.cuda.amp import autocast
 from torch.cuda.amp import GradScaler
+from torch.quantization.fuser_method_mappings import DEFAULT_OP_LIST_TO_FUSER_METHOD
 import time
 import subprocess
 import tempfile
@@ -22,20 +24,64 @@ except ImportError:
     LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
 from torch.quantization import QuantStub, DeQuantStub
-#fuse model
-def fuse4deepvac(civilnet):
-    for m in civilnet.modules():
-        if not hasattr(m, 'fuse4deepvac'):
+
+def _get_module(model, submodule_key):
+    tokens = submodule_key.split('.')
+    cur_mod = model
+    for s in tokens:
+        cur_mod = getattr(cur_mod, s)
+    return cur_mod
+
+def _set_module(model, submodule_key, module):
+    tokens = submodule_key.split('.')
+    sub_tokens = tokens[:-1]
+    cur_mod = model
+    for s in sub_tokens:
+        cur_mod = getattr(cur_mod, s)
+    setattr(cur_mod, tokens[-1], module)
+
+def get_fuser_module_index(mod_list):
+    rc = []
+    if len(mod_list) < 2:
+        return rc
+    keys = sorted(list(DEFAULT_OP_LIST_TO_FUSER_METHOD.keys()), key=lambda x: len(x), reverse=True)
+    mod2fused_list = [list(x) for x in keys]
+
+    for mod2fused in mod2fused_list:
+        if len(mod2fused) > len(mod_list):
             continue
-        m.fuse4deepvac()
-    if hasattr(civilnet, 'fuse4deepvac'):
-        civilnet.fuse4deepvac()
+        mod2fused_idx = [(i, i+len(mod2fused)) for i in range(len(mod_list) - len(mod2fused) + 1) if mod_list[i:i+len(mod2fused)] == mod2fused]
+        if not mod2fused_idx:
+            continue
+
+        for idx in mod2fused_idx:
+            start,end = idx
+            mod_list[start: end] = [None] * len(mod2fused)
+
+        rc.extend(mod2fused_idx)
+
+    return rc
+
+def auto_fuse_model(model):
+    module_names = []
+    module_types = []
+    for name, m in model.named_modules():
+        module_names.append(name)
+        module_types.append(type(m))
+
+    if len(module_types) < 2:
+        return model
+
+    module_idxs = get_fuser_module_index(module_types)
+    modules_to_fuse = [module_names[mi[0]:mi[1]] for mi in module_idxs]
+    new_model = torch.quantization.fuse_modules(model, modules_to_fuse)
+    return new_model
 
 class DeepvacQAT(torch.nn.Module):
     def __init__(self, net2qat):
         super(DeepvacQAT, self).__init__()
         self.quant = QuantStub()
-        self.net2qat = fuse4deepvac(net2qat)
+        self.net2qat = auto_fuse_model(net2qat)
         self.dequant = DeQuantStub()
 
     def forward(self, x):
@@ -111,11 +157,14 @@ class Deepvac(object):
         l = [self.conf.static_quantize_dir, self.conf.dynamic_quantize_dir,self.conf.qat_dir]
         l2 = [x for x in l if x]
         if len(l2) > 1:
-            LOG.logE("Error: [static_quantize_dir, dynamic_quantize_dir, qat_dir] are exclusive for each other. You can only enable one of them in a train task.")
+            LOG.logE("Error: [static_quantize_dir, dynamic_quantize_dir, qat_dir] are exclusive for each other. You can only enable one of them in a train task.", exit=True)
 
         #audit for amp
         if self.conf.amp and self.device.type != 'cuda':
             LOG.logE("Error: amp can only be enabled when using cuda device", exit=True)
+
+        if self.conf.qat_dir and self.conf.trace_model_dir:
+            LOG.logE("Error: [qat_dir and trace_model_dir] are exclusive for each other. You can only enable one of them in a train task.", exit=True)
 
 
     def getConf(self):
@@ -241,6 +290,12 @@ class Deepvac(object):
 
         return self.getOutput()
 
+    def getConvertedNetFromQAT(self, net):
+        toq_net = copy.deepcopy(self.net)
+        toq_net.eval()
+        torch.quantization.convert(toq_net.cpu(), inplace=True)
+        return toq_net
+
     def saveModel4Libtorch(self, input_net, output_file, mode='trace', input_sample=None):
         LOG.logI("saveModel4Libtorch: {} ...".format(output_file))
         with torch.no_grad():
@@ -284,7 +339,8 @@ class Deepvac(object):
             output_script_file = self.conf.script_model_dir
 
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
-        self.saveModel4Libtorch(self.net, output_script_file, 'script')
+        net = self.getConvertedNetFromQAT(self.net) if self.conf.qat_dir else self.net
+        self.saveModel4Libtorch(net, output_script_file, 'script')
         #script quantized model
         if self.dynamic_quantized_net:
             self.saveModel4Libtorch(self.dynamic_quantized_net, output_script_file + ".dynamic_quantized", 'script')
@@ -430,8 +486,7 @@ class Deepvac(object):
             backend = 'fbgemm'
             if self.conf.quantize_backend:
                 backend = self.conf.quantize_backend
-
-            self.qat_net_prepared = self.net if self.conf.modules_to_fuse is None else torch.quantization.fuse_modules(self.net, self.conf.modules_to_fuse)
+            self.qat_net_prepared = DeepvacQAT(self.net)
             self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
             torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)
             #after this, train net will be transfered to QAT !
@@ -444,16 +499,9 @@ class Deepvac(object):
         if output_quant_file is None:
             output_quant_file = self.conf.qat_dir
 
-        is_train = self.net.training
-        #to eval mode temporary
-        if is_train:
-            self.net.eval()
-        self.qat_net = torch.quantization.convert(self.net)
+        net = self.getConvertedNetFromQAT(self.net)
         LOG.logI("Pytorch model QAT quantize succeed, save model in {}".format(output_quant_file))
-        torch.save(self.qat_net.state_dict(), output_quant_file)
-        #back to train mode.
-        if is_train:
-            self.net.train()
+        torch.save(net.state_dict(), output_quant_file)
 
     def loadDB(self, db_path):
         self.xb = torch.load(db_path).to(self.device)
@@ -532,8 +580,8 @@ class DeepvacTrain(Deepvac):
         self._mandatory_member_name = ['train_dataset','val_dataset','train_loader','val_loader','net','criterion','optimizer']
 
     def initOutputDir(self):
-        if self.conf.output_dir != 'output' or self.conf.output_dir != './output':
-            LOG.logW("According deepvac standard, you should save model files to [output] directory.")
+        if self.conf.output_dir != 'output' and self.conf.output_dir != './output':
+            LOG.logW("According deepvac standard, you should set config.output_dir to [output] rather than [{}].".format(self.conf.output_dir))
 
         self.output_dir = '{}/{}'.format(self.conf.output_dir, self.branch)
         LOG.logI('model save dir: {}'.format(self.output_dir))
