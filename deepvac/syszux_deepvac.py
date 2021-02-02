@@ -96,6 +96,7 @@ class Deepvac(object):
         self._mandatory_member = dict()
         self._mandatory_member_name = ['']
         self.input_output = {'input':[], 'output':[]}
+        self.use_original_net_pre_qat = False
         self.conf = deepvac_config
         self.assertInGit()
         #init self.net
@@ -222,7 +223,6 @@ class Deepvac(object):
         self.static_quantized_net = None
         self.static_quantized_net_prepared = None
         self.qat_net_prepared = None
-        self.qat_net = None
         if self.conf.qat_dir:
             self.exportQAT(prepare=True)
 
@@ -255,16 +255,39 @@ class Deepvac(object):
         LOG.logI('Missing keys:{} | {}'.format(len(missing_keys), missing_keys))
         LOG.logI('Unused keys:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
-        assert len(used_keys) > 0, 'load NONE from pretrained model'
 
-        if len(missing_keys) > 0:
+        origin_code_net_keys = 0
+        origin_used_keys = 0
+        origin_unused_keys = 999999
+        origin_missing_keys = 999999
+
+        if self.conf.qat_dir:
+            origin_code_net_keys = set(self.net.net2qat.state_dict().keys())
+            origin_used_keys = origin_code_net_keys & state_dict_keys
+            origin_unused_keys = state_dict_keys - origin_code_net_keys
+            origin_missing_keys = origin_code_net_keys - state_dict_keys
+            LOG.logI('Origin missing keys:{}'.format(len(origin_missing_keys)))
+            LOG.logI('Origin unused keys:{}'.format(len(origin_unused_keys)))
+            LOG.logI('Origin used keys:{}'.format(len(origin_used_keys)))
+
+        if len(used_keys) == 0 and len(origin_used_keys) == 0:
+            LOG.logE('Error: load NONE from pretrained model', exit=True)
+
+        if len(missing_keys) > 0 and len(origin_missing_keys) > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
+
+        if self.conf.qat_dir and origin_used_keys > used_keys:
+            self.use_original_net_pre_qat = True
 
     def loadStateDict(self):
         if not self.state_dict:
             LOG.logI("self.state_dict not initialized, omit loadStateDict()")
             return
-        self.net.load_state_dict(self.state_dict, strict=False)
+        
+        if self.conf.qat_dir and self.use_original_net_pre_qat:
+            self.net.net2qat.load_state_dict(self.state_dict, strict=False)
+        else:
+            self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
         self.net = self.net.to(self.device)
 
@@ -328,9 +351,6 @@ class Deepvac(object):
         if self.static_quantized_net:
             self.saveModel4Libtorch(self.static_quantized_net, output_trace_file + ".static_quantized", 'trace', self.sample)
 
-        if self.qat_net:
-            self.saveModel4Libtorch(self.qat_net, output_trace_file + ".qat_quantized", 'trace', self.sample)
-
     def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
             return
@@ -347,9 +367,6 @@ class Deepvac(object):
 
         if self.static_quantized_net:
             self.saveModel4Libtorch(self.static_quantized_net, output_script_file + ".static_quantized", 'script')
-
-        if self.qat_net:
-            self.saveModel4Libtorch(self.qat_net, output_script_file + ".qat_quantized", 'script')
 
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
@@ -540,8 +557,6 @@ class DeepvacTrain(Deepvac):
         self.loader = self.train_loader
         self.batch_size = self.conf.train.batch_size
         self.net.train()
-        if self.qat_net_prepared:
-            self.qat_net_prepared.train()
 
     def setValContext(self):
         self.is_train = False
@@ -551,8 +566,6 @@ class DeepvacTrain(Deepvac):
         self.loader = self.val_loader
         self.batch_size = self.conf.val.batch_size
         self.net.eval()
-        if self.qat_net_prepared:
-            self.qat_net_prepared.eval()
 
     def initTrainContext(self):
         self.scheduler = None
