@@ -98,6 +98,8 @@ class Deepvac(object):
         self.input_output = {'input':[], 'output':[]}
         self.use_original_net_pre_qat = False
         self.conf = deepvac_config
+        if self.conf.is_forward_only is None:
+            self.conf.is_forward_only = True
         self.assertInGit()
         #init self.net
         self.initNet()
@@ -207,6 +209,8 @@ class Deepvac(object):
         self.initStateDict()
         #just load model after audit
         self.loadStateDict()
+        #jit load model
+        self.loadJitModel()
         #just print model parameters info
         self._parametersInfo()
 
@@ -224,16 +228,19 @@ class Deepvac(object):
         self.static_quantized_net_prepared = None
         self.qat_net_prepared = None
         if self.conf.qat_dir:
-            self.exportQAT(prepare=True)
+            self.prepareQAT()
 
     def initNetWithCode(self):
         self.net = None
         LOG.logE("You must reimplement initNetWithCode() to initialize self.net", exit=True)
 
     def initStateDict(self):
+        self.state_dict = None
+        if self.conf.jit_model_path:
+            LOG.logI("config.jit_model_path specified, omit the initStateDict")
+            return
         if not self.conf.model_path:
-            self.state_dict = None
-            LOG.logI("config.model_path not specified, omit the initialization of self.state_dict")
+            LOG.logI("config.model_path not specified, omit the initStateDict")
             return
         LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
         self.state_dict = torch.load(self.conf.model_path, map_location=self.device)
@@ -290,6 +297,18 @@ class Deepvac(object):
             self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
         self.net = self.net.to(self.device)
+    
+    def loadJitModel(self):
+        if not self.conf.jit_model_path:
+            LOG.logI("config.jit_model_path not specified, omit the loadJitModel")
+            return
+        
+        if not self.conf.is_forward_only:
+            LOG.logE("Error: only in forward only mode(i.e. inherit from Deepvac directly) you can enable the config.jit_model_path", exit=True)
+
+        self.net = torch.jit.load(self.conf.jit_model_path)
+        self.net.eval()
+        self.net = self.net.to(self.device)
 
     def initLog(self):
         pass
@@ -302,7 +321,7 @@ class Deepvac(object):
         return self.net(self.sample)
 
     def __call__(self, input=None):
-        if not self.state_dict:
+        if not self.state_dict and not self.conf.jit_model_path:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
 
         if input:
@@ -314,6 +333,8 @@ class Deepvac(object):
         return self.getOutput()
 
     def getConvertedNetFromQAT(self, net):
+        if self.qat_net_prepared is None:
+            LOG.logE("Error: You haven't prepared the model for QAT. call prepareQAT() first.",exit=True)
         toq_net = copy.deepcopy(self.net)
         toq_net.eval()
         torch.quantization.convert(toq_net.cpu(), inplace=True)
@@ -490,35 +511,22 @@ class Deepvac(object):
         LOG.logI("Pytorch model static quantize succeed, save model in {}".format(output_quant_file))
         torch.save(self.static_quantized_net.state_dict(), output_quant_file)
 
-    def exportQAT(self, output_quant_file=None, prepare=False):
+    def prepareQAT(self):
         if not self.conf.qat_dir:
             return
+        LOG.logI("You have enabled QAT, this step is only for prepare.")
 
-        if prepare:
-            LOG.logI("You have enabled QAT, this step is only for prepare.")
+        if self.qat_net_prepared:
+            LOG.logE("Error: You have already prepared the model for QAT.", exit=True)
 
-            if self.qat_net_prepared:
-                LOG.logE("Error: You have already prepared the model for QAT.", exit=True)
-
-            backend = 'fbgemm'
-            if self.conf.quantize_backend:
-                backend = self.conf.quantize_backend
-            self.qat_net_prepared = DeepvacQAT(self.net)
-            self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
-            torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)
-            #after this, train net will be transfered to QAT !
-            self.net = self.qat_net_prepared
-            return
-
-        if self.qat_net_prepared is None:
-            LOG.logE("Error: You haven't prepared the model for QAT. call exportQAT(prepare=True) first.",exit=True)
-
-        if output_quant_file is None:
-            output_quant_file = self.conf.qat_dir
-
-        net = self.getConvertedNetFromQAT(self.net)
-        LOG.logI("Pytorch model QAT quantize succeed, save model in {}".format(output_quant_file))
-        torch.save(net.state_dict(), output_quant_file)
+        backend = 'fbgemm'
+        if self.conf.quantize_backend:
+            backend = self.conf.quantize_backend
+        self.qat_net_prepared = DeepvacQAT(self.net)
+        self.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
+        torch.quantization.prepare_qat(self.qat_net_prepared, inplace=True)
+        #after this, train net will be transfered to QAT !
+        self.net = self.qat_net_prepared
 
     def loadDB(self, db_path):
         self.xb = torch.load(db_path).to(self.device)
@@ -545,6 +553,7 @@ class Deepvac(object):
 
 class DeepvacTrain(Deepvac):
     def __init__(self, deepvac_config):
+        deepvac_config.is_forward_only=False
         super(DeepvacTrain,self).__init__(deepvac_config)
         self.initTrainParameters()
         self.initTrainContext()
@@ -798,7 +807,6 @@ class DeepvacTrain(Deepvac):
         #convert for quantize, must before trace and script!!!
         self.exportDynamicQuant(output_dynamic_quant_file)
         self.exportStaticQuant(output_quant_file=output_static_quant_file)
-        self.exportQAT(output_quant_file=output_qat_file)
         #save pt via trace
         self.exportTorchViaTrace(self.sample, output_trace_file)
         #save pt vida script
