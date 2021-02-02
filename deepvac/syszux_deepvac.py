@@ -287,6 +287,7 @@ class Deepvac(object):
             self.use_original_net_pre_qat = True
 
     def loadStateDict(self):
+        self.net = self.net.to(self.device)
         if not self.state_dict:
             LOG.logI("self.state_dict not initialized, omit loadStateDict()")
             return
@@ -296,7 +297,6 @@ class Deepvac(object):
         else:
             self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
-        self.net = self.net.to(self.device)
     
     def loadJitModel(self):
         if not self.conf.jit_model_path:
