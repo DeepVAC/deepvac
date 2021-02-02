@@ -152,6 +152,7 @@ class Yolov5L(Yolov5S):
     def __init__(self, deepvac_config):
         self.class_num = deepvac_config.class_num
         super(Yolov5L, self).__init__(self.class_num)
+        self.detect.stride = torch.Tensor(deepvac_config.strides) 
 
     def initBlock1(self):
         cfgs = [
