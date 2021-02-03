@@ -282,6 +282,9 @@ config.val.batch_size = None
 #测试和验证不同之处有很多，其中一点就是要显式的从文件系统上加载训练过程中保存的模型：
 #model_path指定要加载模型的路径
 config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
+
+#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关
+config.jit_model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pt'
 ```
 
 ### DDP（分布式训练）
