@@ -107,7 +107,8 @@ class DeepvacQAT(torch.nn.Module):
 
 class SaveModel(object):
     def __init__(self, input_net, output_file, backend = 'fbgemm'):
-        self.input_net = input_net
+        self.input_net = copy.deepcopy(input_net)
+        self.input_net.cpu().eval()
         self.output_file = output_file
         self.dq_output_file = '{}.dq'.format(output_file)
         self.sq_output_file = '{}.sq'.format(output_file)
@@ -122,19 +123,22 @@ class SaveModel(object):
         return toq_net
 
     def export(self, input_sample=None):
+        if isinstance(input_sample, torch.Tensor):
+            input_sample = input_sample.cpu()
+
         with torch.no_grad():
-            self._export(self, input_sample)
+            self._export(input_sample)
 
     def saveByInputOrNot(self, input_sample=None):
         if self.ts is None:
-            self.export(self, input_sample)
+            self.export(input_sample)
         
         freeze_ts = torch.jit.freeze(self.ts)
         torch.jit.save(freeze_ts, self.output_file)
 
     def saveDQ(self, input_sample=None):
         if self.ts is None:
-            self.export(self, input_sample)
+            self.export(input_sample)
         LOG.logI("Pytorch model dynamic quantize starting, will save model in {}".format(self.dq_output_file))
         quantized_model = quantize_dynamic_jit(self.ts, self.d_qconfig_dict)
         torch.jit.save(quantized_model, self.dq_output_file)
@@ -142,7 +146,7 @@ class SaveModel(object):
 
     def saveSQ(self, data_loader_test, input_sample=None):
         if self.ts is None:
-            self.export(self, input_sample)
+            self.export(input_sample)
 
         LOG.logI("Pytorch model static quantize starting, will save model in {}".format(self.sq_output_file))
         quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [data_loader_test], inplace=False,debug=False)
@@ -386,11 +390,15 @@ class Deepvac(object):
         if not self.conf.jit_model_path:
             LOG.logI("config.jit_model_path not specified, omit the loadJitModel")
             return
-        
+
+        if not self.conf.is_forward_only:
+            LOG.logI("You are in training mode, omit the loadJitModel")
+            return
+
         if not self.conf.is_forward_only:
             LOG.logE("Error: only in forward only mode(i.e. inherit from Deepvac directly) you can enable the config.jit_model_path", exit=True)
 
-        self.net = torch.jit.load(self.conf.jit_model_path)
+        self.net = torch.jit.load(self.conf.jit_model_path, map_location=self.device)
         self.net.eval()
         self.net = self.net.to(self.device)
 
