@@ -430,4 +430,6 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 - <your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 
 
-
+# 已知问题
+- 在DDP模式中，训练任务不支持再开启trace和script。解决方案：等待上游PyTorch添加新功能；
+- 量化感知训练（QAT）不支持图模式，因此需要手工修改网络，参考：https://zhuanlan.zhihu.com/p/349019936 所述。解决方案：等待上游PyTorch添加新功能；
