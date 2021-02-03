@@ -14,7 +14,7 @@ import time
 import subprocess
 import tempfile
 from enum import Enum
-from types import FunctionType
+from typing import Any, Callable
 from .syszux_annotation import *
 from .syszux_log import LOG,getCurrentGitBranch
 from .syszux_helper import AverageMeter
@@ -76,6 +76,13 @@ def auto_fuse_model(model):
     modules_to_fuse = [module_names[mi[0]:mi[1]] for mi in module_idxs]
     new_model = torch.quantization.fuse_modules(model, modules_to_fuse)
     return new_model
+
+class DeQuantStub(nn.Module):
+    def __init__(self):
+        super(DeQuantStub, self).__init__()
+
+    def forward(self, x: Any) -> Any:
+        return x
 
 class DeepvacQAT(torch.nn.Module):
     def __init__(self, net2qat):
@@ -657,7 +664,7 @@ class DeepvacTrain(Deepvac):
     def initScheduler(self):
         if isinstance(self.conf.lr_step, list):
             self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
-        elif isinstance(self.conf.lr_step, FunctionType):
+        elif isinstance(self.conf.lr_step, Callable):
             self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.conf.lr_step)
         else:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.conf.lr_step,self.conf.lr_factor)
