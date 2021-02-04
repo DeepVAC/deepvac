@@ -145,12 +145,14 @@ class SaveModel(object):
         torch.jit.save(quantized_model, self.dq_output_file)
         LOG.logI("Pytorch model dynamic quantize succeeded, saved model in {}".format(self.dq_output_file))
 
-    def saveSQ(self, data_loader_test, input_sample=None):
+    def saveSQ(self, loader, input_sample=None):
+        if loader is None:
+            LOG.logE("You enabled config.static_quantize_dir, but didn't provide self.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
         if self.ts is None:
             self.export(input_sample)
 
         LOG.logI("Pytorch model static quantize starting, will save model in {}".format(self.sq_output_file))
-        quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [data_loader_test], inplace=False,debug=False)
+        quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [loader], inplace=False,debug=False)
         torch.jit.save(quantized_model, self.sq_output_file)
         LOG.logI("Pytorch model static quantize succeeded, saved model in {}".format(self.sq_output_file))
 
@@ -306,6 +308,7 @@ class Deepvac(object):
         self.loadJitModel()
         #just print model parameters info
         self._parametersInfo()
+        self.initTestLoader()
 
     def initNetPost(self):
         self.xb = torch.Tensor().to(self.device)
@@ -319,6 +322,10 @@ class Deepvac(object):
         self.qat_net_prepared = None
         if self.conf.qat_dir:
             self.prepareQAT()
+
+    def initTestLoader(self):
+        self.test_loader = None
+        LOG.logW("You must reimplement initTestLoader() to initialize self.test_loader")
 
     def initEMA(self):
         self.ema = None
@@ -445,7 +452,15 @@ class Deepvac(object):
 
         if input:
             self.setInput(input)
-
+        
+        if self.conf.script_model_dir:
+            self.exportTorchViaScript()
+        
+        if self.conf.trace_model_dir:
+            if input is None:
+                LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
+            self.exportTorchViaTrace(input)
+            
         with torch.no_grad():
             self.process()
 
@@ -475,7 +490,8 @@ class Deepvac(object):
         
         if self.conf.static_quantize_dir:
             LOG.logI("You have enabled config.static_quantize_dir, will static quantize the model...")
-            save_model.saveSQ(self.val_loader, self.sample)
+            loader = self.test_loader if self.conf.is_forward_only else self.val_loader
+            save_model.saveSQ(loader, self.sample)
 
     def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
@@ -500,7 +516,8 @@ class Deepvac(object):
 
         if self.conf.static_quantize_dir:
             LOG.logI("You have enabled config.static_quantize_dir, will static quantize the model...")
-            save_model.saveSQ(self.val_loader)
+            loader = self.test_loader if self.conf.is_forward_only else self.val_loader
+            save_model.saveSQ(loader)
 
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
