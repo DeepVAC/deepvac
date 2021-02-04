@@ -450,7 +450,7 @@ class Deepvac(object):
         if not self.state_dict and not self.conf.jit_model_path:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
 
-        if input:
+        if input is not None:
             self.setInput(input)
         
         if self.conf.script_model_dir:
