@@ -283,7 +283,8 @@ config.val.batch_size = None
 #model_path指定要加载模型的路径
 config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 
-#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关
+#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关.
+#开启此开关后，在test中将会忽略config.model_path
 config.jit_model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pt'
 ```
 
@@ -329,7 +330,16 @@ python train.py --rank 0 --gpu 0
 python train.py --rank 1 --gpu 1
 python train.py --rank 2 --gpu 2
 ```
+### 启用EMA
+EMA: exponential moving average，指数滑动平均。滑动平均可以使模型更健壮。采用梯度下降算法训练神经网络时，使用滑动平均在很多应用中都可以在一定程度上提高最终模型的表现。
 
+要开启EMA，需要设置如下配置：
+```python
+config.ema = True
+
+#可选配置，默认为lambda x: 0.9999 * (1 - math.exp(-x / 2000))
+config.ema_decay = <lambda function>
+```
 ### 启用tensorboard服务  
 Deepvac会自动在log/<git_branch>/下写入tensorboard数据，如果需要在线可视化，则还需要如下配置：
 ```python

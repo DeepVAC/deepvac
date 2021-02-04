@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import datetime
 import argparse
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -325,7 +326,7 @@ class Deepvac(object):
             return
         
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
-        self.conf.ema_updates = 0
+        self.ema_updates = 0
         self.ema = copy.deepcopy(self.net)
         self.ema.to(self.device)
         if self.conf.ema_decay is None:
@@ -351,12 +352,14 @@ class Deepvac(object):
 
     def initStateDict(self):
         self.state_dict = None
-        if self.conf.jit_model_path:
-            LOG.logI("config.jit_model_path specified, omit the initStateDict")
-            return
         if not self.conf.model_path:
             LOG.logI("config.model_path not specified, omit the initStateDict")
             return
+
+        if self.conf.jit_model_path and self.conf.is_forward_only:
+            LOG.logI("config.jit_model_path specified in forward-only mode, omit the initStateDict")
+            return
+
         LOG.logI('Loading State Dict from {}'.format(self.conf.model_path))
         self.state_dict = torch.load(self.conf.model_path, map_location=self.device)
         #remove prefix begin
@@ -421,9 +424,6 @@ class Deepvac(object):
         if not self.conf.is_forward_only:
             LOG.logI("You are in training mode, omit the loadJitModel")
             return
-
-        if not self.conf.is_forward_only:
-            LOG.logE("Error: only in forward only mode(i.e. inherit from Deepvac directly) you can enable the config.jit_model_path", exit=True)
 
         self.net = torch.jit.load(self.conf.jit_model_path, map_location=self.device)
         self.net.eval()
@@ -561,7 +561,8 @@ class Deepvac(object):
             self.conf.onnx_model_dir = f.name
 
         #to onnx
-        torch.onnx.export(model, self.sample, self.conf.onnx_model_dir, verbose=True, input_names=input_names, output_names=output_names)
+        net = self.ema if self.conf.ema else self.net
+        torch.onnx.export(net, self.sample, self.conf.onnx_model_dir, verbose=True, input_names=input_names, output_names=output_names)
         #onnx2coreml
         model_coreml = convert(model=self.conf.onnx_model_dir, preprocessing_args= self.conf.coreml_preprocessing_args, mode=self.conf.coreml_mode, image_input_names=['deepvac_in'],
             class_labels=self.conf.coreml_class_labels, predicted_feature_name='deepvac_out', minimum_ios_deployment_target=self.conf.minimum_ios_deployment_target)
@@ -577,7 +578,8 @@ class Deepvac(object):
         else:
             self.onnx_model_dir = output_onnx_file
 
-        torch.onnx._export(self.net, self.sample, output_onnx_file, export_params=True)
+        net = self.ema if self.conf.ema else self.net
+        torch.onnx._export(net, self.sample, output_onnx_file, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
 
     def prepareQAT(self):
@@ -951,7 +953,7 @@ class DeepvacTrain(Deepvac):
         self.iter = 0
         epoch_start = self.epoch
         if self.conf.ema:
-            self.conf.ema_updates = self.epoch * len(self.train_loader) // self.conf.nominal_batch_factor
+            self.ema_updates = self.epoch * len(self.train_loader) // self.conf.nominal_batch_factor
         self.processVal(smoke=True)
         self.optimizer.zero_grad()
         for epoch in range(epoch_start, self.conf.epoch_num):
