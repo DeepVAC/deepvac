@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+import math
 from datetime import datetime
 import argparse
 import torch
@@ -325,7 +326,7 @@ class Deepvac(object):
             return
         
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
-        self.conf.ema_updates = 0
+        self.ema_updates = 0
         self.ema = copy.deepcopy(self.net)
         self.ema.to(self.device)
         if self.conf.ema_decay is None:
@@ -951,7 +952,7 @@ class DeepvacTrain(Deepvac):
         self.iter = 0
         epoch_start = self.epoch
         if self.conf.ema:
-            self.conf.ema_updates = self.epoch * len(self.train_loader) // self.conf.nominal_batch_factor
+            self.ema_updates = self.epoch * len(self.train_loader) // self.conf.nominal_batch_factor
         self.processVal(smoke=True)
         self.optimizer.zero_grad()
         for epoch in range(epoch_start, self.conf.epoch_num):

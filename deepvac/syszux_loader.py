@@ -150,7 +150,9 @@ class CocoCVDataset(Dataset):
     def loadAnns(self, index):
         ann_ids = self.coco.getAnnIds(imgIds=self.ids[index])
         anns = self.coco.loadAnns(ann_ids)
-        category_ids = np.array([self.cats.index(i["category_id"]) for i in anns], dtype=np.float)
+        # category_ids = np.array([self.cats.index(i["category_id"]) for i in anns], dtype=np.float)
+        category_ids = np.array([i["category_id"] for i in anns], dtype=np.float)
         boxes = np.array([i["bbox"] for i in anns], dtype=np.float)
-        masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
+        # masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
+        masks = None
         return category_ids, boxes, masks
