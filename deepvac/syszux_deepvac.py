@@ -296,6 +296,7 @@ class Deepvac(object):
         self.initNetWithCode()
         #init quantize stuff
         self.initNetWithQuantize()
+        self.initEMA()
         #init self.model_dict
         self.initStateDict()
         #just load model after audit
@@ -317,6 +318,32 @@ class Deepvac(object):
         self.qat_net_prepared = None
         if self.conf.qat_dir:
             self.prepareQAT()
+
+    def initEMA(self):
+        self.ema = None
+        if self.conf.ema is None:
+            return
+        
+        LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
+        self.conf.ema_updates = 0
+        self.ema = copy.deepcopy(self.net)
+        self.ema.to(self.device)
+        if self.conf.ema_decay is None:
+            self.conf.ema_decay = lambda x: 0.9999 * (1 - math.exp(-x / 2000))
+
+        for p in self.ema.parameters():
+            p.requires_grad_(False)
+
+    def updateEMA(self):
+        if self.conf.ema is None:
+            return
+        self.ema_updates += 1
+        d = self.conf.ema_decay(self.ema_updates)
+        msd = self.net.state_dict()
+        for k, v in self.ema.state_dict().items():
+            if not v.is_floating_point:
+                continue
+            v = v * d + (1. - d) * msd[k].detach()
 
     def initNetWithCode(self):
         self.net = None
@@ -438,7 +465,8 @@ class Deepvac(object):
 
         LOG.logI("config.trace_model_dir found, save trace model to {}...".format(output_trace_file))
 
-        save_model = SaveModelByTrace(self.net, output_trace_file)
+        net = self.ema if self.conf.ema else self.net
+        save_model = SaveModelByTrace(net, output_trace_file)
         save_model.saveByInputOrNot(self.sample)
 
         if self.conf.dynamic_quantize_dir:
@@ -458,7 +486,8 @@ class Deepvac(object):
 
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
 
-        save_model = SaveModelByQAT(self.net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else SaveModelByScript(self.net, output_script_file) 
+        net = self.ema if self.conf.ema else self.net
+        save_model = SaveModelByQAT(net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else SaveModelByScript(net, output_script_file) 
         save_model.saveByInputOrNot()
 
         if self.conf.qat_dir:
@@ -693,6 +722,8 @@ class DeepvacTrain(Deepvac):
                 self.scaler = GradScaler()
 
         self.epoch = state_dict['epoch']
+        if self.conf.ema:
+            self.ema.load_state_dict(state_dict['ema'])
 
     def initScheduler(self):
         if isinstance(self.conf.lr_step, list):
@@ -806,6 +837,8 @@ class DeepvacTrain(Deepvac):
         else:
             self.optimizer.step()
         self.optimizer.zero_grad()
+        if self.conf.ema:
+            self.updateEMA()
 
     def doLog(self):
         if self.step % self.conf.log_every != 0:
@@ -826,12 +859,14 @@ class DeepvacTrain(Deepvac):
         output_ncnn_file = '{}/ncnn__{}.bin'.format(self.output_dir, file_partial_name)
         output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.output_dir, file_partial_name)
         #save state_dict
-        torch.save(self.net.state_dict(), state_file)
+        net = self.ema if self.conf.ema else self.net
+        torch.save(net.state_dict(), state_file)
         #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
             'epoch': self.epoch,
             'scheduler': self.scheduler.state_dict() if self.scheduler else None,
+            'ema': self.ema.state_dict() if self.conf.ema else None,
             'scaler': self.scaler.state_dict() if self.conf.amp else None},  checkpoint_file)
 
         self.exportTorchViaTrace(self.sample, output_trace_file)
@@ -915,6 +950,8 @@ class DeepvacTrain(Deepvac):
         self.auditConfig()
         self.iter = 0
         epoch_start = self.epoch
+        if self.conf.ema:
+            self.conf.ema_updates = self.epoch * len(self.train_loader) // self.conf.nominal_batch_factor
         self.processVal(smoke=True)
         self.optimizer.zero_grad()
         for epoch in range(epoch_start, self.conf.epoch_num):
