@@ -153,6 +153,8 @@ class SaveModel(object):
         LOG.logI("Pytorch model static quantize starting, will save model in {}".format(self.sq_output_file))
         quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [data_loader_test], inplace=False,debug=False)
         torch.jit.save(quantized_model, self.sq_output_file)
+
+
         LOG.logI("Pytorch model static quantize succeeded, saved model in {}".format(self.sq_output_file))
 
 class SaveModelByTrace(SaveModel):
@@ -328,7 +330,7 @@ class Deepvac(object):
         
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
         self.ema_updates = 0
-        self.ema = copy.deepcopy(self.net)
+        self.ema = copy.deepcopy(self.net).eval()
         self.ema.to(self.device)
         if self.conf.ema_decay is None:
             self.conf.ema_decay = lambda x: 0.9999 * (1 - math.exp(-x / 2000))
@@ -339,13 +341,15 @@ class Deepvac(object):
     def updateEMA(self):
         if self.conf.ema is None:
             return
-        self.ema_updates += 1
-        d = self.conf.ema_decay(self.ema_updates)
-        msd = self.net.state_dict()
-        for k, v in self.ema.state_dict().items():
-            if not v.is_floating_point:
-                continue
-            v = v * d + (1. - d) * msd[k].detach()
+        with torch.no_grad():
+            self.ema_updates += 1
+            d = self.conf.ema_decay(self.ema_updates)
+            msd = self.net.state_dict()
+            for k, v in self.ema.state_dict().items():
+                if not v.is_floating_point():
+                    continue
+                v *= d
+                v += (1. - d) * msd[k].detach()
 
     def initNetWithCode(self):
         self.net = None
@@ -864,6 +868,7 @@ class DeepvacTrain(Deepvac):
         #save state_dict
         net = self.ema if self.conf.ema else self.net
         torch.save(net.state_dict(), state_file)
+        torch.save(self.net.state_dict(), state_file.replace(".pth", ".pkl"))
         #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
