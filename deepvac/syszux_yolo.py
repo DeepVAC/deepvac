@@ -6,7 +6,6 @@ from .syszux_modules import Conv2dBNHardswish, BottleneckStd, BottleneckCSP, SPP
 
 
 class Detect(nn.Module):
-    is_training = True
     def __init__(self, class_num=80, anchors=(), in_planes_list=()):
         super(Detect, self).__init__()
         self.class_num = class_num
@@ -19,7 +18,9 @@ class Detect(nn.Module):
         self.register_buffer('anchor_grid', anchor_t.clone().view(self.detect_layer_num, 1, -1, 1, 1, 2))  # shape(detect_layer_num,1, anchor_num,1,1,2)
         self.conv_list = nn.ModuleList(nn.Conv2d(x, self.output_num_per_anchor * self.anchor_num, 1) for x in in_planes_list)
 
-    def forward(self, x: List[Tensor]) -> Tuple[Tensor, Tensor, Tensor]:
+        self.output: List[Tensor] = [torch.empty(0),] * 3
+
+    def forward(self, x: List[Tensor]) -> Tensor:
         inference_result: List[Tensor] = []
         for i, layer in enumerate(self.conv_list):
             x[i] = layer(x[i])
@@ -27,19 +28,17 @@ class Detect(nn.Module):
             #x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.anchor_num, self.output_num_per_anchor, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 
-            if not self.is_training:
-                if self.grid[i].shape[2:4] != x[i].shape[2:4]:
-                    self.grid[i] = self.makeGrid(nx, ny).to(x[i].device)
+            # if not self.is_training:
+            if self.grid[i].shape[2:4] != x[i].shape[2:4]:
+                self.grid[i] = self.makeGrid(nx, ny).to(x[i].device)
 
-                y = x[i].sigmoid()
-                y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i].to(x[i].device)) * self.strides[i]  # xy
-                y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
-                inference_result.append(y.view(bs, -1, self.output_num_per_anchor))
+            y = x[i].sigmoid()
+            y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i].to(x[i].device)) * self.strides[i]  # xy
+            y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
+            inference_result.append(y.view(bs, -1, self.output_num_per_anchor))
 
-        if self.is_training:
-            return (x[0], x[1], x[2])
-
-        return (torch.cat(inference_result, 1), torch.empty(0), torch.empty(0))
+        self.output = x
+        return torch.cat(inference_result, 1)
 
     @staticmethod
     def makeGrid(nx: int=20, ny: int=20) -> Tensor:
@@ -56,7 +55,7 @@ class Yolov5S(nn.Module):
     def __init__(self, class_num=80, strides=[8, 16, 32]):
         super(Yolov5S, self).__init__()
         self.class_num = class_num
-        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
+        self.upsample = nn.Upsample(scale_factor=2., mode="nearest")
         self.cat = Concat(1)
         self.initBlock1()
         self.initBlock2()
