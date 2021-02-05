@@ -109,7 +109,7 @@ class DeepvacQAT(torch.nn.Module):
 class SaveModel(object):
     def __init__(self, input_net, output_file, backend = 'fbgemm'):
         self.input_net = copy.deepcopy(input_net)
-        self.input_net.cpu()
+        self.input_net.cpu().eval()
         self.output_file = output_file
         self.dq_output_file = '{}.dq'.format(output_file)
         self.sq_output_file = '{}.sq'.format(output_file)
@@ -334,7 +334,7 @@ class Deepvac(object):
         
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
         self.ema_updates = 0
-        self.ema = copy.deepcopy(self.net).eval()
+        self.ema = copy.deepcopy(self.net)
         self.ema.to(self.device)
         if self.conf.ema_decay is None:
             self.conf.ema_decay = lambda x: 0.9999 * (1 - math.exp(-x / 2000))
