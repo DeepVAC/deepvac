@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 
 from torch import nn, Tensor
 from typing import List, Tuple
