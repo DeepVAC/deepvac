@@ -93,11 +93,11 @@ print(conf.log_dir)
 print(self.conf.train.batch_size)
 ```
 
-## 6. 编写synthesis/synthesis.py
+## 6. 编写synthesis/synthesis.py（可选）
 编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
 这一步为可选，如果有需要的话，可以参考Deepvac组织下其它项目的实现。
 
-## 7. 编写aug/aug.py
+## 7. 编写aug/aug.py（可选）
 编写该文件，用于实现数据增强策略。数据增强逻辑一般写在aug/aug.py中，或者（如果简单的话）写在train.py中。
 数据增强的逻辑要封装在Executor子类中，具体来说就是继承Executor基类，比如：
 ```python
@@ -156,7 +156,7 @@ class NSFWTrainDataset(ImageFolderWithTransformDataset):
 ```
 
 ## 9. 编写训练和验证脚本
-代码写在train.py文件中，必须继承DeepvacTrain类：
+在Deepvac规范中，train.py就代表训练模式。训练模式的代码写在train.py文件中，必须继承DeepvacTrain类：
 ```python
 from deepvac import DeepvacTrain, is_ddp
 
@@ -206,12 +206,15 @@ class MyTrain(DeepvacTrain):
 ```   
 
 ## 10. 编写测试脚本
-代码写在test.py文件中，继承Deepvac类。和train.py中的train/val的本质不同在于：
+在Deepvac规范中，test.py就代表测试模式。测试代码写在test.py文件中，继承Deepvac类。
+
+和train.py中的train/val的本质不同在于：
 - 舍弃train/val上下文；
-- 不再使用DataLoader装载数据，开始使用OpenCV等三方库来直接读取图片样本；
+- 继承Deepvac类并重新实现initTestLoader, 也就是初始化self.test_loader；
 - 网络不再使用autograd上下文；
-- 不再计算loss、acc等；取而代之的是使用Deepvac的*Report模块来进行准确度、速度方面的衡量；
-- 代码更便于生产环境的部署；    
+- 不再进行loss、反向、优化等计算；
+- 使用Deepvac的*Report模块来进行准确度、速度方面的衡量；
+- 代码更便于生产环境的部署;  
 
 继承Deepvac类的子类必须（重新）实现以下方法才能够开始测试：
 
@@ -219,13 +222,37 @@ class MyTrain(DeepvacTrain):
 | ---- | ---- | ---- |
 | * initNetWithCode | 初始化self.net成员 | 用于初始化网络，在此方法中手动将网络转移到device设备中 |
 | * process | 网络的推理计算过程 | 在该过程中，通过report.add(gt, pred)添加测试结果，生成报告 |
+| * initTestLoader | 初始化self.test_loader成员 | 初始化用于测试的DataLoader | 
+
+典型的写法如下：
+```python
+class MyTest(Deepvac):
+    ...
+    def initNetWithCode(self):
+        self.net = ...
+
+    def process(self):
+        ...
+
+    def initTestLoader(self):
+        self.test_dataset = ...
+        self.test_loader = ...
+
+test = MyTest()
+test()
+```
  
 一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
 
 # 再谈配置文件
-基于deepvac的PyTorch项目，可以通过在config.py中添加一些配置项来自动实现特定的功能。
+基于DeepVAC规范的PyTorch项目，可以通过在config.py中添加一些配置项来自动实现特定的功能。
 
-### 通用配置
+这些配置的作用范围有三种：
+- 仅适用于训练模式，也就是在train.py执行的时候生效；
+- 仅适用于测试模式，也就是在test.py执行的时候生效；
+- 适用于训练模式和测试模式，也就是train.py、test.py执行的时候都生效。
+
+### 通用配置 (适用于训练模式和测试模式)
 ```python
 #单卡训练和测试所使用的device，多卡请开启Deepvac的DDP功能
 config.device = "cuda"
@@ -237,13 +264,17 @@ config.output_dir = "output"
 config.log_dir = "log"
 #每多少次迭代打印一次训练日志
 config.log_every = 10
+
+#用于训练时，加载预训练模型。注意不是checkpoint，可参考 config.checkpoint_suffix
+#用于测试时，加载测试模型。
+config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 ```
-### Dataloader
+### Dataloader (适用于训练模式和测试模式)
 ```python
 #Dataloader的线程数
 config.num_workers = 3
 ```
-### 优化器
+### 优化器 (仅适用于训练模式)
 ```python
 #学习率
 config.lr = 0.01
@@ -257,7 +288,7 @@ config.weight_decay = None
 config.milestones = [2,4,6,8,10]
 ```
 
-### 训练
+### 训练 (仅适用于训练模式)
 ```python
 #训练的batch size
 config.train.batch_size = 128
@@ -266,29 +297,29 @@ config.epoch_num = 30
 #一个Epoch中保存多少次模型和Checkpoint文件
 config.save_num = 5
 
-#加载预训练模型。注意，如果指定了checkpoint_suffix，则该配置无意义。
-config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
 #checkpoint_suffix一旦配置，则启动train.py的时候将加载output/<git_branch>/checkpoint:<checkpoint_suffix>
-#训练将会从Epoch10重新开始
-#不配置或者配置为空字符串，表明从头开始训练
+#不配置或者配置为空字符串，表明从头开始训练。
+#训练模式下，该配置会覆盖config.model_path。
 config.checkpoint_suffix = '2020-09-01-17-37_acc:0.9682857142857143_epoch:10_step:6146_lr:0.00011543040395151496.pth'
 ```
 
-### 验证和测试
+### 验证 (仅适用于训练模式)
 ```python
 #验证时所用的batch size
 config.val.batch_size = None
-
-#测试和验证不同之处有很多，其中一点就是要显式的从文件系统上加载训练过程中保存的模型：
-#model_path指定要加载模型的路径
-config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
-
-#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关.
-#开启此开关后，在test中将会忽略config.model_path
-config.jit_model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pt'
 ```
 
-### DDP（分布式训练）
+### 测试 (仅适用于测试模式)
+```python
+#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关。
+#测试模式下，开启此开关后将会忽略config.model_path
+config.jit_model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pt'
+
+#测试时所用的batch size
+config.test.batch_size = None
+```
+
+### DDP（分布式训练，仅适用于训练模式）
 要启用分布式训练，需要确保3点： 
 - MyTrain类的initTrainLoader中初始化了self.train_sampler。举例：
 ```python
@@ -330,7 +361,7 @@ python train.py --rank 0 --gpu 0
 python train.py --rank 1 --gpu 1
 python train.py --rank 2 --gpu 2
 ```
-### 启用EMA
+### 启用EMA (仅适用于训练模式)
 EMA: exponential moving average，指数滑动平均。滑动平均可以使模型更健壮。采用梯度下降算法训练神经网络时，使用滑动平均在很多应用中都可以在一定程度上提高最终模型的表现。
 
 要开启EMA，需要设置如下配置：
@@ -340,7 +371,7 @@ config.ema = True
 #可选配置，默认为lambda x: 0.9999 * (1 - math.exp(-x / 2000))
 config.ema_decay = <lambda function>
 ```
-### 启用tensorboard服务  
+### 启用tensorboard服务 (仅适用于训练模式)
 Deepvac会自动在log/<git_branch>/下写入tensorboard数据，如果需要在线可视化，则还需要如下配置：
 ```python
 # 如果不配置，则不启用tensorboard服务
@@ -349,7 +380,7 @@ config.tensorboard_port = "6007"
 config.tensorboard_ip = None
 ```
 
-### 输出TorchScript
+### 输出TorchScript（适用于训练模式和测试模式）
 如果要转换PyTorch模型到TorchScript，你需要设置如下的配置：
 ```python
 #通过script的方式将pytorch训练的模型编译为TorchScript模型
@@ -359,19 +390,22 @@ config.script_model_dir = <your_script_model_dir_only4smoketest>
 config.trace_model_dir = <your_trace_model_dir_only4smoketest>
 ```
 注意：
-- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为TorchScript。之后，在每次保存PyTorch模型的时候，会同时保存TorchScript；
-- <your_trace_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为TorchScript。之后，在每次保存PyTorch模型的时候，会同时保存TorchScript；
+- 在训练模式下，<your_trace_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下，<your_trace_model_dir_only4smoketest> 为TorchScript模型输出路径。
 
-### 输出ONNX模型
+### 输出ONNX模型（适用于训练模式和测试模式）
 如果要转换PyTorch模型到ONNX，你需要设置如下的配置：
 ```python
 #输出config.onnx_model_dir
 config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
 ```
 注意：
-- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为ONNX。之后，在每次保存PyTorch模型的时候，会同时保存ONNX。
-- <your_onnx_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-### 输出NCNN模型
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为ONNX。之后，在每次保存PyTorch模型的时候，会同时保存ONNX。
+- 在训练模式下，<your_onnx_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下，<your_onnx_model_dir_only4smoketest> 为ONNX模型输出路径。
+
+### 输出NCNN模型（适用于训练模式和测试模式）
 如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
 ```python
 # NCNN的文件路径, ncnn.arch ncnn.bin
@@ -380,9 +414,11 @@ config.ncnn_model_dir = <your_ncnn_model_dir_only4smoketest>
 config.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ```
 注意：
-- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为NCNN。之后，在每次保存PyTorch模型的时候，会同时保存NCNN。
-- <your_ncnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-### 输出CoreML
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为NCNN。之后，在每次保存PyTorch模型的时候，会同时保存NCNN。
+- 在训练模式下，<your_ncnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下，<your_ncnn_model_dir_only4smoketest> 为NCNN模型输出路径。
+
+### 输出CoreML（适用于训练模式和测试模式）
 如果要转换PyTorch模型到CoreML，你需要设置如下的配置：
 ```python
 config.coreml_model_dir = <your_coreml_model_dir_only4smoketest>
@@ -394,15 +430,18 @@ config.coreml_class_labels = ["cls1","cls2","cls3","cls4","cls5","cls6"]
 config.coreml_mode = 'classifier'
 ```
 注意：
-- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
-- <your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
+- 在训练模式下，<your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下，<your_coreml_model_dir_only4smoketest> 为CoreML模型输出路径。
 - 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
-### 启用自动混合精度训练
+
+### 启用自动混合精度训练（仅适用于训练模式）
 如果要开启自动混合精度训练（AMP），你只需要设置如下配置即可：
 ```python
 config.amp = True
 ```
 详情参考[PyTorch的自动混合精度](https://zhuanlan.zhihu.com/p/165152789)。
+
 ### 启用量化
 目前PyTorch有三种量化方式，详情参考[PyTorch的量化](https://zhuanlan.zhihu.com/p/299108528):
 - 动态量化
@@ -411,13 +450,13 @@ config.amp = True
 
 一次训练任务中只能开启一种。
 
-#### 动态量化
+#### 动态量化（适用于训练模式和测试模式）
 要开启动态量化，你需要设置如下的配置：
 ```python
 config.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 ```
 
-#### 静态量化
+#### 静态量化（适用于训练模式和测试模式）
 要开启静态量化，你需要设置如下配置：
 ```python
 config.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
@@ -426,8 +465,9 @@ config.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 config.quantize_backend = <'fbgemm' | 'qnnpack'>
 ```
 
-#### 量化感知训练(QAT)
-开启QAT后，整个训练任务的Net就会转变为量化模型，也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。要开启QAT，你需要设置如下配置：
+#### 量化感知训练(QAT，仅适用于训练模式)
+开启QAT后，整个训练任务的self.net就会转变为量化模型。也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。
+要开启QAT，你需要设置如下配置：
 ```python
 config.qat_dir = <your_quantize_model_output_dir_only4smoketest>
 
@@ -436,8 +476,9 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 ```
 
 注意：
-- 一旦配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
-- <your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
+- 在训练模式下，<your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下（如果支持的话），<your_quantize_model_output_dir_only4smoketest> 为量化模型输出路径。
 
 
 # 已知问题
