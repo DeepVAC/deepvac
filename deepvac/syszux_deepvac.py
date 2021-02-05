@@ -882,7 +882,6 @@ class DeepvacTrain(Deepvac):
         #save state_dict
         net = self.ema if self.conf.ema else self.net
         torch.save(net.state_dict(), state_file)
-        torch.save(self.net.state_dict(), state_file.replace(".pth", ".pkl"))
         #save checkpoint
         torch.save({
             'optimizer': self.optimizer.state_dict(),
