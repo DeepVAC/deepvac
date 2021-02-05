@@ -87,11 +87,12 @@ class OsWalkerLoader(object):
         if input_dir:
             self.input_dir = input_dir
 
+        files = []
         for subdir, dirs, files in os.walk(self.input_dir):
             for file in files:
-                #print os.path.join(subdir, file)
                 filepath = subdir + os.sep + file
-                yield filepath
+                files.append(filepath)
+        return files
 
 
 class CocoCVDataset(Dataset):
