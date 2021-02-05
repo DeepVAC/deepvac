@@ -155,8 +155,6 @@ class SaveModel(object):
         LOG.logI("Pytorch model static quantize starting, will save model in {}".format(self.sq_output_file))
         quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [loader], inplace=False,debug=False)
         torch.jit.save(quantized_model, self.sq_output_file)
-
-
         LOG.logI("Pytorch model static quantize succeeded, saved model in {}".format(self.sq_output_file))
 
 class SaveModelByTrace(SaveModel):
