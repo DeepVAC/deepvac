@@ -1,7 +1,6 @@
 import copy
 import os
 import sys
-import math
 from datetime import datetime
 import argparse
 import math
@@ -110,7 +109,7 @@ class DeepvacQAT(torch.nn.Module):
 class SaveModel(object):
     def __init__(self, input_net, output_file, backend = 'fbgemm'):
         self.input_net = copy.deepcopy(input_net)
-        self.input_net.cpu().eval()
+        self.input_net.cpu()
         self.output_file = output_file
         self.dq_output_file = '{}.dq'.format(output_file)
         self.sq_output_file = '{}.sq'.format(output_file)
