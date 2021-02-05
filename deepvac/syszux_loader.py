@@ -88,9 +88,9 @@ class OsWalkerLoader(object):
             self.input_dir = input_dir
 
         files = []
-        for subdir, dirs, files in os.walk(self.input_dir):
-            for file in files:
-                filepath = subdir + os.sep + file
+        for subdir, dirs, fns in os.walk(self.input_dir):
+            for fn in fns:
+                filepath = os.path.join(subdir, fn)
                 files.append(filepath)
         return files
 
