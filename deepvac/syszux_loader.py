@@ -78,20 +78,24 @@ class FileLineCvStrDataset(FileLineDataset):
             sample = self.transform(sample)
         return sample
 
-class OsWalkerLoader(object):
+class OsWalkDataset(Dataset):
     def __init__(self, deepvac_config):
-        self.conf = deepvac_config
-        self.input_dir = self.conf.input_dir
+        super(OsWalkDataset, self).__init__()
+        self.transform = deepvac_config.transform
+        self.files = []
+        for subdir, dirs, fns in os.walk(deepvac_config.input_dir):
+            for fn in fns:
+                self.files.append(os.path.join(subdir, fn))
 
-    def __call__(self, input_dir=None):
-        if input_dir:
-            self.input_dir = input_dir
+    def __len__(self):
+        return len(self.files)
 
-        for subdir, dirs, files in os.walk(self.input_dir):
-            for file in files:
-                #print os.path.join(subdir, file)
-                filepath = subdir + os.sep + file
-                yield filepath
+    def __getitem__(self, index):
+        filepath = self.files[index]
+        sample = cv2.imread(filepath)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        return sample
 
 
 class CocoCVDataset(Dataset):
