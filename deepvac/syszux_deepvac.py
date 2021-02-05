@@ -146,12 +146,14 @@ class SaveModel(object):
         torch.jit.save(quantized_model, self.dq_output_file)
         LOG.logI("Pytorch model dynamic quantize succeeded, saved model in {}".format(self.dq_output_file))
 
-    def saveSQ(self, data_loader_test, input_sample=None):
+    def saveSQ(self, loader, input_sample=None):
+        if loader is None:
+            LOG.logE("You enabled config.static_quantize_dir, but didn't provide self.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
         if self.ts is None:
             self.export(input_sample)
 
         LOG.logI("Pytorch model static quantize starting, will save model in {}".format(self.sq_output_file))
-        quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [data_loader_test], inplace=False,debug=False)
+        quantized_model = quantize_jit(self.ts, self.s_qconfig_dict, calibrate, [loader], inplace=False,debug=False)
         torch.jit.save(quantized_model, self.sq_output_file)
 
 
@@ -309,6 +311,7 @@ class Deepvac(object):
         self.loadJitModel()
         #just print model parameters info
         self._parametersInfo()
+        self.initTestLoader()
 
     def initNetPost(self):
         self.xb = torch.Tensor().to(self.device)
@@ -322,6 +325,10 @@ class Deepvac(object):
         self.qat_net_prepared = None
         if self.conf.qat_dir:
             self.prepareQAT()
+
+    def initTestLoader(self):
+        self.test_loader = None
+        LOG.logW("You must reimplement initTestLoader() to initialize self.test_loader")
 
     def initEMA(self):
         self.ema = None
@@ -341,10 +348,10 @@ class Deepvac(object):
     def updateEMA(self):
         if self.conf.ema is None:
             return
+        self.ema_updates += 1
+        d = self.conf.ema_decay(self.ema_updates)
+        msd = self.net.state_dict()
         with torch.no_grad():
-            self.ema_updates += 1
-            d = self.conf.ema_decay(self.ema_updates)
-            msd = self.net.state_dict()
             for k, v in self.ema.state_dict().items():
                 if not v.is_floating_point():
                     continue
@@ -448,8 +455,10 @@ class Deepvac(object):
         if not self.state_dict and not self.conf.jit_model_path:
             LOG.logE("self.state_dict not initialized, cannot do predict.", exit=True)
 
-        if input:
+        if input is not None:
             self.setInput(input)
+        
+        self.smokeTestForExport3rd(input)
 
         with torch.no_grad():
             self.process()
@@ -464,6 +473,9 @@ class Deepvac(object):
 
         if sample is not None:
             self.sample = sample
+        
+        if self.sample is None:
+            LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
 
         if output_trace_file is None:
             output_trace_file = self.conf.trace_model_dir
@@ -480,7 +492,8 @@ class Deepvac(object):
         
         if self.conf.static_quantize_dir:
             LOG.logI("You have enabled config.static_quantize_dir, will static quantize the model...")
-            save_model.saveSQ(self.val_loader, self.sample)
+            loader = self.test_loader if self.conf.is_forward_only else self.val_loader
+            save_model.saveSQ(loader, self.sample)
 
     def exportTorchViaScript(self, output_script_file=None):
         if not self.conf.script_model_dir:
@@ -505,7 +518,8 @@ class Deepvac(object):
 
         if self.conf.static_quantize_dir:
             LOG.logI("You have enabled config.static_quantize_dir, will static quantize the model...")
-            save_model.saveSQ(self.val_loader)
+            loader = self.test_loader if self.conf.is_forward_only else self.val_loader
+            save_model.saveSQ(loader)
 
     def exportNCNN(self, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
@@ -586,6 +600,15 @@ class Deepvac(object):
         net = self.ema if self.conf.ema else self.net
         torch.onnx._export(net, self.sample, output_onnx_file, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
+
+    @syszux_once
+    def smokeTestForExport3rd(self, input=None):
+        #exportNCNN must before exportONNX !!!
+        self.exportONNX()
+        self.exportNCNN()
+        self.exportCoreML()
+        self.exportTorchViaTrace(input)
+        self.exportTorchViaScript()
 
     def prepareQAT(self):
         if not self.conf.qat_dir:
@@ -788,15 +811,6 @@ class DeepvacTrain(Deepvac):
     @syszux_once
     def addGraph(self, input):
         self.writer.add_graph(self.net, input)
-
-    @syszux_once
-    def smokeTestForExport3rd(self):
-        #exportNCNN must before exportONNX !!!
-        self.exportONNX()
-        self.exportNCNN()
-        self.exportCoreML()
-        self.exportTorchViaTrace()
-        self.exportTorchViaScript()
 
     def earlyIter(self):
         start = time.time()
