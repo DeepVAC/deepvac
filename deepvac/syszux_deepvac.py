@@ -348,10 +348,12 @@ class Deepvac(object):
         self.ema_updates += 1
         d = self.conf.ema_decay(self.ema_updates)
         msd = self.net.state_dict()
-        for k, v in self.ema.state_dict().items():
-            if not v.is_floating_point:
-                continue
-            v = v * d + (1. - d) * msd[k].detach()
+        with torch.no_grad():
+            for k, v in self.ema.state_dict().items():
+                if not v.is_floating_point():
+                    continue
+                v *= d
+                v += (1. - d) * msd[k].detach()
 
     def initNetWithCode(self):
         self.net = None
@@ -460,7 +462,7 @@ class Deepvac(object):
             if input is None:
                 LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
             self.exportTorchViaTrace(input)
-            
+
         with torch.no_grad():
             self.process()
 
