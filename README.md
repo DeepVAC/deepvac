@@ -484,3 +484,13 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 # 已知问题
 - 在DDP模式中，训练任务不支持再开启trace和script。解决方案：等待上游PyTorch添加新功能；
 - 量化感知训练（QAT）不支持图模式，因此需要手工修改网络，参考：https://zhuanlan.zhihu.com/p/349019936 所述。解决方案：等待上游PyTorch添加新功能；
+
+# Deepvac的社区产品
+| 产品名称 | 部署形式 |当前版本 | 获取方式 |
+| ---- | ---- | ---- |---- |
+|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.0 | pip install|
+|[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
+|[deepvac开发时镜像](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
+|[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
+|DeepVAC版PyTorch | conda包 |1.8.0 | conda install -y pytorch -c gemfield |
+|[DeepVAC版LibTorch](https://github.com/CivilNet/libtorch)| 压缩包 | 1.8.0 | 下载 & 解压|
