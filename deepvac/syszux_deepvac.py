@@ -455,13 +455,7 @@ class Deepvac(object):
         if input is not None:
             self.setInput(input)
         
-        if self.conf.script_model_dir:
-            self.exportTorchViaScript()
-        
-        if self.conf.trace_model_dir:
-            if input is None:
-                LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
-            self.exportTorchViaTrace(input)
+        self.smokeTestForExport3rd(input)
 
         with torch.no_grad():
             self.process()
@@ -476,6 +470,9 @@ class Deepvac(object):
 
         if sample is not None:
             self.sample = sample
+        
+        if self.sample is None:
+            LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
 
         if output_trace_file is None:
             output_trace_file = self.conf.trace_model_dir
@@ -600,6 +597,15 @@ class Deepvac(object):
         net = self.ema if self.conf.ema else self.net
         torch.onnx._export(net, self.sample, output_onnx_file, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
+
+    @syszux_once
+    def smokeTestForExport3rd(self, input=None):
+        #exportNCNN must before exportONNX !!!
+        self.exportONNX()
+        self.exportNCNN()
+        self.exportCoreML()
+        self.exportTorchViaTrace(input)
+        self.exportTorchViaScript()
 
     def prepareQAT(self):
         if not self.conf.qat_dir:
@@ -802,15 +808,6 @@ class DeepvacTrain(Deepvac):
     @syszux_once
     def addGraph(self, input):
         self.writer.add_graph(self.net, input)
-
-    @syszux_once
-    def smokeTestForExport3rd(self):
-        #exportNCNN must before exportONNX !!!
-        self.exportONNX()
-        self.exportNCNN()
-        self.exportCoreML()
-        self.exportTorchViaTrace()
-        self.exportTorchViaScript()
 
     def earlyIter(self):
         start = time.time()
