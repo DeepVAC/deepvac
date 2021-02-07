@@ -22,14 +22,11 @@ DeepVAC的依赖有：
 
 这些依赖使用pip命令（或者git clone）自行安装，不再赘述。
 
-在DeepVAC内部，我们尽量使用最新版的PyTorch版本，并且使用Docker容器（实际上是基于Docker的更复杂的MLab2.0系统）进行训练和发布。我们为用户提供了构建好的Docker镜像，帮助用户省掉不必要的环境配置：
+对于普通用户来说，最方便高效的方式还是使用DeepVAC的预构建Docker镜像，可以帮助用户省掉不必要的环境配置时间：
 ```bash
-#只使用cpu
-docker run -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
-#使用GPU的话
-docker run --gpus all -it gemfield/pytorch:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 bash
+docker run --gpus all -it gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04 bash
 ```
-该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)
+该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)。
   
 
 ## 3. 安装deepvac库
@@ -490,7 +487,7 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 | ---- | ---- | ---- |---- |
 |[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.0 | pip install|
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
-|[deepvac开发时镜像](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
+|[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
 |[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
 |DeepVAC版PyTorch | conda包 |1.8.0 | conda install -y pytorch -c gemfield |
 |[DeepVAC版LibTorch](https://github.com/CivilNet/libtorch)| 压缩包 | 1.8.0 | 下载 & 解压|
