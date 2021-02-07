@@ -390,27 +390,25 @@ class Deepvac(object):
         LOG.logI('Unused keys:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
 
-        origin_code_net_keys = 0
-        origin_used_keys = 0
-        origin_unused_keys = 999999
-        origin_missing_keys = 999999
+        origin_used_keys_num = 0
+        origin_missing_keys_num = 99999
 
         if self.conf.qat_dir:
             origin_code_net_keys = set(self.net.net2qat.state_dict().keys())
-            origin_used_keys = origin_code_net_keys & state_dict_keys
-            origin_unused_keys = state_dict_keys - origin_code_net_keys
-            origin_missing_keys = origin_code_net_keys - state_dict_keys
-            LOG.logI('Origin missing keys:{}'.format(len(origin_missing_keys)))
-            LOG.logI('Origin unused keys:{}'.format(len(origin_unused_keys)))
-            LOG.logI('Origin used keys:{}'.format(len(origin_used_keys)))
+            origin_used_keys_num = len(origin_code_net_keys & state_dict_keys)
+            origin_unused_keys_num = len(state_dict_keys - origin_code_net_keys)
+            origin_missing_keys_num = len(origin_code_net_keys - state_dict_keys)
+            LOG.logI('Origin missing keys:{}'.format(origin_missing_keys_num))
+            LOG.logI('Origin unused keys:{}'.format(origin_unused_keys_num))
+            LOG.logI('Origin used keys:{}'.format(origin_used_keys_num))
 
-        if len(used_keys) == 0 and len(origin_used_keys) == 0:
+        if len(used_keys) == 0 and origin_used_keys_num == 0:
             LOG.logE('Error: load NONE from pretrained model', exit=True)
 
-        if len(missing_keys) > 0 and len(origin_missing_keys) > 0:
+        if len(missing_keys) > 0 and origin_missing_keys_num > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
 
-        if self.conf.qat_dir and origin_used_keys > used_keys:
+        if self.conf.qat_dir and origin_used_keys_num > len(used_keys):
             self.use_original_net_pre_qat = True
 
     def loadStateDict(self):
