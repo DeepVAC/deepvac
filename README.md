@@ -24,7 +24,7 @@ DeepVAC的依赖有：
 
 对于普通用户来说，最方便高效的方式还是使用DeepVAC的预构建Docker镜像，可以帮助用户省掉不必要的环境配置时间：
 ```bash
-docker run --gpus all -it gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04 bash
+docker run --gpus all -it gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 bash
 ```
 该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)。
   
@@ -487,7 +487,7 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 | ---- | ---- | ---- |---- |
 |[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.0 | pip install|
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
-|[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:1.8.0-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
+|[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
 |[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
 |DeepVAC版PyTorch | conda包 |1.8.0 | conda install -y pytorch -c gemfield |
 |[DeepVAC版LibTorch](https://github.com/CivilNet/libtorch)| 压缩包 | 1.8.0 | 下载 & 解压|
