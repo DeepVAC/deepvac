@@ -485,7 +485,7 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 # Deepvac的社区产品
 | 产品名称 | 部署形式 |当前版本 | 获取方式 |
 | ---- | ---- | ---- |---- |
-|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.0 | pip install|
+|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.1 | pip install|
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
 |[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
 |[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|

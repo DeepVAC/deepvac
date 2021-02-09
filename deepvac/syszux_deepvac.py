@@ -432,6 +432,10 @@ class Deepvac(object):
             LOG.logI("You are in training mode, omit the loadJitModel")
             return
 
+        exclusive_options = [self.conf.trace_model_dir, self.conf.script_model_dir, self.conf.static_quantize_dir, self.conf.dynamic_quantize_dir]
+        if any(exclusive_options):
+            LOG.logE("config.jit_model_path is exclusive with {} in TEST MODE.".format(exclusive_options),exit=True)
+
         self.net = torch.jit.load(self.conf.jit_model_path, map_location=self.device)
         self.net.eval()
         self.net = self.net.to(self.device)
