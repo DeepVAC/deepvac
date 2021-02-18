@@ -452,6 +452,7 @@ config.amp = True
 ```python
 config.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 ```
+注意：开启动态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。	
 
 #### 静态量化（适用于训练模式和测试模式）
 要开启静态量化，你需要设置如下配置：
@@ -461,6 +462,7 @@ config.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 # backend 为可选，默认为fbgemm
 config.quantize_backend = <'fbgemm' | 'qnnpack'>
 ```
+注意：开启静态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。	
 
 #### 量化感知训练(QAT，仅适用于训练模式)
 开启QAT后，整个训练任务的self.net就会转变为量化模型。也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。
@@ -479,10 +481,12 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 
 
 # 已知问题
-- 在DDP模式中，训练任务不支持再开启trace和script。解决方案：等待上游PyTorch添加新功能；
-- 量化感知训练（QAT）不支持图模式，因此需要手工修改网络，参考：https://zhuanlan.zhihu.com/p/349019936 所述。解决方案：等待上游PyTorch添加新功能；
+- 由上游PyTorch引入的问题：[问题列表](https://github.com/DeepVAC/deepvac/issues/72); 
+- 暂无。
 
-# Deepvac的社区产品
+
+
+# DeepVAC的社区产品
 | 产品名称 | 部署形式 |当前版本 | 获取方式 |
 | ---- | ---- | ---- |---- |
 |[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.1 | pip install|
@@ -491,3 +495,4 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 |[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
 |DeepVAC版PyTorch | conda包 |1.8.0 | conda install -y pytorch -c gemfield |
 |[DeepVAC版LibTorch](https://github.com/CivilNet/libtorch)| 压缩包 | 1.8.0 | 下载 & 解压|
+|MLab| PaaS平台 | 2.0 | 私有化部署|
