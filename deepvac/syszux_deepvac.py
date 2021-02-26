@@ -264,6 +264,10 @@ class Deepvac(object):
         if self.val_loader is None:
             LOG.logE("Error: self.val_loader not initialized. Have you reimplemented initValLoader() API?", exit=True)
 
+        #audit for ema
+        if self.conf.is_forward_only and self.conf.ema:
+            LOG.logE("Error: You must disable config.ema in test only mode.", exit=True)
+
     def getConf(self):
         return self.conf
 
@@ -809,20 +813,21 @@ class DeepvacTrain(Deepvac):
 
     @syszux_once
     def addGraph(self, input):
-        self.writer.add_graph(self.net, input)
-
-    def earlyIter(self):
-        start = time.time()
-        self.sample = self.sample.to(self.device)
-        self.target = self.target.to(self.device)
-        if not self.is_train:
-            return
-        self.data_cpu2gpu_time.update(time.time() - start)
         try:
-            self.addGraph(self.sample)
+            self.writer.add_graph(self.net, input)
         except:
             LOG.logW("Tensorboard addGraph failed. You network foward may have more than one parameters?")
             LOG.logW("Seems you need reimplement preIter function.")
+
+    def earlyIter(self):
+        self.feedSample()
+        self.feedTarget()
+    
+    def feedSample(self):
+        self.sample = self.sample.to(self.device)
+
+    def feedTarget(self):
+        self.target = self.target.to(self.device)
 
     def preIter(self):
         pass
@@ -912,14 +917,17 @@ class DeepvacTrain(Deepvac):
         self.load_data_time.reset()
         self.data_cpu2gpu_time.reset()
 
-        start = time.time()
+        iter_tick = time.time()
         for i, (sample, target) in enumerate(self.loader):
-            self.load_data_time.update(time.time() - start)
+            self.load_data_time.update(time.time() - iter_tick)
             self.step = i
             self.target = target
             self.sample = sample
             self.preIter()
+            feed_sample_tick = time.time()
             self.earlyIter()
+            self.data_cpu2gpu_time.update(time.time() - feed_sample_tick)
+            self.addGraph(self.sample)
             with autocast(enabled=self.conf.amp if self.conf.amp else False):
                 self.doForward()
                 self.doLoss()
@@ -928,11 +936,11 @@ class DeepvacTrain(Deepvac):
             self.doLog()
             self.postIter()
             self.iter += 1
-            self.train_time.update(time.time() - start)
+            self.train_time.update(time.time() - iter_tick)
             if self.step in self.save_list:
                 self.processVal()
                 self.setTrainContext()
-            start = time.time()
+            iter_tick = time.time()
 
         self.addScalar('{}/TrainTime(hours/epoch)'.format(self.phase), round(self.train_time.sum / 3600, 2), self.epoch)
         self.addScalar('{}/AverageBatchTrainTime(secs/epoch)'.format(self.phase), self.train_time.avg, self.epoch)
@@ -1022,6 +1030,7 @@ class DeepvacDDP(DeepvacTrain):
     def preEpoch(self):
         self.train_sampler.set_epoch(self.epoch)
 
+    @syszux_once
     def smokeTestForExport3rd(self):
         if self.args.rank != 0:
             return
@@ -1046,7 +1055,7 @@ class DeepvacDDP(DeepvacTrain):
     def addGraph(self, input):
         if self.args.rank != 0:
             return
-        self.writer.add_graph(self.net, input)
+        super(DeepvacDDP, self).addGraph(input)
 
 if __name__ == "__main__":
     from config import config as deepvac_config
