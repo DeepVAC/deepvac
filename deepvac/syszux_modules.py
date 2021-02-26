@@ -379,8 +379,6 @@ class FPN(nn.Module):
         self.conv5 = Conv2dBNLeakyReLU(out_planes, out_planes, padding=1, leaky=leaky)
 
     def forward(self, input):
-        input = list(input.values())
-
         output1 = self.conv1(input[0])
         output2 = self.conv2(input[1])
         output3 = self.conv3(input[2])
