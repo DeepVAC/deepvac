@@ -36,7 +36,7 @@ class AugBase(object):
     @staticmethod
     def pillow2cv(pillow_img, is_rgb2bgr=True):
         cv_image = np.array(pillow_img)
-        if is_bgr2rgb:
+        if is_rgb2bgr:
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
         return cv_image
 
