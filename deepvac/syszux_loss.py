@@ -528,3 +528,15 @@ class MultiBoxLoss(nn.Module):
         loss_landm /= N1
 
         return loss_l, loss_c, loss_landm
+
+
+class WingLoss(nn.Module):
+    def __init__(self):
+        super(WingLoss, self).__init__()
+
+    def forward(self, pred, truth, w=10.0, epsilon=2.0):
+        x = truth - pred
+        c = w * (1.0 - math.log(1.0 + w / epsilon))
+        absolute_x = torch.abs(x)
+        losses = torch.where(w > absolute_x, w * torch.log(1.0 + absolute_x / epsilon), absolute_x - c)
+        return torch.sum(losses) / (len(losses) * 1.0)
