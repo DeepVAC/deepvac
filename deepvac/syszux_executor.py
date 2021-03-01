@@ -182,7 +182,6 @@ class SegImageAugExecutor(Executor):
 class SegImageWithMaskAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(SegImageWithMaskAugExecutor, self).__init__(deepvac_config)
-        # ac1 = AugChain('ImageWithMaskHorizontalFlipAug || ImageWithMaskRotateAug',deepvac_config)
         ac1 = AugChain('ImageWithMasksRandomHorizontalFlipAug || ImageWithMasksRandomRotateAug',deepvac_config)
         self.addAugChain('ac1', ac1, 1)
 

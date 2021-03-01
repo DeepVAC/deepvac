@@ -86,6 +86,18 @@ class Conv2dBNHardswish(nn.Sequential):
             nn.Hardswish()
         )
 
+class ResBlock(nn.Module):
+     def __init__(self, in_channel, expand_channel, out_channel, kernel_size, stride, shortcut=True):
+         super(ResBlock, self).__init__()
+         self.layer = nn.Sequential(
+                 Conv2dBNReLU(in_channel, expand_channel, 1, 1),
+                 Conv2dBNReLU(expand_channel, expand_channel, kernel_size, stride, kernel_size//2, expand_channel),
+                 Conv2dBN(expand_channel, out_channel, 1, 1),
+                 )
+         self.shortcut = shortcut and (in_channel == out_channel)
+
+     def forward(self, x):
+         return self.layer(x) + x if self.shortcut else self.layer(x)
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
