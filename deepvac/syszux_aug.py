@@ -866,6 +866,7 @@ class HFlipAug(AugBase):
             label[:, 1] = 1 - label[:, 1]
         return img, label
 
+
 class VFlipAug(AugBase):
     def __init__(self, deepvac_config):
         super(VFlipAug, self).__init__(deepvac_config)
@@ -888,21 +889,21 @@ class CropFacialWithBoxesAndLmksAug(AugBase):
 
     def auditConfig(self):
         pass
-    
+
     def _matrix_iof(self, a, b):
         lt = np.maximum(a[:, np.newaxis, :2], b[:, :2])
         rb = np.minimum(a[:, np.newaxis, 2:], b[:, 2:])
         area_i = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
         area_a = np.prod(a[:, 2:] - a[:, :2], axis=1)
         return area_i / np.maximum(area_a[:, np.newaxis], 1)
-    
+
     def __call__(self, image):
         image, label = self.auditInput(image, has_label=True)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         boxes, landms, labels = label
         height, width, _ = image.shape
 
@@ -994,7 +995,7 @@ class BrightDistortFacialAug(DistortFacialAugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         self._convert(image, beta=random.uniform(-32, 32))
 
         return image, label
@@ -1012,7 +1013,7 @@ class ContrastDistortFacialAug(DistortFacialAugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         self._convert(image, alpha=random.uniform(0.5, 1.5))
 
         return image, label
@@ -1030,7 +1031,7 @@ class SaturationDistortFacialAug(DistortFacialAugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         self._convert(image[:, :, 1], alpha=random.uniform(0.5, 1.5))
         image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
@@ -1072,7 +1073,7 @@ class MirrorFacialAug(AugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         boxes, landms, labels = label
         _, width, _ = image.shape
         image = image[:, ::-1]
@@ -1107,7 +1108,7 @@ class Pad2SquareFacialAug(AugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         height, width, _ = image.shape
         if height == width:
             return image, label
@@ -1131,7 +1132,7 @@ class ResizeSubtractMeanFacialAug(AugBase):
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-        
+
         boxes, landms, labels = label
         height, width, _ = image.shape
 
@@ -1140,13 +1141,13 @@ class ResizeSubtractMeanFacialAug(AugBase):
         image = cv2.resize(image, (self.conf.img_dim, self.conf.img_dim), interpolation=interp_method)
         image = image.astype(np.float32)
         image -= self.conf.rgb_means
-        
+
         boxes[:, 0::2] /= width
         boxes[:, 1::2] /= height
 
         landms[:, 0::2] /= width
         landms[:, 1::2] /= height
-        
+
         return image.transpose(2, 0, 1), [boxes, landms, labels]
 
 
@@ -1160,7 +1161,6 @@ class ImageWithMasksRandomHorizontalFlipAug(AugBase):
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
-        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
         imgs = [img]
         imgs.extend(label)
         for i in range(len(imgs)):
@@ -1177,7 +1177,6 @@ class ImageWithMasksRandomRotateAug(AugBase):
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
-        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
         imgs = [img]
         imgs.extend(label)
         angle = random.random() * 2 * self.max_angle - self.max_angle
