@@ -18,7 +18,6 @@ DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一�
 DeepVAC的依赖有：
 - Python3。不支持Python2，其已被废弃；
 - 依赖包：torch, torchvision, tensorboard, scipy, numpy, cv2, Pillow；
-- 字体文件（可选）：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
 
 这些依赖使用pip命令（或者git clone）自行安装，不再赘述。
 

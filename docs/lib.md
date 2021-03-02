@@ -16,5 +16,4 @@ deepvac库对云上炼丹师提供以下模块：
 |各种loss函数 | from deepvac.syszux_loss import * | 神经网络中各种损失评价函数的实现 |
 |MobileNet | from deepvac.syszux_mobilenet import * | MobileNet系列的模型实现 |
 |ResNet | from deepvac.syszux_resnet import * | ResNet系列的模型实现 |
-|Yolo   | from deepvac.syszux_yolo import *  | Yolo系列的模型实现 |
 

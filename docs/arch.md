@@ -54,4 +54,4 @@ deepvac采用的是git branch的解决方案。deepvac规定：
 - 内部开发定义的配置均在类的auditConfig方法中；
 - 所有临时调试的配置均在类的构造函数中，或者由argparse.ArgumentParser模块来传递；
 - 开启分布式训练时，由于--rank和--gpu参数为进程级别，由argparse.ArgumentParser模块来传递，用户需要在命令行指定；
-- 类的构造函数输入为config；
+- 类的构造函数的入参一般为config实例；config实例在DeepVAC框架中为一等公民。
