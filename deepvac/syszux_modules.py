@@ -86,9 +86,9 @@ class Conv2dBNHardswish(nn.Sequential):
             nn.Hardswish()
         )
 
-class ResBlock(nn.Module):
+class ResBnBlock(nn.Module):
      def __init__(self, in_channel, expand_channel, out_channel, kernel_size, stride, shortcut=True):
-         super(ResBlock, self).__init__()
+         super(ResBnBlock, self).__init__()
          self.layer = nn.Sequential(
                  Conv2dBNReLU(in_channel, expand_channel, 1, 1),
                  Conv2dBNReLU(expand_channel, expand_channel, kernel_size, stride, kernel_size//2, expand_channel),

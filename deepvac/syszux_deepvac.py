@@ -819,6 +819,8 @@ class DeepvacTrain(Deepvac):
         self.optimizer = optim.Adam(
             self.net.parameters(),
             lr=self.conf.lr,
+            betas=self.conf.betas if self.conf.betas else (0.9, 0.999),
+            weight_decay=self.conf.weight_decay if self.conf.weight_decay else 0
         )
         for group in self.optimizer.param_groups:
             group.setdefault('initial_lr', group['lr'])
