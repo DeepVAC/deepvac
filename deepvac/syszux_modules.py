@@ -86,6 +86,18 @@ class Conv2dBNHardswish(nn.Sequential):
             nn.Hardswish()
         )
 
+class ResBnBlock(nn.Module):
+     def __init__(self, in_channel, expand_channel, out_channel, kernel_size, stride, shortcut=True):
+         super(ResBnBlock, self).__init__()
+         self.layer = nn.Sequential(
+                 Conv2dBNReLU(in_channel, expand_channel, 1, 1),
+                 Conv2dBNReLU(expand_channel, expand_channel, kernel_size, stride, kernel_size//2, expand_channel),
+                 Conv2dBN(expand_channel, out_channel, 1, 1),
+                 )
+         self.shortcut = shortcut and (in_channel == out_channel)
+
+     def forward(self, x):
+         return self.layer(x) + x if self.shortcut else self.layer(x)
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
@@ -392,3 +404,37 @@ class FPN(nn.Module):
         output1 = self.conv4(output1)
         out = [output1, output2, output3]
         return out
+
+class InvertedResidualFacialKpBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, expansion_factor: int=6, kernel_size: int=3, stride: int=2, padding: int=1,
+                 is_residual: bool=True):
+        super(InvertedResidualFacialKpBlock, self).__init__()
+        assert stride in [1, 2]
+
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels * expansion_factor, 1, bias=False),
+            nn.BatchNorm2d(in_channels * expansion_factor),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels * expansion_factor, in_channels * expansion_factor,
+                      kernel_size, stride, padding, 1,
+                      groups=in_channels * expansion_factor, bias=False),
+            nn.BatchNorm2d(in_channels * expansion_factor),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels * expansion_factor, out_channels, 1,
+                      bias=False),
+            nn.BatchNorm2d(out_channels))
+
+        self.is_residual = is_residual if stride == 1 else False
+        self.is_conv_res = False if in_channels == out_channels else True
+        #todo
+        if stride == 1 and self.is_conv_res:
+            self.conv_res = nn.Sequential(nn.Conv2d(in_channels, out_channels, 1, bias=False),
+                                          nn.BatchNorm2d(out_channels))
+
+    def forward(self, x):
+        block = self.block(x)
+        if self.is_residual:
+            if self.is_conv_res:
+                return self.conv_res(x) + block
+            return x + block
+        return block

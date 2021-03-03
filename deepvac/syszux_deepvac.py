@@ -460,7 +460,7 @@ class Deepvac(object):
 
         if input is not None:
             self.setInput(input)
-        
+
         self.smokeTestForExport3rd(input)
 
         with torch.no_grad():
@@ -476,9 +476,6 @@ class Deepvac(object):
 
         if sample is not None:
             self.sample = sample
-        
-        if self.sample is None:
-            LOG.logE("You enabled config.trace_model_dir, but didn't provide input. Please add input_tensor first, e.g. x = Deepvac(input_tensor)",exit=True)
 
         if output_trace_file is None:
             output_trace_file = self.conf.trace_model_dir
@@ -524,9 +521,15 @@ class Deepvac(object):
             loader = self.test_loader if self.conf.is_forward_only else self.val_loader
             save_model.saveSQ(loader)
 
-    def exportNCNN(self, output_ncnn_file=None):
+    def exportNCNN(self, sample=None, output_ncnn_file=None):
         if not self.conf.ncnn_model_dir:
             return
+
+        if sample is None and self.sample is None:
+            LOG.logE("either call exportNCNN and pass value to pamameter sample, or call exportNCNN in Train mode.", exit=True)
+
+        if sample is not None:
+            self.sample = sample
 
         if not self.conf.onnx2ncnn:
             LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
@@ -534,16 +537,17 @@ class Deepvac(object):
         if output_ncnn_file is None:
             output_ncnn_file = self.conf.ncnn_model_dir
 
-        self.ncnn_arch_dir = '{}.param'.format(output_ncnn_file)
-        try:
-            import onnx
-            from onnxsim import simplify
-        except:
-            LOG.logE("You must install onnx and onnxsim package if you want to convert pytorch to ncnn.")
+        self.conf.ncnn_arch_dir = '{}.param'.format(output_ncnn_file)
 
         if not self.conf.onnx_model_dir:
-            f = tempfile.NamedTemporaryFile()
+            f = tempfile.NamedTemporaryFile(delete=False)
             self.conf.onnx_model_dir = f.name
+
+        try:
+            import onnx
+        except:
+            LOG.logE("You must install onnx package if you want to convert pytorch to ncnn.")
+            return
 
         self.exportONNX()
 
@@ -551,6 +555,11 @@ class Deepvac(object):
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() != b"":
             LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. We try to simplify the model first")
+            try:
+                from onnxsim import simplify
+            except:
+                LOG.logE("You must install onnxsim package if you want to convert pytorch to ncnn.", exit=True)
+
             model_op, check_ok = simplify(self.conf.onnx_model_dir, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
             onnx.save(model_op, self.conf.onnx_model_dir)
             if not check_ok:
@@ -563,9 +572,15 @@ class Deepvac(object):
 
         LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.conf.ncnn_arch_dir, output_ncnn_file))
 
-    def exportCoreML(self, output_coreml_file=None):
+    def exportCoreML(self, sample=None, output_coreml_file=None):
         if not self.conf.coreml_model_dir:
             return
+
+        if sample is None and self.sample is None:
+            LOG.logE("either call exportCoreML and pass value to pamameter sample, or call exportCoreML in Train mode.", exit=True)
+
+        if sample is not None:
+            self.sample = sample
 
         if output_coreml_file is None:
             output_coreml_file = self.conf.coreml_model_dir
@@ -592,13 +607,26 @@ class Deepvac(object):
         # Save the CoreML model
         coreml_model.save(output_coreml_file)
 
-    def exportONNX(self, output_onnx_file=None):
+    def exportONNX(self, sample=None, output_onnx_file=None):
         if not self.conf.onnx_model_dir:
             return
+
+        if sample is None and self.sample is None:
+            LOG.logE("either call exportONNX and pass value to pamameter sample, or call exportONNX in Train mode.", exit=True)
+
+        if sample is not None:
+            self.sample = sample
+
+        try:
+            import onnx
+        except:
+            LOG.logE("You must install onnx package if you want to convert pytorch to onnx.")
+            return
+        
         if output_onnx_file is None:
-            output_onnx_file = self.onnx_model_dir
+            output_onnx_file = self.conf.onnx_model_dir
         else:
-            self.onnx_model_dir = output_onnx_file
+            self.conf.onnx_model_dir = output_onnx_file
 
         net = self.ema if self.conf.ema else self.net
         torch.onnx._export(net, self.sample, output_onnx_file, export_params=True)
@@ -607,9 +635,9 @@ class Deepvac(object):
     @syszux_once
     def smokeTestForExport3rd(self, input=None):
         #exportNCNN must before exportONNX !!!
-        self.exportONNX()
-        self.exportNCNN()
-        self.exportCoreML()
+        self.exportONNX(input)
+        self.exportNCNN(input)
+        self.exportCoreML(input)
         self.exportTorchViaTrace(input)
         self.exportTorchViaScript()
 
@@ -791,6 +819,8 @@ class DeepvacTrain(Deepvac):
         self.optimizer = optim.Adam(
             self.net.parameters(),
             lr=self.conf.lr,
+            betas=self.conf.betas if self.conf.betas else (0.9, 0.999),
+            weight_decay=self.conf.weight_decay if self.conf.weight_decay else 0
         )
         for group in self.optimizer.param_groups:
             group.setdefault('initial_lr', group['lr'])
@@ -896,9 +926,9 @@ class DeepvacTrain(Deepvac):
 
         self.exportTorchViaTrace(self.sample, output_trace_file)
         self.exportTorchViaScript(output_script_file)
-        self.exportONNX(output_onnx_file)
-        self.exportNCNN(output_ncnn_file)
-        self.exportCoreML(output_coreml_file)
+        self.exportONNX(self.sample, output_onnx_file)
+        self.exportNCNN(self.sample, output_ncnn_file)
+        self.exportCoreML(self.sample, output_coreml_file)
         #tensorboard
         self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
