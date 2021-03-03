@@ -1198,14 +1198,16 @@ class ImageWithMasksRandomCropAug(AugBase):
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
-        assert len(label) == self.conf.kernel_num + 1, 'mask num incorrect.'
+        h, w, _ = img.shape
+
         imgs = [img]
         imgs.extend(label)
-        img_size = (self.conf.img_size, self.conf.img_size)
-        h, w = imgs[0].shape[0:2]
-        th, tw = img_size
-        if w == tw and h == th:
-            return imgs
+        if max(h, w) <= self.conf.img_size:
+            return [imgs[0],imgs[1:]]
+
+        img_size = (self.conf.img_size,) * 2
+        th = min(h, img_size[0])
+        tw = min(w, img_size[0])
 
         if random.random() > self.p and np.max(imgs[1]) > 0:
             tl = np.min(np.where(imgs[1] > 0), axis = 1) - img_size
