@@ -11,12 +11,18 @@ from .syszux_helper import WarpMLS, apply_perspective_transform, Remaper, Liner,
 class AugBase(object):
     def __init__(self, deepvac_config):
         self.auditConfig()
+        self.conf = deepvac_config
 
     def auditConfig(self):
         raise Exception("Not implemented!")
 
+    def auditUserConfig(self, attr: str):
+        if attr not in self.conf:
+            raise Exception("declare attr {} in config.py first".format(attr))
+
     def __call__(self,img):
         raise Exception("Not implemented!")
+
 
     @staticmethod
     def auditInput(img, has_label=False):
@@ -884,8 +890,8 @@ class VFlipAug(AugBase):
 
 class CropFacialWithBoxesAndLmksAug(AugBase):
     def __init__(self, deepvac_config):
-        self.conf = deepvac_config
         super(CropFacialWithBoxesAndLmksAug, self).__init__(deepvac_config)
+        self.auditUserConfig("img_dim")
 
     def auditConfig(self):
         pass
@@ -1096,8 +1102,8 @@ class MirrorFacialAug(AugBase):
 
 class Pad2SquareFacialAug(AugBase):
     def __init__(self, deepvac_config):
-        self.conf = deepvac_config
         super(Pad2SquareFacialAug, self).__init__(deepvac_config)
+        self.auditUserConfig("rgb_means")
 
     def auditConfig(self):
         pass
@@ -1120,8 +1126,9 @@ class Pad2SquareFacialAug(AugBase):
 
 class ResizeSubtractMeanFacialAug(AugBase):
     def __init__(self, deepvac_config):
-        self.conf = deepvac_config
         super(ResizeSubtractMeanFacialAug, self).__init__(deepvac_config)
+        self.auditUserConfig("img_dim")
+        self.auditUserConfig("rgb_means")
 
     def auditConfig(self):
         pass
@@ -1154,7 +1161,6 @@ class ResizeSubtractMeanFacialAug(AugBase):
 class ImageWithMasksRandomHorizontalFlipAug(AugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
-        self.conf = deepvac_config
 
     def auditConfig(self):
         pass
@@ -1170,7 +1176,6 @@ class ImageWithMasksRandomHorizontalFlipAug(AugBase):
 class ImageWithMasksRandomRotateAug(AugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
-        self.conf = deepvac_config
 
     def auditConfig(self):
         self.max_angle = 10
@@ -1191,7 +1196,7 @@ class ImageWithMasksRandomRotateAug(AugBase):
 class ImageWithMasksRandomCropAug(AugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomCropAug, self).__init__(deepvac_config)
-        self.conf = deepvac_config
+        self.auditUserConfig("img_size")
 
     def auditConfig(self):
         self.p = 3.0 / 8.0
