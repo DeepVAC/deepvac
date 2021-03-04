@@ -133,7 +133,7 @@ class SaveModel(object):
     def saveByInputOrNot(self, input_sample=None):
         if self.ts is None:
             self.export(input_sample)
-        
+
         freeze_ts = torch.jit.freeze(self.ts)
         torch.jit.save(freeze_ts, self.output_file)
 
@@ -171,7 +171,7 @@ class SaveModelByQAT(SaveModelByScript):
         LOG.logI("SaveModelByQAT: {} ...".format(self.output_file))
         qat_net = self.getConvertedNetFromQAT(self.input_net)
         self.ts = torch.jit.script(qat_net).eval()
-    
+
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
@@ -246,7 +246,7 @@ class Deepvac(object):
 
         if self.conf.dynamic_quantize_dir and not any([self.conf.script_model_dir, self.conf.trace_model_dir]):
             LOG.logE("Error: to enable config.dynamic_quantize_dir, you must enable config.script_model_dir or config.trace_model_dir first.", exit=True)
-        
+
         if self.conf.static_quantize_dir and not any([self.conf.script_model_dir, self.conf.trace_model_dir]):
             LOG.logE("Error: to enable config.static_quantize_dir, you must enable config.script_model_dir or config.trace_model_dir first.", exit=True)
 
@@ -260,7 +260,7 @@ class Deepvac(object):
         #audit datalodaer
         if self.train_loader is None:
             LOG.logE("Error: self.train_loader not initialized. Have you reimplemented initTrainLoader() API?", exit=True)
-        
+
         if self.val_loader is None:
             LOG.logE("Error: self.val_loader not initialized. Have you reimplemented initValLoader() API?", exit=True)
 
@@ -335,7 +335,7 @@ class Deepvac(object):
         self.ema = None
         if self.conf.ema is None:
             return
-        
+
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
         self.ema_updates = 0
         self.ema = copy.deepcopy(self.net)
@@ -420,13 +420,13 @@ class Deepvac(object):
         if not self.state_dict:
             LOG.logI("self.state_dict not initialized, omit loadStateDict()")
             return
-        
+
         if self.conf.qat_dir and self.use_original_net_pre_qat:
             self.net.net2qat.load_state_dict(self.state_dict, strict=False)
         else:
             self.net.load_state_dict(self.state_dict, strict=False)
         self.net.eval()
-    
+
     def loadJitModel(self):
         if not self.conf.jit_model_path:
             LOG.logI("config.jit_model_path not specified, omit the loadJitModel")
@@ -489,7 +489,7 @@ class Deepvac(object):
         if self.conf.dynamic_quantize_dir:
             LOG.logI("You have enabled config.dynamic_quantize_dir, will dynamic quantize the model...")
             save_model.saveDQ(self.sample)
-        
+
         if self.conf.static_quantize_dir:
             LOG.logI("You have enabled config.static_quantize_dir, will static quantize the model...")
             loader = self.test_loader if self.conf.is_forward_only else self.val_loader
@@ -505,7 +505,7 @@ class Deepvac(object):
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
 
         net = self.ema if self.conf.ema else self.net
-        save_model = SaveModelByQAT(net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else SaveModelByScript(net, output_script_file) 
+        save_model = SaveModelByQAT(net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else SaveModelByScript(net, output_script_file)
         save_model.saveByInputOrNot()
 
         if self.conf.qat_dir:
@@ -622,7 +622,7 @@ class Deepvac(object):
         except:
             LOG.logE("You must install onnx package if you want to convert pytorch to onnx.")
             return
-        
+
         if output_onnx_file is None:
             output_onnx_file = self.conf.onnx_model_dir
         else:
@@ -852,7 +852,7 @@ class DeepvacTrain(Deepvac):
     def earlyIter(self):
         self.feedSample()
         self.feedTarget()
-    
+
     def feedSample(self):
         self.sample = self.sample.to(self.device)
 

@@ -40,14 +40,14 @@ class BCEBlurWithLogitsLoss(LossBase):
 class FocalLoss(LossBase):
     # Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
-        super(FocalLoss, self).__init__()
+        super(FocalLoss, self).__init__(deepvac_config)
         # must be nn.BCEWithLogitsLoss()
-        self.loss_fcn = deepvac_config.loss_fcn
+        self.reduction = deepvac_config.reduction
+        self.loss_fcn = nn.BCEWithLogitsLoss(reduction='none')
 
     def auditConfig(self):
         self.gamma = 1.5
         self.alpha = 0.25
-        self.reduction = 'none'
 
     def __call__(self, pred, true):
         loss = self.loss_fcn(pred, true)
@@ -69,7 +69,7 @@ class FocalLoss(LossBase):
 class QFocalLoss(LossBase):
     # Wraps Quality focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
-        super(QFocalLoss, self).__init__()
+        super(QFocalLoss, self).__init__(deepvac_config)
         # must be nn.BCEWithLogitsLoss()
         self.loss_fcn = deepvac_config.loss_fcn
 
