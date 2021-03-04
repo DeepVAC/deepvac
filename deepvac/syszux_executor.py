@@ -176,7 +176,7 @@ class OcrDetectAugExecutor(Executor):
 class SegImageAugExecutor(Executor):
     def __init__(self, deepvac_config):
         super(SegImageAugExecutor, self).__init__(deepvac_config)
-        ac1 = AugChain('GaussianAug || RandomColorJitterAug || BrightnessJitterAug || ContrastJitterAug || MotionAug',deepvac_config)
+        ac1 = AugChain('GaussianAug || RandomColorJitterAug || BrightnessJitterAug || ContrastJitterAug',deepvac_config)
         ac2 = AugChain('MotionAug',deepvac_config)
         self.addAugChain('ac1', ac1, 1)
         self.addAugChain('ac2', ac1, 0.2)
