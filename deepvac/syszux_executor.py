@@ -167,10 +167,27 @@ class RetinaAugExecutor(PickOneExecutor):
         self.addAugChain("ac2", ac2, 0.5)
 
 class OcrDetectAugExecutor(Executor):
-    def __init__(self, deepvac_config): 
+    def __init__(self, deepvac_config):
         super(OcrDetectAugExecutor, self).__init__(deepvac_config)
         ac1 = AugChain('ImageWithMasksRandomHorizontalFlipAug@0.5 => ImageWithMasksRandomRotateAug => ImageWithMasksRandomCropAug',deepvac_config)
         self.addAugChain('ac1', ac1, 1)
+
+
+class SegImageAugExecutor(Executor):
+    def __init__(self, deepvac_config):
+        super(SegImageAugExecutor, self).__init__(deepvac_config)
+        ac1 = AugChain('GaussianAug || RandomColorJitterAug || BrightnessJitterAug || ContrastJitterAug',deepvac_config)
+        ac2 = AugChain('MotionAug',deepvac_config)
+        self.addAugChain('ac1', ac1, 1)
+        self.addAugChain('ac2', ac1, 0.2)
+
+class SegImageWithMaskAugExecutor(Executor):
+    def __init__(self, deepvac_config):
+        super(SegImageWithMaskAugExecutor, self).__init__(deepvac_config)
+        ac1 = AugChain('ImageWithMasksRandomCropAug',deepvac_config)
+        ac2 = AugChain('ImageWithMasksRandomHorizontalFlipAug || ImageWithMasksRandomRotateAug',deepvac_config)
+        self.addAugChain('ac1', ac1, 0.4)
+        self.addAugChain('ac2', ac2, 0.6)
 
 if __name__ == "__main__":
     x = Chain("RandomColorJitterAug@0.3 => MosaicAug@0.8 => MotionAug ")

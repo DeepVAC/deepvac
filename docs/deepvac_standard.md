@@ -18,17 +18,17 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 
 ## 代码
 包含如下三个方面：
-#### 使用deepvac库
+#### 使用[deepvac库](./lib.md)
 代码必须基于deepvac库，且维护在MLab代码服务系统上。特别的：
-- 模型定义基于deepvac.syszux_modules、deepvac.syszux_*；
-- 训练、测试代码基于Deepvac类体系；
-- 日志基于deepvac.syszux_log；
-- 配置基于deepvac.syszux_config;
-- 数据合成基于deepvac.syszux_synthesis;
-- 数据增强基于deepvac.syszux_aug;
-- 数据动态增强基于deepvac.syszux_executor;
-- dataloader基于deepvac.syszux_loader;
-- 模型性能报告基于deepvac.syszux_report;
+- 训练、测试代码基于DeepvacTrain、Deepvac模块；
+- 日志基于LOG模块；
+- 配置基于config模块;
+- 数据合成基于Synthesis*;
+- 数据增强基于*Aug;
+- 数据动态增强基于{,*Aug}Executor;
+- 自定义dataloader基于*Dataset;
+- 模型性能报告基于Report模块;
+- 模型定义基于deepvac.syszux_modules、deepvac.syszux_*。
 
 #### 使用DeepVAC代码规范
 访问：[代码规范](./code_standard.md)
@@ -38,9 +38,9 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 
 
 ## 训练
-所有的模型训练默认至少包含两种：
-- 模型部署目标为x86+CUDA Linux的训练;
-- 模型部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练；
+模型训练默认包含两种：
+- 部署目标为x86+CUDA Linux的训练;
+- 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练；
 
 并且最终需要满足：
 - 在验收集上的指标必须符合要求；
@@ -56,28 +56,36 @@ date: <测试日期>
 |gemfield|144|75.579|0.631944444444|1.0|0.631944444444|0.118055555556|0.368055555556|
 |self|2047|1065.102|0.829018075232|1.0|0.829018075232|0.0229604298974|0.170981924768|
 
-#### 模型部署目标为x86+CUDA Linux的训练
-必须开启如下开关：
-- config.script_model_dir
-- config.trace_model_dir
-- config.static_quantize_dir
+#### 部署目标为x86+CUDA Linux的训练
+开启如下开关：
+- config.script_model_dir（必须）
+- config.trace_model_dir（可选）
+- config.static_quantize_dir（必须）
+- config.dynamic_quantize_dir（可选）
+- config.ema（可选）
+- config.tensorboard_*（可选）
+- config.amp（可选）
+- config.dist_url（可选）
 
-可选开启如下开关：
-- config.dynamic_quantize_dir
 
-#### 模型部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
-必须开启如下开关：
-- config.script_model_dir
-- config.trace_model_dir
-- config.qat_dir
-
-可选开启如下开关：
-- config.onnx_model_dir
-- config.ncnn_model_dir, config.onnx2ncnn
-- config.coreml_model_dir, config.coreml_preprocessing_args
+#### 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
+在部署目标为x86+CUDA Linux的训练基础上，开启如下开关：
+- config.qat_dir（必须）
+- config.onnx_model_dir（可选，需要ONNX时开启）
+- config.ncnn_model_dir, config.onnx2ncnn（可选，需要NCNN时开启）
+- config.coreml_model_dir, config.coreml_preprocessing_args（可选，需要CoreML时开启）
 
 ## 部署方式
-所有的AI产品默认必须进行这3种部署测试：x86 + CUDA Linux、x86 Linux、 Arm Android；可选这2种部署测试：Arm iOS、Arm Linux。整体部署测试说明如下：
+所有的AI产品默认进行3种部署测试：
+- x86 + CUDA Linux
+- x86 Linux
+- Arm Android
+
+可选2种部署测试：
+- Arm iOS
+- Arm Linux。
+
+整体部署测试说明如下：
 |  部署目标  | 部署方式 | 大小 | 是否必须   | 
 |------------|---------|---------|---------|
 |x86 + CUDA Linux| 基于 libdeepvac cuda docker image | docker image大小 | 是|
@@ -86,7 +94,7 @@ date: <测试日期>
 |Arm iOS     | App + libdeepvac.dylib | libdeepvac.dylib大小 | 否|
 |Arm Linux   | App + libdeepvac.so | libdeepvac.so大小 | 否|
 
-测试成功后，则：
+测试成功后：
 - Docker镜像维护在ai5.gemfield.org上；
 - 库维护在MLab:/opt/；
 

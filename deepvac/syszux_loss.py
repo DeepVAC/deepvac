@@ -40,14 +40,14 @@ class BCEBlurWithLogitsLoss(LossBase):
 class FocalLoss(LossBase):
     # Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
-        super(FocalLoss, self).__init__()
+        super(FocalLoss, self).__init__(deepvac_config)
         # must be nn.BCEWithLogitsLoss()
-        self.loss_fcn = deepvac_config.loss_fcn
+        self.reduction = deepvac_config.reduction
+        self.loss_fcn = nn.BCEWithLogitsLoss(reduction='none')
 
     def auditConfig(self):
         self.gamma = 1.5
         self.alpha = 0.25
-        self.reduction = 'none'
 
     def __call__(self, pred, true):
         loss = self.loss_fcn(pred, true)
@@ -69,7 +69,7 @@ class FocalLoss(LossBase):
 class QFocalLoss(LossBase):
     # Wraps Quality focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
-        super(QFocalLoss, self).__init__()
+        super(QFocalLoss, self).__init__(deepvac_config)
         # must be nn.BCEWithLogitsLoss()
         self.loss_fcn = deepvac_config.loss_fcn
 
@@ -528,3 +528,15 @@ class MultiBoxLoss(nn.Module):
         loss_landm /= N1
 
         return loss_l, loss_c, loss_landm
+
+
+class WingLoss(nn.Module):
+    def __init__(self):
+        super(WingLoss, self).__init__()
+
+    def forward(self, pred, truth, w=10.0, epsilon=2.0):
+        x = truth - pred
+        c = w * (1.0 - math.log(1.0 + w / epsilon))
+        absolute_x = torch.abs(x)
+        losses = torch.where(w > absolute_x, w * torch.log(1.0 + absolute_x / epsilon), absolute_x - c)
+        return torch.sum(losses) / (len(losses) * 1.0)

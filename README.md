@@ -18,7 +18,6 @@ DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一�
 DeepVAC的依赖有：
 - Python3。不支持Python2，其已被废弃；
 - 依赖包：torch, torchvision, tensorboard, scipy, numpy, cv2, Pillow；
-- 字体文件（可选）：如果使用text synthesis，请安装字体文件：https://github.com/CivilNet/SYSZUXfont;
 
 这些依赖使用pip命令（或者git clone）自行安装，不再赘述。
 
@@ -171,8 +170,10 @@ class MyTrain(DeepvacTrain):
 | initScheduler | 初始化self.scheduler成员 | 默认初始化为torch.optim.lr_scheduler |
 | * initTrainLoader | 初始化self.train_loader成员 | 初始化用于训练的DataLoader | 
 | * initValLoader | 初始化self.val_loader成员  | 初始化用于验证的DataLoader |
+| feedSample | 将self.sample移动到config.device设备上  | 可以重写 |
+| feedTarget | 将self.target（标签）移动到config.device设备上  | 可以重写，比如需要修改target的类型 |
 | preEpoch | 每轮Epoch之前的操作 | 默认啥也不做 |
-| preIter | 每个batch迭代之前的操作 | 默认会将数据加载到device上，并初始化self.sample、self.target，并对上一个迭代计算得到的梯度进行zero_grad操作 |
+| preIter | 每个batch迭代之前的操作 | 默认啥也不做 |
 | postIter | 每个batch迭代之后的操作 | 默认啥也不做 |
 | postEpoch | 每轮Epoch之后的操作 | 默认会调用self.scheduler.step() |
 | doForward | 网络前向推理过程 | 默认会将推理得到的值赋值给self.output成员 |
@@ -489,7 +490,7 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 # DeepVAC的社区产品
 | 产品名称 | 部署形式 |当前版本 | 获取方式 |
 | ---- | ---- | ---- |---- |
-|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.1 | pip install|
+|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.6 | pip install deepvac |
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
 |[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
 |[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
