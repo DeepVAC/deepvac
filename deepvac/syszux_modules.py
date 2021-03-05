@@ -83,7 +83,7 @@ class Conv2dBnAct(nn.Sequential):
         super(Conv2dBnAct, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
             nn.BatchNorm2d(out_planes),
-            nn.SiLU() if act else (act if isinstance(act, nn.Module) else nn.Identity())
+            nn.SiLU() if (act is True) else (act if isinstance(act, nn.Module) else nn.Identity())
         )
 
 class ResBnBlock(nn.Module):
