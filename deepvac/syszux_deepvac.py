@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import datetime
 import argparse
+import collections
 import math
 import torch
 import torch.nn as nn
@@ -406,7 +407,7 @@ class Deepvac(object):
             LOG.logI('Origin unused keys:{}'.format(origin_unused_keys_num))
             LOG.logI('Origin used keys:{}'.format(origin_used_keys_num))
 
-        if len(used_keys) == 0 and origin_used_keys_num == 0:
+        if not self.conf.model_reinterpret_cast and len(used_keys) == 0 and origin_used_keys_num == 0:
             LOG.logE('Error: load NONE from pretrained model', exit=True)
 
         if len(missing_keys) > 0 and origin_missing_keys_num > 0:
@@ -420,6 +421,17 @@ class Deepvac(object):
         if not self.state_dict:
             LOG.logI("self.state_dict not initialized, omit loadStateDict()")
             return
+        
+        if self.conf.model_reinterpret_cast == True:
+            LOG.logI("config.model_reinterpret_cast is True, Try to reinterpret cast the model")
+            state_dict = collections.OrderedDict()
+            keys = list(self.state_dict.keys())
+            for idx, name in enumerate(self.net.state_dict()):
+                if self.net.state_dict()[name].size() == self.state_dict[keys[idx]].size():
+                    state_dict[name] = self.state_dict[keys[idx]]
+                else:
+                    LOG.logE("Weights shape must be equal, {} and {} shape are not equal".format(keys[idx], name), exit=True)
+            self.state_dict = state_dict
 
         if self.conf.qat_dir and self.use_original_net_pre_qat:
             self.net.net2qat.load_state_dict(self.state_dict, strict=False)

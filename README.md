@@ -266,6 +266,9 @@ config.log_every = 10
 #用于训练时，加载预训练模型。注意不是checkpoint，可参考 config.checkpoint_suffix
 #用于测试时，加载测试模型。
 config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
+#是否强制加载模型，特别是针对于网络结构相同而层名不同的情况
+#例如，对官方开源网络进行deepvac标准化以后，加载官方预训练模型
+config.model_reinterpret_cast = False
 ```
 ### Dataloader (适用于训练模式和测试模式)
 ```python
