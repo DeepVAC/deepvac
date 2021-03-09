@@ -111,6 +111,20 @@ class BottleneckStd(nn.Module):
     def forward(self, x):
         return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
 
+class BottleneckC3(nn.Module):
+    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5, act=True):
+        super(BottleneckC3, self).__init__()
+        hidden_planes = int(out_planes * expansion)
+        self.conv1 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
+        self.conv2 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
+        self.conv3 = Conv2dBnAct(hidden_planes*2, out_planes, 1, 1, act=act)
+        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0, act=act) for _ in range(bottle_std_num)])
+
+    def forward(self, x):
+        y1 = self.std_bottleneck_list(self.conv1(x))
+        y2 = self.conv2(x)
+        return self.conv3(torch.cat([y1, y2], dim=1))
+
 class BottleneckCSP(nn.Module):
     def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5, act=True):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(BottleneckCSP, self).__init__()
