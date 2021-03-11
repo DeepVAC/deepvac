@@ -266,6 +266,13 @@ config.log_every = 10
 #用于训练时，加载预训练模型。注意不是checkpoint，可参考 config.checkpoint_suffix
 #用于测试时，加载测试模型。
 config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
+
+#initNetWithCode()定义的网络如果和权重文件里的parameter name不一致，而在结构上一致，
+#从逻辑上来说本应该能加载权重文件，但因为name不匹配而会失败。
+#可以开启model_reinterpret_cast来解决此问题。这就带来了此开关的2个使用场景：
+#场景1：对原官方开源网络的代码进行deepvac标准化后，为了仍然能够加载原官方预训练模型，可以开启此开关。
+#场景2：也可以通过开启此开关，然后加载原官方的预训练模型到deepvac化后的网络，来进行重构正确性的检查。
+config.model_reinterpret_cast = False
 ```
 ### Dataloader (适用于训练模式和测试模式)
 ```python
