@@ -165,16 +165,17 @@ class Yolov5Loss(LossBase):
         self.box = deepvac_config.box
         self.obj = deepvac_config.obj
         self.device = deepvac_config.device
-        self.strides = torch.Tensor(deepvac_config.strides)
+        self.ssi = deepvac_config.strides.index(16) if self.autobalance else 0
+
         # define criteria
         BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([self.cls_pw], device=self.device))
         BCEobj = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([self.obj_pw], device=self.device))
         if self.fl_gamma > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, self.fl_gamma), FocalLoss(BCEobj, self.fl_gamma)
         self.BCEcls, self.BCEobj = BCEcls, BCEobj
+
         # model info
         det = deepvac_config.model.detect
-        self.ssi = (self.strides == 16).nonzero(as_tuple=False).item()
         for k in ("anchor_num", "class_num", "detect_layer_num", "anchors"):
             setattr(self, k, getattr(det, k))
 
@@ -185,8 +186,8 @@ class Yolov5Loss(LossBase):
         self.obj_pw = 1.0
         self.fl_gamma = 0.0
         self.autobalance = False
-        self.balance = [4.0, 1.0, 0.4]
         self.cp, self.cn = self.smoothBCE(eps=0.0)
+        self.balance = {[4.0, 1.0, 0.4]}.get(self.detect_layer_num, [4.0, 1.0, 0.25, 0.06, 0.02])  # P3-P7
 
     def build_target(self, pred, target):
         target_num = target.size(0)
@@ -242,26 +243,28 @@ class Yolov5Loss(LossBase):
             tcls.append(cls)
         return tcls, tbox, indices, anch
 
-    def compute_loss(self, p, tcls, tbox, indices, anchors, balance):
+    def compute_loss(self, p, tcls, tbox, indices, anchor, i):
         img_id, anchor_index, cy_index, cx_index = indices
         tobj = torch.zeros_like(p[..., 0], device=self.device)
         target_num = img_id.size(0)
         if not target_num:
-            lobj = self.BCEobj(p[..., 4], tobj) * balance
-            balance = balance * 0.9999 + 0.0001 / lobj.detach().item() if self.autobalance else balance
+            lobj = self.BCEobj(p[..., 4], tobj) * self.balance[i]
+            if self.autobalance:
+                self.balance[i] = self.balance[i] * 0.9999 + 0.0001 / lobj.detach().item()
             return 0, 0, lobj
         # p: [px, py, pw, ph, conf, cls] ...
         ps = p[img_id, anchor_index, cy_index, cx_index]
         # Regression
         pcxcy = ps[:, :2].sigmoid() * 2. - 0.5
-        pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors
+        pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchor
         pbox = torch.cat((pcxcy, pwh), 1)
         iou = self.bbox_iou(pbox.T, tbox, x1y1x2y2=False, CIou=True)
         lbox = (1.0 - iou).mean()
         # Objectness
         tobj[img_id, anchor_index, cy_index, cx_index] = (1.0 - self.gr) + self.gr * iou.detach().clamp(0).type(tobj.dtype)
-        lobj = self.BCEobj(p[..., 4], tobj) * balance
-        balance = balance * 0.9999 + 0.0001 / lobj.detach().item() if self.autobalance else balance
+        lobj = self.BCEobj(p[..., 4], tobj) * self.balance[i]
+        if self.autobalance:
+            self.balance[i] = self.balance[i] * 0.9999 + 0.0001 / lobj.detach().item()
         # Classification
         if self.class_num <= 1:
             return lbox, 0, lobj
@@ -275,11 +278,12 @@ class Yolov5Loss(LossBase):
         tcls, tbox, indices, anchors = self.build_target(pred, target)
         # pred: [(n, c, h1, w1, 9), (n, c, h2, w2, 9), (n, c, h3, w3, 9)]
         for i, p in enumerate(pred):
-            libox, licls, liobj = self.compute_loss(p, tcls[i], tbox[i], indices[i], anchors[i], self.balance[i])
+            libox, licls, liobj = self.compute_loss(p, tcls[i], tbox[i], indices[i], anchors[i], i)
             lbox += libox
             lcls += licls
             lobj += liobj
-        self.balance = [x / self.balance[self.ssi] for x in self.balance] if self.autobalance else self.balance
+        if self.autobalance:
+            self.balance = [x / self.balance[self.ssi] for x in self.balance]
         lbox *= self.box
         lobj *= self.obj
         lcls *= self.cls
