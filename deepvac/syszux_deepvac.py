@@ -333,7 +333,7 @@ class Deepvac(object):
 
     def initEMA(self):
         self.ema = None
-        if self.conf.ema is None:
+        if self.conf.ema is not True:
             return
 
         LOG.logI("Notice: You have enabled ema, which will increase the memory usage.")
