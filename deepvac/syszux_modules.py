@@ -76,6 +76,16 @@ def initWeightsNormal(civilnet):
                 nn.init.normal_(m.weight, 1.0, 0.02)
                 nn.init.zeros_(m.bias)
 
+class Conv2dBnAct(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, act=True):
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        super(Conv2dBnAct, self).__init__(
+            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
+            nn.BatchNorm2d(out_planes),
+            nn.SiLU() if (act is True) else (act if isinstance(act, nn.Module) else nn.Identity())
+        )
+
 class Conv2dBNHardswish(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
         if padding is None:
@@ -86,6 +96,18 @@ class Conv2dBNHardswish(nn.Sequential):
             nn.Hardswish()
         )
 
+class ResBnBlock(nn.Module):
+     def __init__(self, in_channel, expand_channel, out_channel, kernel_size, stride, shortcut=True):
+         super(ResBnBlock, self).__init__()
+         self.layer = nn.Sequential(
+                 Conv2dBNReLU(in_channel, expand_channel, 1, 1),
+                 Conv2dBNReLU(expand_channel, expand_channel, kernel_size, stride, kernel_size//2, expand_channel),
+                 Conv2dBN(expand_channel, out_channel, 1, 1),
+                 )
+         self.shortcut = shortcut and (in_channel == out_channel)
+
+     def forward(self, x):
+         return self.layer(x) + x if self.shortcut else self.layer(x)
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
