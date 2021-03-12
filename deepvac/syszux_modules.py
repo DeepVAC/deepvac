@@ -76,66 +76,40 @@ def initWeightsNormal(civilnet):
                 nn.init.normal_(m.weight, 1.0, 0.02)
                 nn.init.zeros_(m.bias)
 
-class Conv2dBnAct(nn.Sequential):
-    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, act=True):
+class Conv2dBNHardswish(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
         if padding is None:
             padding = (kernel_size - 1) // 2
-        super(Conv2dBnAct, self).__init__(
+        super(Conv2dBNHardswish, self).__init__(
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False),
-            nn.BatchNorm2d(out_planes),
-            nn.SiLU() if (act is True) else (act if isinstance(act, nn.Module) else nn.Identity())
+            nn.BatchNorm2d(out_planes, eps=eps, momentum=momentum),
+            nn.Hardswish()
         )
 
-class ResBnBlock(nn.Module):
-     def __init__(self, in_channel, expand_channel, out_channel, kernel_size, stride, shortcut=True):
-         super(ResBnBlock, self).__init__()
-         self.layer = nn.Sequential(
-                 Conv2dBNReLU(in_channel, expand_channel, 1, 1),
-                 Conv2dBNReLU(expand_channel, expand_channel, kernel_size, stride, kernel_size//2, expand_channel),
-                 Conv2dBN(expand_channel, out_channel, 1, 1),
-                 )
-         self.shortcut = shortcut and (in_channel == out_channel)
-
-     def forward(self, x):
-         return self.layer(x) + x if self.shortcut else self.layer(x)
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
-    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, expansion=0.5, act=True):  # ch_in, ch_out, shortcut, groups, expansion
+    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, eps=1e-5, momentum=0.1, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
         super(BottleneckStd, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
-        self.conv2 = Conv2dBnAct(hidden_planes, out_planes, 3, 1, groups=groups, act=act)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
+        self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, eps, momentum, groups=groups)
         self.add = shortcut and in_planes == out_planes
 
     def forward(self, x):
         return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
 
-class BottleneckC3(nn.Module):
-    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5, act=True):
-        super(BottleneckC3, self).__init__()
-        hidden_planes = int(out_planes * expansion)
-        self.conv1 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
-        self.conv2 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
-        self.conv3 = Conv2dBnAct(hidden_planes*2, out_planes, 1, 1, act=act)
-        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0, act=act) for _ in range(bottle_std_num)])
-
-    def forward(self, x):
-        y1 = self.std_bottleneck_list(self.conv1(x))
-        y2 = self.conv2(x)
-        return self.conv3(torch.cat([y1, y2], dim=1))
-
 class BottleneckCSP(nn.Module):
-    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5, act=True):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, eps=1e-5, momentum=0.1, groups=1, expansion=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(BottleneckCSP, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
         self.conv2 = nn.Conv2d(in_planes, hidden_planes, 1, 1, bias=False)
         self.conv3 = nn.Conv2d(hidden_planes, hidden_planes, 1, 1, bias=False)
-        self.conv4 = Conv2dBnAct(2 * hidden_planes, out_planes, 1, 1, act=act)
-        self.bn = nn.BatchNorm2d(2 * hidden_planes)  # applied to cat(conv2, conv3)
+        self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1, eps, momentum)
+        self.bn = nn.BatchNorm2d(2 * hidden_planes, eps=eps, momentum=momentum)  # applied to cat(conv2, conv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
-        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0, act=act) for _ in range(bottle_std_num)])
+        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, eps=eps, momentum=momentum, expansion=1.0) for _ in range(bottle_std_num)])
 
     def forward(self, x):
         y1 = self.conv3(self.std_bottleneck_list(self.conv1(x)))
@@ -144,11 +118,11 @@ class BottleneckCSP(nn.Module):
 
 class SPP(nn.Module):
     # Spatial pyramid pooling layer used in YOLOv3-SPP
-    def __init__(self, in_planes, out_planes, pool_kernel_size=(5, 9, 13), act=True):
+    def __init__(self, in_planes, out_planes, pool_kernel_size=(5, 9, 13), eps=1e-5, momentum=0.1):
         super(SPP, self).__init__()
         hidden_planes = in_planes // 2  # hidden channels
-        self.conv1 = Conv2dBnAct(in_planes, hidden_planes, 1, 1, act=act)
-        self.conv2 = Conv2dBnAct(hidden_planes * (len(pool_kernel_size) + 1), out_planes, 1, 1, act=act)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
+        self.conv2 = Conv2dBNHardswish(hidden_planes * (len(pool_kernel_size) + 1), out_planes, 1, 1, eps, momentum)
         self.pool_list = nn.ModuleList([nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2) for k in pool_kernel_size])
 
     def forward(self, x):
@@ -157,9 +131,9 @@ class SPP(nn.Module):
 
 class Focus(nn.Module):
     # Focus wh information into c-space
-    def __init__(self, in_planes, out_planes, kernel_size=1, stride=1, padding=None, groups=1, act=True):
+    def __init__(self, in_planes, out_planes, kernel_size=1, stride=1, eps=1e-5, momentum=0.1, padding=None, groups=1):
         super(Focus, self).__init__()
-        self.conv = Conv2dBnAct(in_planes * 4, out_planes, kernel_size, stride, padding, groups, act=act)
+        self.conv = Conv2dBNHardswish(in_planes * 4, out_planes, kernel_size, stride, eps, momentum, padding, groups)
 
     def forward(self, x):  # x(b,c,w,h) -> y(b,4c,w/2,h/2)
         return self.conv(torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1))
