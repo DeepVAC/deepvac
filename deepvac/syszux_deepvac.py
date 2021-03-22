@@ -782,6 +782,9 @@ class DeepvacTrain(Deepvac):
             return
         LOG.logI('Load checkpoint from {} folder'.format(self.output_dir))
         self.net.load_state_dict(torch.load(self.output_dir+'/model__{}'.format(self.conf.checkpoint_suffix), map_location=self.device))
+        if self.conf.load_state_dict_only:
+            LOG.logW('Load state_dict only from {} folder'.format(self.output_dir))
+            return
         state_dict = torch.load(self.output_dir+'/checkpoint__{}'.format(self.conf.checkpoint_suffix), map_location=self.device)
         self.optimizer.load_state_dict(state_dict['optimizer'])
         if self.scheduler:
