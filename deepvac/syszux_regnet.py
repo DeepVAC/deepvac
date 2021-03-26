@@ -2,13 +2,49 @@ import numpy as np
 import torch.nn as nn
 import torch
 
+#function begin
+def quantize_float(f, q):
+    """Converts a float to closest non-zero int divisible by q."""
+    return int(round(f / q) * q)
+
+
+def adjust_ws_gs_comp(ws, bms, gs):
+    """Adjusts the compatibility of widths and groups."""
+    ws_bot = [int(w * b) for w, b in zip(ws, bms)]
+    gs = [min(g, w_bot) for g, w_bot in zip(gs, ws_bot)]
+    ws_bot = [quantize_float(w_bot, g) for w_bot, g in zip(ws_bot, gs)]
+    ws = [int(w_bot / b) for w_bot, b in zip(ws_bot, bms)]
+    return ws, gs
+
+
+def get_stages_from_blocks(ws, rs):
+    """Gets ws/ds of network at each stage from per block values."""
+    ts_temp = zip(ws + [0], [0] + ws, rs + [0], [0] + rs)
+    ts = [w != wp or r != rp for w, wp, r, rp in ts_temp]
+    s_ws = [w for w, t in zip(ws, ts[:-1]) if t]
+    s_ds = np.diff([d for d, t in zip(range(len(ts)), ts) if t]).tolist()
+    return s_ws, s_ds
+
+
+def generate_regnet(anynet_slope, anynet_initial_width, w_m, d, q=8):
+    """Generates per block ws from RegNet parameters."""
+    assert anynet_slope >= 0 and anynet_initial_width > 0 and w_m > 1 and anynet_initial_width % q == 0
+    ws_cont = np.arange(d) * anynet_slope + anynet_initial_width
+    ks = np.round(np.log(ws_cont / anynet_initial_width) / np.log(w_m))
+    ws = anynet_initial_width * np.power(w_m, ks)
+    ws = np.round(np.divide(ws, q)) * q
+    num_stages, max_stage = len(np.unique(ws)), ks.max() + 1
+    ws, ws_cont = ws.astype(int).tolist(), ws_cont.tolist()
+    return ws, num_stages, max_stage, ws_cont
+#function end
+
 class AnyHead(nn.Module):
     """AnyNet head: AvgPool, 1x1."""
 
-    def __init__(self, w_in, nc):
+    def __init__(self, w_in, class_num):
         super(AnyHead, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(w_in, nc, bias=True)
+        self.fc = nn.Linear(w_in, class_num, bias=True)
 
     def forward(self, x):
         x = self.avg_pool(x)
@@ -108,148 +144,66 @@ class AnyStage(nn.Module):
             x = block(x)
         return x
 
-class AnyNet(nn.Module):
-    """AnyNet model."""
-
-    def __init__(self, **kwargs):
-        super(AnyNet, self).__init__()
-        self._construct(**kwargs)
-        #self.apply(net.init_weights)
-
-    def _construct(self, stem_type, stem_w, block_type, ds, ws, ss, bms, gws, se_r, nc):
+class RegNet(nn.Module):
+    def __init__(self, anynet_slope, anynet_initial_width, w_m, d, group_w, class_num=0,stem_w = 32,se_r = 0.25):
+        super(RegNet, self).__init__()
+        ws, num_stages, _, _ = generate_regnet(anynet_slope, anynet_initial_width, w_m, d)
+        # Convert to per stage format
+        width_per_stage, depth_per_stage = get_stages_from_blocks(ws, ws)
+        # Use the same gw, bm and ss for each stage
+        # GROUP_W: 8 for 200MF
+        group_w_per_stage = [group_w for _ in range(num_stages)]
+        bot_muls_per_stage = [1.0 for _ in range(num_stages)]
+        stride_per_stage = self.auditConfig(num_stages)
+        assert(len(stride_per_stage) == num_stages, "configure stride_per_stage error!")
+        # Adjust the compatibility of ws and gws
+        width_per_stage, group_w_per_stage = adjust_ws_gs_comp(width_per_stage, bot_muls_per_stage, group_w_per_stage)
         # Generate dummy bot muls and gs for models that do not use them
-        bms = bms if bms else [None for _d in ds]
-        gws = gws if gws else [None for _d in ds]
-        stage_params = list(zip(ds, ws, ss, bms, gws))
-        #stem_fun = get_stem_fun(stem_type)
+        bot_muls_per_stage = bot_muls_per_stage if bot_muls_per_stage else [None for _d in depth_per_stage]
+        group_w_per_stage = group_w_per_stage if group_w_per_stage else [None for _d in depth_per_stage]
+        stage_params = list(zip(depth_per_stage, width_per_stage, stride_per_stage, bot_muls_per_stage, group_w_per_stage))
+
         self.stem = SimpleStemIN(3, stem_w)
-        #block_fun = get_block_fun(block_type)
         prev_w = stem_w
         for i, (d, w, s, bm, gw) in enumerate(stage_params):
             name = "s{}".format(i + 1)
             self.add_module(name, AnyStage(prev_w, w, s, d, ResBottleneckBlock, bm, gw, se_r))
             prev_w = w
-        self._gethead(prev_w, nc)
 
-    def _gethead(self, prev_w, nc):
-        self.head = AnyHead(w_in=prev_w, nc=nc)
+        if class_num > 0:
+            self.head = AnyHead(w_in=prev_w, class_num=class_num)
+    
+    def auditConfig(self, num_stages):
+        stride_per_stage = [2 for _ in range(num_stages)]
+        return stride_per_stage
 
     def forward(self, x):
         for module in self.children():
             x = module(x)
         return x
 
+class RegNetSmall(RegNet):
+    def __init__(self, class_num):
+        super(RegNetSmall, self).__init__(27.89, 48, 2.09, 16, 8, class_num)
 
-def quantize_float(f, q):
-    """Converts a float to closest non-zero int divisible by q."""
-    return int(round(f / q) * q)
+class RegNetMedium(RegNet):
+    def __init__(self, class_num):
+        super(RegNetMedium, self).__init__(20.71, 48, 2.65, 27, 24, class_num)
 
-
-def adjust_ws_gs_comp(ws, bms, gs):
-    """Adjusts the compatibility of widths and groups."""
-    ws_bot = [int(w * b) for w, b in zip(ws, bms)]
-    gs = [min(g, w_bot) for g, w_bot in zip(gs, ws_bot)]
-    ws_bot = [quantize_float(w_bot, g) for w_bot, g in zip(ws_bot, gs)]
-    ws = [int(w_bot / b) for w_bot, b in zip(ws_bot, bms)]
-    return ws, gs
-
-
-def get_stages_from_blocks(ws, rs):
-    """Gets ws/ds of network at each stage from per block values."""
-    ts_temp = zip(ws + [0], [0] + ws, rs + [0], [0] + rs)
-    ts = [w != wp or r != rp for w, wp, r, rp in ts_temp]
-    s_ws = [w for w, t in zip(ws, ts[:-1]) if t]
-    s_ds = np.diff([d for d, t in zip(range(len(ts)), ts) if t]).tolist()
-    return s_ws, s_ds
-
-
-def generate_regnet(w_a, w_0, w_m, d, q=8):
-    """Generates per block ws from RegNet parameters."""
-    assert w_a >= 0 and w_0 > 0 and w_m > 1 and w_0 % q == 0
-    ws_cont = np.arange(d) * w_a + w_0
-    ks = np.round(np.log(ws_cont / w_0) / np.log(w_m))
-    ws = w_0 * np.power(w_m, ks)
-    ws = np.round(np.divide(ws, q)) * q
-    num_stages, max_stage = len(np.unique(ws)), ks.max() + 1
-    ws, ws_cont = ws.astype(int).tolist(), ws_cont.tolist()
-    return ws, num_stages, max_stage, ws_cont
-
-class RegNet(AnyNet):
-    """RegNet model."""
-
-    def get_dynamic_args(self):
-        return [36.44, 24, 2.49, 13, 8]
-
-    def get_args(self):
-        """Convert RegNet to AnyNet parameter format."""
-        # Generate RegNet ws per block
-        w_a, w_0, w_m, d, gw = self.get_dynamic_args()
-        ws, num_stages, _, _ = generate_regnet(w_a, w_0, w_m, d)
-        # Convert to per stage format
-        s_ws, s_ds = get_stages_from_blocks(ws, ws)
-        # Use the same gw, bm and ss for each stage
-        # GROUP_W: 8 for 200MF
-        s_gs = [gw for _ in range(num_stages)]
-        s_bs = [1.0 for _ in range(num_stages)]
-        s_ss = [2 for _ in range(num_stages)]
-        # Adjust the compatibility of ws and gws
-        s_ws, s_gs = adjust_ws_gs_comp(s_ws, s_bs, s_gs)
-        # Get AnyNet arguments defining the RegNet
-        return {
-            "stem_type": "simple_stem_in",
-            "stem_w": 32,
-            "block_type": 'res_bottleneck_block',
-            "ds": s_ds,
-            "ws": s_ws,
-            "ss": s_ss,
-            "bms": s_bs,
-            "gws": s_gs,
-            "se_r": 0.25,
-            "nc": 1000,
-        }
-
-    def __init__(self):
-        kwargs = self.get_args()
-        super(RegNet, self).__init__(**kwargs)
+class RegNetLarge(RegNet):
+    def __init__(self, class_num):
+        super(RegNetLarge, self).__init__(31.41, 96, 2.24, 22, 64, class_num)
 
 class RegNetOCR(RegNet):
-    def get_dynamic_args(self):
-        return [27.89, 48, 2.09, 16, 8]
-    
-    def get_args(self):
-        """Convert RegNet to AnyNet parameter format."""
-        # Generate RegNet ws per block
-        w_a, w_0, w_m, d, gw = self.get_dynamic_args()
-        ws, num_stages, _, _ = generate_regnet(w_a, w_0, w_m, d)
-        # Convert to per stage format
-        s_ws, s_ds = get_stages_from_blocks(ws, ws)
-        # Use the same gw, bm and ss for each stage
-        # GROUP_W: 8 for 200MF
-        s_gs = [gw for _ in range(num_stages)]
-        s_bs = [1.0 for _ in range(num_stages)]
-        s_ss = [(2,1),(2,1),(2,1),2]
-        # Adjust the compatibility of ws and gws
-        s_ws, s_gs = adjust_ws_gs_comp(s_ws, s_bs, s_gs)
-        # Get AnyNet arguments defining the RegNet
-        return {
-            "stem_type": "simple_stem_in",
-            "stem_w": 32,
-            "block_type": 'res_bottleneck_block',
-            "ds": s_ds,
-            "ws": s_ws,
-            "ss": s_ss,
-            "bms": s_bs,
-            "gws": s_gs,
-            "se_r": 0.25,
-            "nc": 1000,
-        }
+    def __init__(self):
+        super(RegNetOCR, self).__init__(27.89, 48, 2.09, 16, 8, 0)
 
-    def _gethead(self, prev_w, nc):
-        pass
+    def auditConfig(self, num_stages):
+        stride_per_stage = [(2,1),(2,1),(2,1),2]
+        return stride_per_stage
 
 if __name__ == '__main__':
-    model = RegNetOCR()
+    model = RegNetSmall(1000)
     print(model)
     x = torch.randn((1,3,32,320))
     print(model(x).shape)
-
