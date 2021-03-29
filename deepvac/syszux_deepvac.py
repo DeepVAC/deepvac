@@ -14,6 +14,8 @@ from torch.cuda.amp import GradScaler
 from torch.quantization.fuser_method_mappings import DEFAULT_OP_LIST_TO_FUSER_METHOD
 from torch.quantization import quantize_dynamic_jit, per_channel_dynamic_qconfig
 from torch.quantization import get_default_qconfig, quantize_jit
+from torch.quantization import default_dynamic_qconfig, float_qparams_weight_only_qconfig
+from torch.quantization.quantize_fx import prepare_fx, convert_fx, prepare_qat_fx
 import time
 import subprocess
 import tempfile
@@ -112,10 +114,11 @@ class SaveModel(object):
         self.input_net = copy.deepcopy(input_net)
         self.input_net.cpu().eval()
         self.output_file = output_file
+        self.backend = backend
         self.dq_output_file = '{}.dq'.format(output_file)
         self.sq_output_file = '{}.sq'.format(output_file)
         self.d_qconfig_dict = {'': per_channel_dynamic_qconfig}
-        self.s_qconfig_dict = {'': get_default_qconfig(backend) }
+        self.s_qconfig_dict = {'': get_default_qconfig(self.backend) }
         self.ts = None
 
     def getConvertedNetFromQAT(self, net):
@@ -162,16 +165,71 @@ class SaveModelByTrace(SaveModel):
         LOG.logI("SaveModelByTrace: {} ...".format(self.output_file))
         self.ts = torch.jit.trace(self.input_net, input_sample).eval()
 
+    def _jitQ(self, model):
+        return torch.jit.freeze( torch.jit.trace(model) )
+
 class SaveModelByScript(SaveModel):
     def _export(self, input_sample=None):
         LOG.logI("SaveModelByScript: {} ...".format(self.output_file))
         self.ts = torch.jit.script(self.input_net).eval()
+    
+    def _jitQ(self, model):
+        return torch.jit.freeze( torch.jit.script(model) )
 
 class SaveModelByQAT(SaveModelByScript):
     def _export(self, input_sample=None):
         LOG.logI("SaveModelByQAT: {} ...".format(self.output_file))
         qat_net = self.getConvertedNetFromQAT(self.input_net)
         self.ts = torch.jit.script(qat_net).eval()
+
+class FXQuantize(SaveModel):
+    def saveDQ(self):
+        qconfig_dict = {
+            "object_type": [
+                (nn.Embedding, float_qparams_weight_only_qconfig),
+                (nn.LSTM, default_dynamic_qconfig),
+                (nn.Linear, default_dynamic_qconfig)
+            ]
+        }
+        prepared_model = prepare_fx(self.input_net, qconfig_dict)
+        quantized_model = convert_fx(prepared_model)
+        torch.jit.save(self._jitQ(quantized_model), self.dq_output_file)
+
+    def saveSQ(self, loader):
+        if loader is None:
+            LOG.logE("You enabled config.static_quantize_dir, but didn't provide self.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
+        prepared_model = prepare_fx(self.input_net, self.s_qconfig_dict)
+        #print(prepared_model.graph)
+        calibrate(prepared_model, loader)
+        quantized_model = convert_fx(prepared_model)
+        torch.jit.save(self._jitQ(quantized_model), self.sq_output_file)
+
+class EagerQuantize(SaveModel):
+    def saveDQ(self):
+        quantized_model = torch.quantization.quantize_dynamic(self.input_net, inplace=False)
+        torch.jit.save(self._jitQ(quantized_model), self.dq_output_file)
+
+    def saveSQ(self, loader):
+        if loader is None:
+            LOG.logE("You enabled config.static_quantize_dir, but didn't provide self.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
+        fused_model = auto_fuse_model(self.input_net)
+        fused_model.qconfig = torch.quantization.get_default_qconfig(self.backend)
+        prepared_model = torch.quantization.prepare(fused_model, inplace=False)
+        calibrate(prepared_model, loader)
+        quantized_model = torch.quantization.convert(prepared_model, inplace=False)
+        torch.jit.save(self._jitQ(quantized_model), self.sq_output_file)
+
+class FXQuantizeAndScript(FXQuantize, SaveModelByScript):
+    pass
+
+class FXQuantizeAndTrace(FXQuantize, SaveModelByTrace):
+    pass
+
+class EagerQuantizeAndScript(EagerQuantize, SaveModelByScript):
+    pass
+
+class EagerQuantizeAndTrace(EagerQuantize, SaveModelByTrace):
+    pass
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
@@ -495,7 +553,7 @@ class Deepvac(object):
         LOG.logI("config.trace_model_dir found, save trace model to {}...".format(output_trace_file))
 
         net = self.ema if self.conf.ema else self.net
-        save_model = SaveModelByTrace(net, output_trace_file)
+        save_model = FXQuantizeAndTrace(net, output_trace_file)
         save_model.saveByInputOrNot(self.sample)
 
         if self.conf.dynamic_quantize_dir:
@@ -517,7 +575,7 @@ class Deepvac(object):
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
 
         net = self.ema if self.conf.ema else self.net
-        save_model = SaveModelByQAT(net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else SaveModelByScript(net, output_script_file)
+        save_model = SaveModelByQAT(net, "{}.qat".format(output_script_file)) if self.conf.qat_dir else FXQuantizeAndScript(net, output_script_file)
         save_model.saveByInputOrNot()
 
         if self.conf.qat_dir:
