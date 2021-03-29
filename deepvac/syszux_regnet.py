@@ -1,7 +1,7 @@
 import numpy as np
 import torch.nn as nn
 import torch
-
+from .syszux_modules import initWeightsKaiming
 #function begin
 
 def adjust_block_compatibility(width_per_stage, bot_muls_per_stage, group_w_per_stage):
@@ -168,6 +168,8 @@ class RegNet(nn.Module):
 
         if class_num > 0:
             self.head = AnyHead(in_planes=prev_w, class_num=class_num, head_w=head_w)
+
+        initWeightsKaiming(self)
     
     def auditConfig(self, width_per_stage):
         stride_per_stage = [2 for _ in width_per_stage]
