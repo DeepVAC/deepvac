@@ -404,6 +404,21 @@ config.trace_model_dir = <your_trace_model_dir_only4smoketest>
 ```python
 #输出config.onnx_model_dir
 config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+#默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
+config.onnx_version = 9
+config.onnx_input_names = ["input"]
+config.onnx_output_names = ["output"]
+#当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
+config.onnx_dynamic_ax = {
+            'input': {
+                2: 'image_height',
+                3: 'image_width'
+                },
+            'output':{
+                2: 'image_height',
+                3: 'image_width'
+            }
+        }
 ```
 注意：
 - 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为ONNX。之后，在每次保存PyTorch模型的时候，会同时保存ONNX。
@@ -439,6 +454,43 @@ config.coreml_mode = 'classifier'
 - 在训练模式下，<your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 - 在测试模式下，<your_coreml_model_dir_only4smoketest> 为CoreML模型输出路径。
 - 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
+
+### 输出TensorRT（适用于训练模式和测试模式）
+如果要转换PyTorch模型到TensorRT，你需要设置如下的配置：
+```python
+config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+config.trt_model_dir = <your_trt_model_dir_only4smoketest>
+
+# 动态输入下的onnx配置和TensorRT配置
+# 需要配置onnx需要支持的动态输入/动态输出的数据维度, 可以参考上面的 输出ONNX模型 
+config.onnx_input_names = ["input"]
+config.onnx_output_names = ["output"]
+config.onnx_dynamic_ax = {
+            'input': {
+                0: 'batch_size',
+                1: 'image_channel',
+                2: 'image_height',
+                3: 'image_width'
+                },
+            'output':{
+                0: 'batch_size',
+                1: 'output_channel',
+                2: 'output_height',
+                3: 'output_width'
+        }
+    }
+# 需要配置图片的最小输入尺寸，最大输入尺寸和最优尺寸
+config.trt_input_min_dims = (1, 3, 1, 1)
+config.trt_input_opt_dims = (1, 3, 640, 640)
+config.trt_input_max_dims = (1, 3, 2000, 2000)
+
+```
+注意：
+- TensorRT模型的转换依赖于onnx，因此需要首先将模型转换为onnx。
+- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为TensorRT。之后，在每次保存PyTorch模型的时候，会同时保存TensorRT。
+- 在训练模式下，<your_trt_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在测试模式下，<your_trt_model_dir_only4smoketest> 为TensorRT模型输出路径。
+
 
 ### 启用自动混合精度训练（仅适用于训练模式）
 如果要开启自动混合精度训练（AMP），你只需要设置如下配置即可：

@@ -489,7 +489,9 @@ class Deepvac(object):
                     state_dict[name] = self.state_dict[keys[idx]]
                 else:
                     LOG.logE("Weights shape must be equal, {} and {} shape are not equal".format(keys[idx], name), exit=True)
+            
             self.state_dict = state_dict
+            LOG.logI("Reinterpret cast the model success")
 
         if self.conf.qat_dir and self.use_original_net_pre_qat:
             self.net.net2qat.load_state_dict(self.state_dict, strict=False)
@@ -690,7 +692,7 @@ class Deepvac(object):
         try:
             import onnx
         except:
-            LOG.logE("You must install onnx package if you want to convert pytorch to onnx.")
+            LOG.logE("You must install onnx package if you want to convert pytorch to onnx.", exit=True)
             return
 
         if output_onnx_file is None:
@@ -698,9 +700,53 @@ class Deepvac(object):
         else:
             self.conf.onnx_model_dir = output_onnx_file
 
+        if self.conf.onnx_input_names is None:
+            self.conf.onnx_input_names = ["input"]
+        
+        if self.conf.onnx_output_names is None:
+            self.conf.onnx_output_names = ["output"]
+
         net = self.ema if self.conf.ema else self.net
-        torch.onnx._export(net, self.sample, output_onnx_file, export_params=True)
+        torch.onnx.export(net, self.sample, output_onnx_file, input_names=self.conf.onnx_input_names, output_names=self.conf.onnx_output_names, dynamic_axes=self.conf.onnx_dynamic_ax, opset_version=self.conf.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
+
+
+    def exportTensorRT(self, output_trt_file=None):
+        if not self.conf.trt_model_dir:
+            return
+        
+        if not self.conf.onnx_model_dir:
+            LOG.logE("Export tensorrt model depends on onnx(pytorch->onnx->tensorrt), you must set onnx_model_dir.", exit=True)
+        
+        if self.conf.trt_enable_dynamic_input and self.conf.onnx_dynamic_ax is None:
+            LOG.logE("If you want to tensorrt support dynamic input, you must set onnx_dynamic_ax.", exit=True)
+
+        try:
+            import tensorrt as trt
+        except:
+            LOG.logE("You must install tensorrt package if you want to convert pytorch to onnx.", exit=True)
+            return
+
+        if output_trt_file is None:
+            output_trt_file = self.conf.trt_model_dir
+        else:
+            self.conf.trt_model_dir = output_trt_file
+
+        trt_logger = trt.Logger(trt.Logger.WARNING)
+        with trt.Builder(trt_logger) as builder, builder.create_network(1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, trt_logger) as parser:
+            builder.max_workspace_size = 1 << 30
+            with open(self.conf.onnx_model_dir, 'rb') as model:
+                parser.parse(model.read())
+            config = builder.create_builder_config()
+            if self.conf.trt_enable_dynamic_input:
+                profile = builder.create_optimization_profile()
+                profile.set_shape(self.conf.onnx_input_names[0], self.conf.trt_input_min_dims, self.conf.trt_input_opt_dims, self.conf.trt_input_max_dims)
+                config.add_optimization_profile(profile)
+            engine = builder.build_engine(network, config)
+            with open(output_trt_file, "wb") as f:
+                f.write(engine.serialize())
+        LOG.logI("Pytorch model convert to TensorRT model succeed, save model in {}".format(output_trt_file))
+
 
     @syszux_once
     def smokeTestForExport3rd(self, input=None):
@@ -710,6 +756,7 @@ class Deepvac(object):
         self.exportCoreML(input)
         self.exportTorchViaTrace(input)
         self.exportTorchViaScript()
+        self.exportTensorRT()
 
     def prepareQAT(self):
         if not self.conf.qat_dir:
@@ -983,6 +1030,7 @@ class DeepvacTrain(Deepvac):
         output_onnx_file = '{}/onnx__{}.onnx'.format(self.output_dir, file_partial_name)
         output_ncnn_file = '{}/ncnn__{}.bin'.format(self.output_dir, file_partial_name)
         output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.output_dir, file_partial_name)
+        output_trt_file = '{}/trt__{}.trt'.format(self.output_dir, file_partial_name)
         #save state_dict
         net = self.ema if self.conf.ema else self.net
         torch.save(net.state_dict(), state_file)
@@ -999,6 +1047,7 @@ class DeepvacTrain(Deepvac):
         self.exportONNX(self.sample, output_onnx_file)
         self.exportNCNN(self.sample, output_ncnn_file)
         self.exportCoreML(self.sample, output_coreml_file)
+        self.exportTensorRT(output_trt_file)
         #tensorboard
         self.addScalar('{}/Accuracy'.format(self.phase), self.accuracy, self.iter)
 
