@@ -707,8 +707,7 @@ class Deepvac(object):
             self.conf.onnx_output_names = ["output"]
 
         net = self.ema if self.conf.ema else self.net
-        torch.onnx.export(net, self.sample, output_onnx_file, input_names=self.conf.onnx_input_names, output_names=self.conf.onnx_output_names, dynamic_axes=self.conf.onnx_dynamic_ax, opset_version=self.conf.onnx_v
-ersion, export_params=True)
+        torch.onnx.export(net, self.sample, output_onnx_file, input_names=self.conf.onnx_input_names, output_names=self.conf.onnx_output_names, dynamic_axes=self.conf.onnx_dynamic_ax, opset_version=self.conf.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(output_onnx_file))
 
 
@@ -1031,7 +1030,7 @@ class DeepvacTrain(Deepvac):
         output_onnx_file = '{}/onnx__{}.onnx'.format(self.output_dir, file_partial_name)
         output_ncnn_file = '{}/ncnn__{}.bin'.format(self.output_dir, file_partial_name)
         output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.output_dir, file_partial_name)
-        output_trt_file = '{}/trt__{}.uff'.format(self.output_dir, file_partial_name)
+        output_trt_file = '{}/trt__{}.trt'.format(self.output_dir, file_partial_name)
         #save state_dict
         net = self.ema if self.conf.ema else self.net
         torch.save(net.state_dict(), state_file)
