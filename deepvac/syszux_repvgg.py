@@ -153,6 +153,7 @@ class RepVGGLarge(RepVGG):
     def __init__(self, class_num=1000, deploy=False):
         super(RepVGGLarge, self).__init__([2, 4, 14, 1], [1.5, 1.5, 1.5, 2.75], None, class_num, deploy)
 
+
 if __name__ == '__main__':
     model = RepVGGSmall()
     print(model)
