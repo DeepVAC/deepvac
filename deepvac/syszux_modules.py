@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from typing import List
 from torch.nn import init
 
+from collections import OrderedDict
+
 #fuse model
 def fuse4deepvac(civilnet):
     for m in civilnet.modules():
@@ -359,6 +361,15 @@ class Conv2dBN(nn.Sequential):
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, bias=False),
             nn.BatchNorm2d(out_planes)
         )
+
+class Conv2dBNWithName(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1):
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        super(Conv2dBNWithName, self).__init__(OrderedDict([
+            ('conv', nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=False)),
+            ('bn', nn.BatchNorm2d(out_planes))
+        ]))
 
 class SSH(nn.Module):
     def __init__(self, in_planes: int, out_planes: int):
