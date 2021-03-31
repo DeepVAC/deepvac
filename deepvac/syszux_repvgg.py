@@ -106,7 +106,7 @@ class RepVGG(nn.Module):
 
         layers = []
         for planes, num_blocks, stride in self.cfgs:
-            layers.extend(self._make_stage(planes, num_blocks, stride))
+            layers.extend(self._make_layer(planes, num_blocks, stride))
         
         self.layer = nn.Sequential(*layers)
 
@@ -120,7 +120,7 @@ class RepVGG(nn.Module):
         self.override_groups_map = None
         LOG.logW("You must reimplement auditConfig() to initialize self.cfgs and self.override_groups_map")
 
-    def _make_stage(self, planes, num_blocks, stride):
+    def _make_layer(self, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         blocks = []
         for stride in strides:
