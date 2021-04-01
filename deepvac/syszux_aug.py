@@ -61,12 +61,13 @@ class SpeckleAug(AugBase):
         self.severity = np.random.uniform(0, 0.6*255)
 
     def __call__(self, img):
+        input_type = img.dtype
         self.auditInput(img)
         blur = ndimage.gaussian_filter(np.random.randn(*img.shape) * self.severity, 1)
         img_speck = (img + blur)
         img_speck[img_speck > 255] = 255
         img_speck[img_speck <= 0] = 0
-        img_speck = img_speck.astype(np.uint8)
+        img_speck = img_speck.astype(input_type)
         return img_speck
 
 # 仿射变换
