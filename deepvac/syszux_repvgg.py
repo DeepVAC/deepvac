@@ -8,14 +8,14 @@ class RepVGGModelConvert(object):
     def __init__(self):
         self.all_weights = {}
 
-    def _isValidName(self, key):
-        if key[0] == '.':
+    def _isValidName(self, name):
+        if name[0] == '.':
             return False
-        if '.rbr_dense' in key:
+        if '.rbr_dense' in name:
             return False
-        if '.rbr_1x1' in key:
+        if '.rbr_1x1' in name:
             return False
-        if '.rbr_identity' in key:
+        if '.rbr_identity' in name:
             return False
         return True
 
