@@ -66,6 +66,7 @@ class SpeckleAug(AugBase):
         img_speck = (img + blur)
         img_speck[img_speck > 255] = 255
         img_speck[img_speck <= 0] = 0
+        img_speck = img_speck.astype(np.uint8)
         return img_speck
 
 # 仿射变换
