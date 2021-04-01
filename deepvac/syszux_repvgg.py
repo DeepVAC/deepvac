@@ -4,6 +4,50 @@ import torch
 from .syszux_modules import initWeightsKaiming, Conv2dBNWithName
 from .syszux_log import LOG
 
+class RepVGGModelConvert(object):
+    def __init__(self):
+        self.all_weights = {}
+
+    def _isValidName(self, name):
+        if name[0] == '.':
+            return False
+        if '.rbr_dense' in name:
+            return False
+        if '.rbr_1x1' in name:
+            return False
+        if '.rbr_identity' in name:
+            return False
+        return True
+
+    def _addReparamPart(self, name, module):
+        kernel, bias = module.repvgg_convert()
+        self.all_weights[name + '.rbr_reparam.weight'] = kernel
+        self. all_weights[name + '.rbr_reparam.bias'] = bias
+
+    def _addOtherPart(self, name, module):
+        for p_name, p_tensor in module.named_parameters():
+            full_name = name + '.' + p_name
+            if self._isValidName(full_name) and full_name not in self.all_weights:
+                self.all_weights[full_name] = p_tensor.detach()
+        for p_name, p_tensor in module.named_buffers():
+            full_name = name + '.' + p_name
+            if self._isValidName(full_name) and full_name not in self.all_weights:
+                self.all_weights[full_name] = p_tensor
+
+    def __call__(self, train_model:torch.nn.Module, deploy_model:torch.nn.Module, save_path=None):
+        self.all_weights = {}
+        for name, module in train_model.named_modules():
+            if hasattr(module, 'repvgg_convert'):
+                self._addReparamPart(name, module)
+            else:
+                self._addOtherPart(name, module)
+
+        deploy_model.load_state_dict(self.all_weights)
+        if save_path is not None:
+            torch.save(deploy_model.state_dict(), save_path)
+
+        return deploy_model
+
 class RepVGGBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, dilation=1, groups=1, padding_mode='zeros', deploy=False):
         super(RepVGGBlock, self).__init__()
@@ -91,7 +135,7 @@ class RepVGGBlock(nn.Module):
 
     def repvgg_convert(self):
         kernel, bias = self.get_equivalent_kernel_bias()
-        return kernel.detach().cpu().numpy(), bias.detach().cpu().numpy(),
+        return kernel.detach(), bias.detach()
 
 class RepVGG(nn.Module):
     def __init__(self, class_num=1000, deploy=False):
