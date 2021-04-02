@@ -23,9 +23,9 @@ DeepVAC的依赖有：
 
 对于普通用户来说，最方便高效的方式还是使用DeepVAC的预构建Docker镜像，可以帮助用户省掉不必要的环境配置时间：
 ```bash
-docker run --gpus all -it gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 bash
+docker run --gpus all -it --entrypoint=/bin/bash gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04
 ```
-该Docker镜像的Dockerfile参考：[Dockerfile](https://github.com/CivilNet/Gemfield/blob/master/dockerfiles/pytorch-dev/Dockerfile.pytorch-1.8.0-devel)。
+在MLab组织内部，我们使用的是基于此镜像的[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)。
   
 
 ## 3. 安装deepvac库
@@ -535,6 +535,7 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 ```
 
 注意：
+- **由于上游PyTorch相关功能的缺失，该功能还不完善。普通用户最好不要打开此开关。**
 - 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
 - 在训练模式下，<your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 - 在测试模式下（如果支持的话），<your_quantize_model_output_dir_only4smoketest> 为量化模型输出路径。
@@ -544,15 +545,13 @@ config.quantize_backend = <'fbgemm' | 'qnnpack'>
 - 由上游PyTorch引入的问题：[问题列表](https://github.com/DeepVAC/deepvac/issues/72); 
 - 暂无。
 
-
-
 # DeepVAC的社区产品
 | 产品名称 | 部署形式 |当前版本 | 获取方式 |
 | ---- | ---- | ---- |---- |
-|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.3.6 | pip install deepvac |
-|[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.8.0 | 下载 & 解压|
-|[deepvac开发时镜像(含libdeepvac开发时)](https://github.com/CivilNet/Gemfield/tree/master/dockerfiles/pytorch-dev) | Docker镜像| gemfield/deepvac:vision-11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
-|[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/deepvac:1.8.0-11.0.3-cudnn8-runtime-ubuntu20.04<br>gemfield/deepvac:1.8.0-intel-x86-64-runtime-ubuntu20.04  | docker pull|
-|DeepVAC版PyTorch | conda包 |1.8.0 | conda install -y pytorch -c gemfield |
-|[DeepVAC版LibTorch](https://github.com/CivilNet/libtorch)| 压缩包 | 1.8.0 | 下载 & 解压|
-|MLab| PaaS平台 | 2.0 | 私有化部署|
+|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.4.0 | pip install deepvac |
+|[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.9.0 | 下载 & 解压|
+|[deepvac/libdeepvac开发时镜像](https://github.com/deepVAC/deepvac#2-%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87) | Docker镜像| gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
+|[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/libdeepvac:11.0.3-cudnn8-runtime-ubuntu20.04-1.9<br>gemfield/libdeepvac:intel-x86-64-runtime-ubuntu20.04-1.9  | docker pull|
+|DeepVAC版PyTorch | conda包 |1.9.0 | conda install -c gemfield pytorch |
+|[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 压缩包 | 1.9.0 | 下载 & 解压|
+|[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| PaaS平台 | 1.0 | 私有化部署|
