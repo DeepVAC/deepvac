@@ -276,8 +276,6 @@ def auditConfig():
     config.test.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config.test.disable_git = True
-    config.test.model_path = sys.argv[2]
-    img_path = sys.argv[3]
     config.test.script_model_dir = "./gemfield_script.pt"
     config.test.transform = trans.Compose([
         trans.Resize((224, 224)),
@@ -324,6 +322,8 @@ if __name__ == "__main__":
     if op == 'train':
         if(len(sys.argv) != 6):
             LOG.logE("Usage: python -m deepvac.syszux_resnet train <pretrained_model.pth> <train_val_data_dir_prefix> <train.txt> <val.txt>", exit=True)
+
+        config.model_path = sys.argv[2]
         config.train.fileline_data_path_prefix = sys.argv[3]
         config.train.fileline_path = sys.argv[4]
         config.val.fileline_data_path_prefix = sys.argv[3]
@@ -335,6 +335,7 @@ if __name__ == "__main__":
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.syszux_resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
 
+        config.test.model_path = sys.argv[2]
         config.test.static_quantize_dir = "./static_quantize.pt"
         config.test.input_dir = sys.argv[3]
         test = ResNet50Test(config.test)
@@ -344,18 +345,16 @@ if __name__ == "__main__":
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.syszux_resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
 
+        config.test.model_path = sys.argv[2]
+        config.test.disable_loader = True
+        img_path = sys.argv[3]
+
         t224x224 = torch.rand((100, 1, 3, 224, 224), dtype = torch.float).to(config.test.device)
         t640x640 = torch.rand((100, 1, 3, 640, 640), dtype = torch.float).to(config.test.device)
         t1280x720 = torch.rand((50, 1, 3, 720, 1280), dtype = torch.float).to(config.test.device)
         t1280x1280 = torch.rand((50, 1, 3, 1280, 1280), dtype = torch.float).to(config.test.device)
 
-        config.test.disable_loader = True
-        
-
         test = ResNet50Test(config.test)
-
-        img_path = sys.argv[3]
-
         test.benchmark(t224x224, img_path)
         test.benchmark(t640x640, img_path)
         test.benchmark(t1280x720, img_path)
