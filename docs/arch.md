@@ -15,17 +15,17 @@
 |config.py     |用户训练和测试的配置文件| 是 |
 |modules/model.py | 模型、Loss的定义文件，PyTorch Module类的扩展实现|否 |
 |modules/model_{name}.py | 同上，有多个model的时候，使用suffix区分|否 |
-|modules/loss.py | loss实现，如果该实现比较轻量的话，可以直接放在modules/model.py中|否 |
+|modules/loss.py | loss实现。如果该实现比较轻量的话，可以直接放在modules/model.py中|否 |
 |modules/utils.py | 工具类/方法的定义文件|否 |
 |modules/utils_{name}.py | 同上，有多个工具类/函数文件的时候，使用suffix区分|否 |
-|data/dataloader.py | dataset类的自定义实现，如果该实现比较轻量的话，可以直接放在modules/model.py中|否 |
+|data/dataloader.py | dataset类的自定义实现。如果该实现比较轻量的话，可以直接放在modules/model.py中|否 |
 |data/train.txt | 训练集清单文件|否 |
 |data/val.txt   | 验证集清单文件|否 |
 |output/model*  | 输出或输入的模型文件 |是 |
 |output/optimizer* | 输出或输入的checkpoint文件 |是 |
 |synthesis/synthesis.py| 数据合成或清洗代码|否 |
 |synthesis/config.py|synthesis.py的配置文件|否 |
-|aug/aug.py|数据增强的代码|否 |
+|aug/aug.py|数据增强的代码。如果该实现比较轻量的话，可以直接放在dataset类的文件中|否 |
 |aug/config.py|aug.py的配置文件|否 |
 |log/*.log    |日志输出目录   |是 |
 
