@@ -4,7 +4,7 @@ def readme():
     with open('README.md') as f:
         return f.read()
 
-version="0.4.0"
+version="0.4.1"
 setuptools.setup(name='deepvac',
     version=version,
     description='PyTorch python project standard',
