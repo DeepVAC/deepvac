@@ -8,15 +8,15 @@
 | 1 | 训练集是否维护在MLab存储上 |         |||
 | 2 | 测试集是否维护在MLab存储上 |         |||
 | 3 | 验收集是否维护在MLab存储上 |         |||
-| 4 | 模型定义是否复用了deepvac.syszux_modules |         |||
-| 5 | 模型定义是否复用了deepvac.syszux_* |         |||
-| 6 | loss定义是否复用了deepvac.syszux_loss |         |||
+| 4 | 模型定义是否复用了deepvac.backbones |         |||
+| 5 | 模型转换是否复用了deepvac.cast |         |||
+| 6 | loss定义是否复用了deepvac.loss |         |||
 | 7 | 训练代码是否基于deepvac库 |         |||
 | 8 | 测试代码是否基于deepvac库 |         |||
 | 9 | 日志代码是否基于deepvac库    |         |||
 |10 | 配置代码是否基于deepvac库    |         |||
 |11 | 数据合成代码是否基于deepvac库    |         |||
-|12 | 数据增强和动态增强代码是否基于deepvac库    |         |||
+|12 | 数据增强和动态增强代码是否基于deepvac.aug    |         |||
 |13 | dataloader代码是否基于deepvac库      |         |||
 |14 | 模型性能报告代码是否基于deepvac库    |         |||
 |15 | 项目代码是否符合DeepVAC代码规范     |         |||

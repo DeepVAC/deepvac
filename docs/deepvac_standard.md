@@ -20,15 +20,18 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 包含如下三个方面：
 #### 使用[deepvac库](./lib.md)
 代码必须基于deepvac库，且维护在MLab代码服务系统上。特别的：
-- 训练、测试代码基于DeepvacTrain、Deepvac模块；
+- 训练、验证代码基于DeepvacTrain类；
+- 测试代码基于Deepvac类；
 - 日志基于LOG模块；
 - 配置基于config模块;
-- 数据合成基于Synthesis*;
-- 数据增强基于*Aug;
-- 数据动态增强基于{,*Aug}Executor;
-- 自定义dataloader基于*Dataset;
+- 数据合成基于Synthesis项目;
+- 数据增强基于deepvac.aug;
+- 数据动态增强基于deepvac.aug模块的Composer类体系;
+- 自定义dataloader基于deepvac.datasets;
 - 模型性能报告基于Report模块;
-- 模型定义基于deepvac.syszux_modules、deepvac.syszux_*。
+- 模型定义基于deepvac.backbones;
+- 损失函数基于deepvac.loss；
+- 模型到各平台的转换基于deepvac.cast；
 
 #### 使用DeepVAC代码规范
 访问：[代码规范](./code_standard.md)
@@ -58,22 +61,22 @@ date: <测试日期>
 
 #### 部署目标为x86+CUDA Linux的训练
 开启如下开关：
-- config.script_model_dir（必须）
-- config.trace_model_dir（可选）
-- config.static_quantize_dir（必须）
-- config.dynamic_quantize_dir（可选）
-- config.ema（可选）
-- config.tensorboard_*（可选）
-- config.amp（可选）
-- config.dist_url（可选）
+- config.train.script_model_dir（必须）
+- config.train.trace_model_dir（可选）
+- config.train.static_quantize_dir（必须）
+- config.train.dynamic_quantize_dir（可选）
+- config.train.ema（可选）
+- config.train.tensorboard_*（可选）
+- config.train.amp（可选）
+- config.train.dist_url（可选）
 
 
 #### 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
 在部署目标为x86+CUDA Linux的训练基础上，开启如下开关：
-- config.qat_dir（必须）
-- config.onnx_model_dir（可选，需要ONNX时开启）
-- config.ncnn_model_dir, config.onnx2ncnn（可选，需要NCNN时开启）
-- config.coreml_model_dir, config.coreml_preprocessing_args（可选，需要CoreML时开启）
+- config.train.qat_dir（必须，该功能还未开发完毕）
+- config.train.onnx_model_dir（可选，需要ONNX时开启）
+- config.train.ncnn_model_dir, config.train.onnx2ncnn（可选，需要NCNN时开启）
+- config.train.coreml_model_dir, config.train.coreml_preprocessing_args（可选，需要CoreML时开启）
 
 ## 部署方式
 所有的AI产品默认进行3种部署测试：

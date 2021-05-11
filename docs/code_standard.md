@@ -109,3 +109,13 @@ switch( level ){
         break;
 }
 ```
+
+## python的import顺序
+按照如下优先级顺序来import模块:
+- import标准库
+- import三方库
+- import cv系列
+- import torch系列
+- import torchvision系列
+- import deepvac系列
+- import 本项目

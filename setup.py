@@ -14,10 +14,8 @@ setuptools.setup(name='deepvac',
     download_url="",
     author='Gemfield',
     author_email='gemfield@civilnet.cn',
-    #packages=setuptools.find_packages(),
-    packages=[
-        'deepvac',
-    ],
+    packages=setuptools.find_packages(),
+    include_package_data=True,
     package_dir={
         'deepvac': 'deepvac',
     },
@@ -33,5 +31,4 @@ setuptools.setup(name='deepvac',
         "Programming Language :: Python :: 3",
         "Topic :: Software Development :: Libraries"
      ],
-    include_package_data=True,
     zip_safe=False)

@@ -21,11 +21,8 @@ DeepVAC的依赖有：
 
 这些依赖使用pip命令（或者git clone）自行安装，不再赘述。
 
-对于普通用户来说，最方便高效的方式还是使用DeepVAC的预构建Docker镜像，可以帮助用户省掉不必要的环境配置时间：
-```bash
-docker run --gpus all -it --entrypoint=/bin/bash gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04
-```
-在MLab组织内部，我们使用的是基于此镜像的[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)。
+对于普通用户来说，最方便高效的方式还是使用[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)作为DeepVAC的使用环境，这是一个预构建的Docker image，可以帮助用户省掉不必要的环境配置时间。
+同时在MLab组织内部，我们也使用[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)进行日常的模型的训练任务。
   
 
 ## 3. 安装deepvac库
@@ -51,57 +48,105 @@ sys.path.insert(0,'/home/gemfield/github/deepvac')
 - 切换到上述的LTS_b1分支中，开始coding；
 
 ## 5. 编写配置文件
-配置文件的文件名均为 config.py，在代码开始处添加```from deepvac import config```；  
-所有用户的配置都存放在这个文件里。 有些配置是全局唯一的，则直接配置如下：
+配置文件的文件名均为 config.py，位于你项目的根目录。在代码开始处添加```from deepvac import config```；
+所有用户的配置都存放在这个文件里。config模块提供了2个预定义的作用域：config.train和config.aug。使用方法如下：
+- 所有和trainer相关（包括train、val、test）的配置都定义在config.train中；
+- 所有和deepvac.aug中增强模块相关的配置都定义在config.aug中；
+- 用户可以开辟自己的作用域，比如config.my_stuff = AttrDict()，然后config.my_stuff.name = 'gemfield'；
 
+Deepvac的config模块内置了如下的配置，而且用户一般不需要修改（如果想修改也可以）：
 ```bash
-config.device = "cuda"
-config.output_dir = "output"
-config.log_dir = "log"
-config.log_every = 10
-......
+## ------------------ common ------------------
+config.train.output_dir = "output"
+config.train.log_dir = "log"
+config.train.log_every = 10
+config.train.disable_git = False
+#使用模型转换器的时候，网络和input是否要to到cpu上
+config.train.cast2cpu = True
+
+## -------------------- loader ------------------
+config.train.num_workers = 3
+
+## -------------------- optimizer ------------------
+#多少个batch更新一次权重
+config.train.nominal_batch_factor = 1
 ```
-有些配置在train、val、test上下文中有不同的值，比如batch_size，则配置在对应的上下文中：
+Deepvac的config模块内置了如下的配置，但是用户一般需要修改（如果用到的话）：
 ```bash
-#in train context
-config.train.batch_size = 128
+## ------------------ common ------------------
+config.train.device = "cuda:0"
 
-#in val context
-config.val.batch_size = 32
-......
+## ------------------ ddp --------------------
+config.train.dist_url = "tcp://localhost:27030"
+config.train.world_size = 2
+
+## ------------------ optimizer  ------------------
+config.train.lr = 0.01
+config.train.lr_step = None
+config.train.lr_factor = 0.2703
+config.train.momentum = 0.9
+config.train.nesterov = False
+config.train.weight_decay = None
+
+## ------------------- train ------------------
+config.train.train_batch_size = 128
+config.train.epoch_num = 30
+#一个Epoch保存几次模型
+config.train.save_num = 5
+#使用MultiStepLR时的学习率下降Epoch idx
+config.train.milestones = [2,4,6,8,10]
+#要加载的预训练模型
+config.train.checkpoint_suffix = ''
+config.train.train_batch_size = 128
+
+## ------------------ val ------------------
+config.train.val_batch_size = 32
 ```
-一个完整的config.py例子可以参考 [config.py例子](./examples/a_resnet_project/config.py)
+以上只是基础配置，更多配置：
+- 预训练模型加载；
+- checkpoint加载；
+- tensorboard使用；
+- TorchScript使用；
+- 转换ONNX；
+- 转换NCNN；
+- 转换CoreML；
+- 转换TensorRT；
+- 转换TNN（即将）；
+- 转换MNN（即将）；
+- 开启量化；
+- 开启EMA；
+- 开启自动混合精度训练；
+
+以及关于配置文件的更详细解释，请阅读[config](./docs/config.md)
 
 
-然后用下面的方式来使用 config.py文件: 
+然后在项目根目录下的train.py中用如下方式引用config.py文件:
 
 ```python
-from config import config as conf
-vac = Deepvac(conf)
+from config import config as deepvac_config
+my_train = DeepvacTrain(deepvac_config.train)
 ```
 
-之后，代码中一般通过如下方式来读写配置项
+之后，train.py代码中通过如下方式来读写config.train中的配置项
 ```python
-#通过conf模块来访问
-print(conf.log_dir)
-
-#在类中可以通过self.conf成员访问配置
-print(self.conf.train.batch_size)
+print(self.config.log_dir)
+print(self.config.batch_size)
+......
 ```
 
 ## 6. 编写synthesis/synthesis.py（可选）
 编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
-这一步为可选，如果有需要的话，可以参考Deepvac组织下其它项目的实现。
+这一步为可选，如果有需要的话，可以参考Deepvac组织下Synthesis2D项目的实现。
 
 ## 7. 编写aug/aug.py（可选）
-编写该文件，用于实现数据增强策略。数据增强逻辑一般写在aug/aug.py中，或者（如果简单的话）写在train.py中。
-数据增强的逻辑要封装在Executor子类中，具体来说就是继承Executor基类，比如：
+编写该文件，用于实现数据增强策略。
+数据增强的逻辑要封装在Composer子类中，具体来说就是继承Composer基类，比如：
 ```python
-from deepvac import Executor
+from deepvac.aug import Composer, AugChain
 
-class MyAugExecutor(Executor):
-    def __init__(self, deepvac_config):
-        super(MyAugExecutor, self).__init__(deepvac_config)
+class MyAugComposer(Composer):
+    def __init__(self, deepvac_aug_config):
+        super(MyAugComposer, self).__init__(deepvac_aug_config)
 
         ac1 = AugChain('RandomColorJitterAug@0.5 => MosaicAug@0.5',deepvac_config)
         ac2 = AugChain('MotionAug || GaussianAug',deepvac_config)
@@ -112,7 +157,7 @@ class MyAugExecutor(Executor):
 
 
 ## 8. 编写Dataset类
-代码编写在train.py文件中。  继承Deepvac中的Dataset类体系，比如FileLineDataset类提供了对如下train.txt对装载封装：
+代码编写在data/dataloader.py文件中。继承deepvac.datasets类体系，比如FileLineDataset类提供了对如下train.txt的装载封装：
 ```bash
 #train.txt，第一列为图片路径，第二列为label
 img0/1.jpg 0
@@ -125,7 +170,7 @@ img2/0.jpg 2
 ```
 有时第二列是字符串，并且想把FileLineDataset中使用Image读取图片对方式替换为cv2，那么可以通过如下的继承方式来重新实现：
 ```python
-from deepvac import FileLineDataset
+from deepvac.datasets import FileLineDataset
 
 class FileLineCvStrDataset(FileLineDataset):
     def _buildLabelFromLine(self, line):
@@ -141,20 +186,11 @@ class FileLineCvStrDataset(FileLineDataset):
 ```
 哦，FileLineCvStrDataset也已经是Deepvac中提供的类了。  
 
-再比如，在例子[a_resnet_project](./examples/a_resnet_project/train.py) 中，NSFWTrainDataset就继承了deepvac库中的ImageFolderWithTransformDataset类：
-
-```python
-from deepvac import ImageFolderWithTransformDataset
-
-class NSFWTrainDataset(ImageFolderWithTransformDataset):
-    def __init__(self, nsfw_config):
-        super(NSFWTrainDataset, self).__init__(nsfw_config)
-```
 
 ## 9. 编写训练和验证脚本
-在Deepvac规范中，train.py就代表训练模式。训练模式的代码写在train.py文件中，必须继承DeepvacTrain类：
+在Deepvac规范中，train.py就代表了训练范式。模型训练的代码写在train.py文件中，必须继承DeepvacTrain类：
 ```python
-from deepvac import DeepvacTrain, is_ddp
+from deepvac import DeepvacTrain
 
 class MyTrain(DeepvacTrain):
     pass
@@ -242,303 +278,6 @@ test()
  
 一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
 
-# 再谈配置文件
-基于DeepVAC规范的PyTorch项目，可以通过在config.py中添加一些配置项来自动实现特定的功能。
-
-这些配置的作用范围有三种：
-- 仅适用于训练模式，也就是在train.py执行的时候生效；
-- 仅适用于测试模式，也就是在test.py执行的时候生效；
-- 适用于训练模式和测试模式，也就是train.py、test.py执行的时候都生效。
-
-### 通用配置 (适用于训练模式和测试模式)
-```python
-#单卡训练和测试所使用的device，多卡请开启Deepvac的DDP功能
-config.device = "cuda"
-#是否禁用git branch约束
-config.disable_git = False
-#模型输出和加载所使用的路径，非必要不要改动
-config.output_dir = "output"
-#日志输出的目录，非必要不要改动
-config.log_dir = "log"
-#每多少次迭代打印一次训练日志
-config.log_every = 10
-
-#用于训练时，加载预训练模型。注意不是checkpoint，可参考 config.checkpoint_suffix
-#用于测试时，加载测试模型。
-config.model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pth'
-
-#initNetWithCode()定义的网络如果和权重文件里的parameter name不一致，而在结构上一致，
-#从逻辑上来说本应该能加载权重文件，但因为name不匹配而会失败。
-#可以开启model_reinterpret_cast来解决此问题。这就带来了此开关的2个使用场景：
-#场景1：对原官方开源网络的代码进行deepvac标准化后，为了仍然能够加载原官方预训练模型，可以开启此开关。
-#场景2：也可以通过开启此开关，然后加载原官方的预训练模型到deepvac化后的网络，来进行重构正确性的检查。
-config.model_reinterpret_cast = False
-```
-### Dataloader (适用于训练模式和测试模式)
-```python
-#Dataloader的线程数
-config.num_workers = 3
-```
-### 优化器 (仅适用于训练模式)
-```python
-#学习率
-config.lr = 0.01
-#学习率下降比
-config.lr_factor = 0.2703
-#SGD相关
-config.momentum = 0.9
-config.nesterov = False
-config.weight_decay = None
-#使用MultiStepLR时的学习率下降Epoch idx
-config.milestones = [2,4,6,8,10]
-```
-
-### 训练 (仅适用于训练模式)
-```python
-#训练的batch size
-config.train.batch_size = 128
-#训练多少个Epoch
-config.epoch_num = 30
-#一个Epoch中保存多少次模型和Checkpoint文件
-config.save_num = 5
-
-#checkpoint_suffix一旦配置，则启动train.py的时候将加载output/<git_branch>/checkpoint:<checkpoint_suffix>
-#不配置或者配置为空字符串，表明从头开始训练。
-#训练模式下，该配置会覆盖config.model_path。
-config.checkpoint_suffix = '2020-09-01-17-37_acc:0.9682857142857143_epoch:10_step:6146_lr:0.00011543040395151496.pth'
-```
-
-### 验证 (仅适用于训练模式)
-```python
-#验证时所用的batch size
-config.val.batch_size = None
-```
-
-### 测试 (仅适用于测试模式)
-```python
-#使用jit加载模型，script、trace后的模型如果在python中加载，必须使用这个开关。
-#测试模式下，开启此开关后将会忽略config.model_path
-config.jit_model_path = '/root/.cache/torch/hub/checkpoints/resnet50-19c8e357.pt'
-
-#测试时所用的batch size
-config.test.batch_size = None
-```
-
-### DDP（分布式训练，仅适用于训练模式）
-要启用分布式训练，需要确保3点： 
-- MyTrain类的initTrainLoader中初始化了self.train_sampler。举例：
-```python
-from deepvac import DeepvacTrain, is_ddp
-
-class MyTrain(DeepvacTrain):
-    ...
-    def initTrainLoader(self):
-        self.train_dataset = ClsDataset(self.conf.train)
-        if is_ddp:
-            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
-        self.train_loader = DataLoader(
-            dataset=self.train_dataset,
-            batch_size=self.conf.train.batch_size,
-            shuffle=False if is_ddp else self.conf.train.shuffle,
-            num_workers=self.conf.workers,
-            pin_memory=self.conf.pin_memory,
-            sampler=self.train_sampler if is_ddp else None
-        )
-```   
-- config.py需要进行如下配置：
-```python
-#dist_url，单机多卡无需改动，多机训练一定要修改
-config.dist_url = "tcp://localhost:27030"
-
-#rank的数量，一定要修改
-config.world_size = 3
-```
-- 命令行传递如下两个参数(不在config.py中配置)：
-```bash
-#从0开始
---rank <rank_idx>
-#从0开始
---gpu <gpu_idx>
-```
-上述的配置表明我们将使用3个进程在3个CUDA设备上进行训练。配置完成后，我们在命令行手工启动3个进程：
-```bash
-python train.py --rank 0 --gpu 0
-python train.py --rank 1 --gpu 1
-python train.py --rank 2 --gpu 2
-```
-### 启用EMA (仅适用于训练模式)
-EMA: exponential moving average，指数滑动平均。滑动平均可以使模型更健壮。采用梯度下降算法训练神经网络时，使用滑动平均在很多应用中都可以在一定程度上提高最终模型的表现。
-
-要开启EMA，需要设置如下配置：
-```python
-config.ema = True
-
-#可选配置，默认为lambda x: 0.9999 * (1 - math.exp(-x / 2000))
-config.ema_decay = <lambda function>
-```
-### 启用tensorboard服务 (仅适用于训练模式)
-Deepvac会自动在log/<git_branch>/下写入tensorboard数据，如果需要在线可视化，则还需要如下配置：
-```python
-# 如果不配置，则不启用tensorboard服务
-config.tensorboard_port = "6007"
-# 不配置的话为0.0.0.0，如非必要则无需改变
-config.tensorboard_ip = None
-```
-
-### 输出TorchScript（适用于训练模式和测试模式）
-如果要转换PyTorch模型到TorchScript，你需要设置如下的配置：
-```python
-#通过script的方式将pytorch训练的模型编译为TorchScript模型
-config.script_model_dir = <your_script_model_dir_only4smoketest>
-
-#通过trace的方式将pytorch训练的模型转换为TorchScript模型
-config.trace_model_dir = <your_trace_model_dir_only4smoketest>
-```
-注意：
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为TorchScript。之后，在每次保存PyTorch模型的时候，会同时保存TorchScript；
-- 在训练模式下，<your_trace_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下，<your_trace_model_dir_only4smoketest> 为TorchScript模型输出路径。
-
-### 输出ONNX模型（适用于训练模式和测试模式）
-如果要转换PyTorch模型到ONNX，你需要设置如下的配置：
-```python
-#输出config.onnx_model_dir
-config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
-#默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
-config.onnx_version = 9
-config.onnx_input_names = ["input"]
-config.onnx_output_names = ["output"]
-#当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
-config.onnx_dynamic_ax = {
-            'input': {
-                2: 'image_height',
-                3: 'image_width'
-                },
-            'output':{
-                2: 'image_height',
-                3: 'image_width'
-            }
-        }
-```
-注意：
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为ONNX。之后，在每次保存PyTorch模型的时候，会同时保存ONNX。
-- 在训练模式下，<your_onnx_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下，<your_onnx_model_dir_only4smoketest> 为ONNX模型输出路径。
-
-### 输出NCNN模型（适用于训练模式和测试模式）
-如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
-```python
-# NCNN的文件路径, ncnn.arch ncnn.bin
-config.ncnn_model_dir = <your_ncnn_model_dir_only4smoketest>
-# onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
-config.onnx2ncnn = <your_onnx2ncnn_executable_file>
-```
-注意：
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为NCNN。之后，在每次保存PyTorch模型的时候，会同时保存NCNN。
-- 在训练模式下，<your_ncnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下，<your_ncnn_model_dir_only4smoketest> 为NCNN模型输出路径。
-
-### 输出CoreML（适用于训练模式和测试模式）
-如果要转换PyTorch模型到CoreML，你需要设置如下的配置：
-```python
-config.coreml_model_dir = <your_coreml_model_dir_only4smoketest>
-config.coreml_preprocessing_args = dict(is_bgr=False, image_scale = 1.0 / 255.0, red_bias = 0, green_bias = 0, blue_bias = 0,image_format='NCHW')
-#config.coreml_preprocessing_args = dict(is_bgr=False, image_scale = 1.0 / (0.226 * 255.0), red_bias = -0.485 / 0.226, green_bias = -0.456 / 0.226, blue_bias = -0.406 / 0.226,image_format='NCHW')
-config.minimum_ios_deployment_target = '13'
-#如果类别多，使用代码初始化这个值
-config.coreml_class_labels = ["cls1","cls2","cls3","cls4","cls5","cls6"]
-config.coreml_mode = 'classifier'
-```
-注意：
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
-- 在训练模式下，<your_coreml_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下，<your_coreml_model_dir_only4smoketest> 为CoreML模型输出路径。
-- 参考[转换PyTorch模型到CoreML](https://zhuanlan.zhihu.com/p/110269410) 获取更多参数的用法。
-
-### 输出TensorRT（适用于训练模式和测试模式）
-如果要转换PyTorch模型到TensorRT，你需要设置如下的配置：
-```python
-config.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
-config.trt_model_dir = <your_trt_model_dir_only4smoketest>
-
-# 动态输入下的onnx配置和TensorRT配置
-# 需要配置onnx需要支持的动态输入/动态输出的数据维度, 可以参考上面的 输出ONNX模型 
-config.onnx_input_names = ["input"]
-config.onnx_output_names = ["output"]
-config.onnx_dynamic_ax = {
-            'input': {
-                0: 'batch_size',
-                1: 'image_channel',
-                2: 'image_height',
-                3: 'image_width'
-                },
-            'output':{
-                0: 'batch_size',
-                1: 'output_channel',
-                2: 'output_height',
-                3: 'output_width'
-        }
-    }
-# 需要配置图片的最小输入尺寸，最大输入尺寸和最优尺寸
-config.trt_input_min_dims = (1, 3, 1, 1)
-config.trt_input_opt_dims = (1, 3, 640, 640)
-config.trt_input_max_dims = (1, 3, 2000, 2000)
-
-```
-注意：
-- TensorRT模型的转换依赖于onnx，因此需要首先将模型转换为onnx。
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为TensorRT。之后，在每次保存PyTorch模型的时候，会同时保存TensorRT。
-- 在训练模式下，<your_trt_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下，<your_trt_model_dir_only4smoketest> 为TensorRT模型输出路径。
-
-
-### 启用自动混合精度训练（仅适用于训练模式）
-如果要开启自动混合精度训练（AMP），你只需要设置如下配置即可：
-```python
-config.amp = True
-```
-详情参考[PyTorch的自动混合精度](https://zhuanlan.zhihu.com/p/165152789)。
-
-### 启用量化
-目前PyTorch有三种量化方式，详情参考[PyTorch的量化](https://zhuanlan.zhihu.com/p/299108528):
-- 动态量化
-- 静态量化
-- 量化感知训练
-
-一次训练任务中只能开启一种。
-
-#### 动态量化（适用于训练模式和测试模式）
-要开启动态量化，你需要设置如下的配置：
-```python
-config.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
-```
-注意：开启动态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。	
-
-#### 静态量化（适用于训练模式和测试模式）
-要开启静态量化，你需要设置如下配置：
-```python
-config.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
-
-# backend 为可选，默认为fbgemm
-config.quantize_backend = <'fbgemm' | 'qnnpack'>
-```
-注意：开启静态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。	
-
-#### 量化感知训练(QAT，仅适用于训练模式)
-开启QAT后，整个训练任务的self.net就会转变为量化模型。也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。
-要开启QAT，你需要设置如下配置：
-```python
-config.qat_dir = <your_quantize_model_output_dir_only4smoketest>
-
-# backend 为可选，默认为fbgemm
-config.quantize_backend = <'fbgemm' | 'qnnpack'>
-```
-
-注意：
-- **由于上游PyTorch相关功能的缺失，该功能还不完善。普通用户最好不要打开此开关。**
-- 在训练模式下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
-- 在训练模式下，<your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在测试模式下（如果支持的话），<your_quantize_model_output_dir_only4smoketest> 为量化模型输出路径。
 
 
 # 已知问题
