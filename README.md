@@ -55,7 +55,7 @@ sys.path.insert(0,'/home/gemfield/github/deepvac')
 - 用户可以开辟自己的作用域，比如config.my_stuff = AttrDict()，然后config.my_stuff.name = 'gemfield'；
 
 Deepvac的config模块内置了如下的配置，而且用户一般不需要修改（如果想修改也可以）：
-```bash
+```python
 ## ------------------ common ------------------
 config.train.output_dir = "output"
 config.train.log_dir = "log"
@@ -66,13 +66,10 @@ config.train.cast2cpu = True
 
 ## -------------------- loader ------------------
 config.train.num_workers = 3
-
-## -------------------- optimizer ------------------
-#多少个batch更新一次权重
-config.train.nominal_batch_factor = 1
 ```
+
 Deepvac的config模块内置了如下的配置，但是用户一般需要修改（如果用到的话）：
-```bash
+```python
 ## ------------------ common ------------------
 config.train.device = "cuda:0"
 
@@ -81,12 +78,8 @@ config.train.dist_url = "tcp://localhost:27030"
 config.train.world_size = 2
 
 ## ------------------ optimizer  ------------------
-config.train.lr = 0.01
-config.train.lr_step = None
-config.train.lr_factor = 0.2703
-config.train.momentum = 0.9
-config.train.nesterov = False
-config.train.weight_decay = None
+#多少个batch更新一次权重
+config.train.nominal_batch_factor = 1
 
 ## ------------------- train ------------------
 config.train.train_batch_size = 128
@@ -102,6 +95,40 @@ config.train.train_batch_size = 128
 ## ------------------ val ------------------
 config.train.val_batch_size = 32
 ```
+
+Deepvac的config模块没有预定义，但是用户必须要定义的配置：
+```python
+## -------------------- loader ------------------
+#dataloader的collate_fn参数
+config.train.collate_fn = None
+#MyTrainDataset为Dataset的子类
+config.train.train_dataset = MyTrainDataset(config.train)
+config.train.train_loader = torch.utils.data.DataLoader(
+    config.train.train_dataset,
+    batch_size=config.train.batch_size,
+    num_workers=config.train.num_workers,
+    shuffle= True,
+    collate_fn=config.train.collate_fn
+)
+#MyValDataset为Dataset的子类
+config.train.val_dataset = MyValDataset(config.train)
+config.train.val_loader = torch.utils.data.DataLoader(config.train.val_dataset, batch_size=1, pin_memory=False)
+
+#MyTestDataset为Dataset的子类
+config.train.test_dataset = MyTestDataset(config.train)
+config.train.test_loader = torch.utils.data.DataLoader(config.train.test_dataset, batch_size=1, pin_memory=False)
+
+## ------------------- train ------------------
+#网络定义
+config.train.net = MyNet()
+#损失函数
+config.train.criterion = MyCriterion()
+
+## ------------------ optimizer  ------------------
+config.train.optimizer = optim.SGD(config.train.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)
+config.train.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.train.optimizer, [2,4,6,8,10], 0.27030)
+```
+
 以上只是基础配置，更多配置：
 - 预训练模型加载；
 - checkpoint加载；
@@ -120,14 +147,32 @@ config.train.val_batch_size = 32
 以及关于配置文件的更详细解释，请阅读[config](./docs/config.md)
 
 
-然后在项目根目录下的train.py中用如下方式引用config.py文件:
+项目根目录下的train.py中用如下方式引用config.py文件:
 
 ```python
 from config import config as deepvac_config
-my_train = DeepvacTrain(deepvac_config.train)
+from deepvac import DeepvacTrain
+
+class MyTrain(DeepvacTrain):
+    ......
+
+my_train = MyTrain(deepvac_config.train)
+my_train()
 ```
 
-之后，train.py代码中通过如下方式来读写config.train中的配置项
+项目根目录下的test.py中用如下方式引用config.py文件:
+```python
+from config import config as deepvac_config
+from deepvac import Deepvac
+
+class MyTest(Deepvac)
+    ......
+
+my_test = MyTest(deepvac_config.train)
+my_test()
+```
+
+之后，train.py/test.py代码中通过如下方式来读写config.train中的配置项
 ```python
 print(self.config.log_dir)
 print(self.config.batch_size)
@@ -155,9 +200,8 @@ class MyAugComposer(Composer):
         self.addAugChain('ac2', ac2, 0.5)
 ```
 
-
 ## 8. 编写Dataset类
-代码编写在data/dataloader.py文件中。继承deepvac.datasets类体系，比如FileLineDataset类提供了对如下train.txt的装载封装：
+代码编写在data/dataloader.py文件中。继承deepvac.datasets类体系，比如FileLineDataset类提供了对如下train.txt这种格式的封装：
 ```bash
 #train.txt，第一列为图片路径，第二列为label
 img0/1.jpg 0
@@ -184,11 +228,11 @@ class FileLineCvStrDataset(FileLineDataset):
             sample = self.transform(sample)
         return sample
 ```
-哦，FileLineCvStrDataset也已经是Deepvac中提供的类了。  
+哦，FileLineCvStrDataset也已经是deepvac.datasets中提供的类了。
 
 
 ## 9. 编写训练和验证脚本
-在Deepvac规范中，train.py就代表了训练范式。模型训练的代码写在train.py文件中，必须继承DeepvacTrain类：
+在Deepvac规范中，train.py就代表了训练范式。模型训练的代码写在train.py文件中，继承DeepvacTrain类：
 ```python
 from deepvac import DeepvacTrain
 
@@ -196,89 +240,65 @@ class MyTrain(DeepvacTrain):
     pass
 ```
 
-继承DeepvacTrain类的子类必须（重新）实现以下方法才能够开始训练：       
-
+继承DeepvacTrain的子类可能需要重新实现以下方法才能够开始训练：
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| * initNetWithCode | 初始化self.net成员 | 用于初始化网络，在此方法中手动将网络加载到device设备上 |
-| * initCriterion | 初始化self.criterion成员 | 用于初始化损失/评价函数 |
-| initOptimizer | 初始化self.optimizer成员 | 用于初始化优化器，默认初始化为SGD |
-| initScheduler | 初始化self.scheduler成员 | 默认初始化为torch.optim.lr_scheduler |
-| * initTrainLoader | 初始化self.train_loader成员 | 初始化用于训练的DataLoader | 
-| * initValLoader | 初始化self.val_loader成员  | 初始化用于验证的DataLoader |
-| feedSample | 将self.sample移动到config.device设备上  | 可以重写 |
-| feedTarget | 将self.target（标签）移动到config.device设备上  | 可以重写，比如需要修改target的类型 |
-| preEpoch | 每轮Epoch之前的操作 | 默认啥也不做 |
-| preIter | 每个batch迭代之前的操作 | 默认啥也不做 |
-| postIter | 每个batch迭代之后的操作 | 默认啥也不做 |
-| postEpoch | 每轮Epoch之后的操作 | 默认会调用self.scheduler.step() |
-| doForward | 网络前向推理过程 | 默认会将推理得到的值赋值给self.output成员 |
-| doLoss | 计算loss的过程| 默认会使用self.output和self.target进行计算得到此次迭代的loss|
-| doBackward | 网络反向传播过程 | 默认调用self.loss.backward() |
-| doOptimize | 网络权重更新的过程 | 默认调用self.optimizer.step() | 
+| preEpoch | 每轮Epoch之前的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
+| preIter | 每个batch迭代之前的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
+| postIter | 每个batch迭代之后的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
+| postEpoch | 每轮Epoch之后的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
+| doFeedData2Device | 将sample移动到device设备上,target（标签）移动到device设备上  | 可以重写 |
+| doForward | 网络前向推理过程 | 默认会将推理得到的值赋值给self.config.output成员 |
+| doLoss | 计算loss的过程| 默认会使用self.config.output和self.config.target进行计算得到此次迭代的loss|
+| doBackward | 网络反向传播过程 | 默认调用self.config.loss.backward() |
+| doOptimize | 网络权重更新的过程 | 默认调用self.config.optimizer.step() |
+| doSchedule | 每轮Epoch之后的操作 | 默认会调用self.config.scheduler.step() |
 
- 
-一个train.py的例子 [train.py](./examples/a_resnet_project/train.py)。            
-如果开启了DDP功能，那么注意需要在MyTrain类的initTrainLoader中初始化self.train_sampler：
+典型的写法如下：
 ```python
-from deepvac import DeepvacTrain, is_ddp
-
 class MyTrain(DeepvacTrain):
     ...
-    def initTrainLoader(self):
-        self.train_dataset = ClsDataset(self.conf.train)
-        if is_ddp:
-            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.train_dataset)
-        self.train_loader = DataLoader(
-            dataset=self.train_dataset,
-            batch_size=self.conf.train.batch_size,
-            shuffle=False if is_ddp else self.conf.train.shuffle,
-            num_workers=self.conf.workers,
-            pin_memory=self.conf.pin_memory,
-            sampler=self.train_sampler if is_ddp else None
-        )
-```   
+    #因为基类不能处理list类型的标签，重写该方法
+    def doFeedData2Device(self):
+        self.config.target = [anno.to(self.config.device) for anno in self.config.target]
+        self.config.sample = self.config.sample.to(self.config.device)
 
+    #初始化config.train.accuracy
+    def postEpoch(self):
+        if self.config.is_train:
+            return
+        self.config.accuracy = 1
+        LOG.logI('Test accuray: {:.4f}'.format(self.config.accuracy))
+
+
+train = MyTrain(deepvac_config.train)
+train()
+```
 ## 10. 编写测试脚本
-在Deepvac规范中，test.py就代表测试模式。测试代码写在test.py文件中，继承Deepvac类。
+在Deepvac规范中，test.py就代表测试范式。测试代码写在test.py文件中，继承Deepvac类。
 
 和train.py中的train/val的本质不同在于：
 - 舍弃train/val上下文；
-- 继承Deepvac类并重新实现initTestLoader, 也就是初始化self.test_loader；
 - 网络不再使用autograd上下文；
 - 不再进行loss、反向、优化等计算；
 - 使用Deepvac的*Report模块来进行准确度、速度方面的衡量；
-- 代码更便于生产环境的部署;  
 
 继承Deepvac类的子类必须（重新）实现以下方法才能够开始测试：
 
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| * initNetWithCode | 初始化self.net成员 | 用于初始化网络，在此方法中手动将网络转移到device设备中 |
 | * process | 网络的推理计算过程 | 在该过程中，通过report.add(gt, pred)添加测试结果，生成报告 |
-| * initTestLoader | 初始化self.test_loader成员 | 初始化用于测试的DataLoader | 
 
 典型的写法如下：
 ```python
 class MyTest(Deepvac):
     ...
-    def initNetWithCode(self):
-        self.net = ...
-
     def process(self):
         ...
 
-    def initTestLoader(self):
-        self.test_dataset = ...
-        self.test_loader = ...
-
-test = MyTest()
+test = MyTest(deepvac_config.train)
 test()
 ```
- 
-一个test.py的小例子 [test.py](./examples/a_resnet_project/test.py)。开始测试前，必须在config.py中配置```config.model_path```。
-
-
 
 # 已知问题
 - 由上游PyTorch引入的问题：[问题列表](https://github.com/DeepVAC/deepvac/issues/72); 
@@ -287,10 +307,10 @@ test()
 # DeepVAC的社区产品
 | 产品名称 | 部署形式 |当前版本 | 获取方式 |
 | ---- | ---- | ---- |---- |
-|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.4.0 | pip install deepvac |
+|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.5.0 | pip install deepvac |
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.9.0 | 下载 & 解压|
-|[deepvac/libdeepvac开发时镜像](https://github.com/deepVAC/deepvac#2-%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87) | Docker镜像| gemfield/deepvac:11.0.3-cudnn8-devel-ubuntu20.04 | docker pull|
-|[libdeepvac运行时镜像](https://github.com/deepvac/libdeepvac)| Docker镜像 | gemfield/libdeepvac:11.0.3-cudnn8-runtime-ubuntu20.04-1.9<br>gemfield/libdeepvac:intel-x86-64-runtime-ubuntu20.04-1.9  | docker pull|
 |DeepVAC版PyTorch | conda包 |1.9.0 | conda install -c gemfield pytorch |
 |[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 压缩包 | 1.9.0 | 下载 & 解压|
-|[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| PaaS平台 | 1.0 | 私有化部署|
+|[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| 迄今为止最先进的容器化PyTorch模型训练环境 | 1.1 | docker run / k8s|
+|MLab RookPod| 迄今为止最先进的成本10万人民币以下的存储解决方案 | NA | 硬件规范 + k8s|
+|MLab BaguaLu（MLab八卦炉）| 运行MLab HomePod的硬件 | NA | 硬件规范|

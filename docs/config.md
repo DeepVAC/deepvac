@@ -34,23 +34,38 @@ config.train.model_reinterpret_cast = False
 ```python
 #Dataloader的线程数
 config.train.num_workers = 3
+#dataloader的collate_fn参数
+config.train.collate_fn = None
+#MyTrainDataset为Dataset的子类
+config.train.train_dataset = MyTrainDataset(config.train)
+config.train.train_loader = torch.utils.data.DataLoader(
+    config.train.train_dataset,
+    batch_size=config.train.batch_size,
+    num_workers=config.train.num_workers,
+    shuffle= True,
+    collate_fn=config.train.collate_fn
+)
+#MyValDataset为Dataset的子类
+config.train.val_dataset = MyValDataset(config.train)
+config.train.val_loader = torch.utils.data.DataLoader(config.train.val_dataset, batch_size=1, pin_memory=False)
+
+#MyTestDataset为Dataset的子类
+config.train.test_dataset = MyTestDataset(config.train)
+config.train.test_loader = torch.utils.data.DataLoader(config.train.test_dataset, batch_size=1, pin_memory=False)
 ```
 ### 优化器 (仅适用于train.py)
 ```python
-#学习率
-config.train.lr = 0.01
-#学习率下降比
-config.train.lr_factor = 0.2703
-#SGD相关
-config.train.momentum = 0.9
-config.train.nesterov = False
-config.train.weight_decay = None
-#使用MultiStepLR时的学习率下降Epoch idx
-config.train.milestones = [2,4,6,8,10]
+config.train.optimizer = optim.SGD(config.train.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)
+config.train.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.train.optimizer, [2,4,6,8,10], 0.27030)
 ```
 
 ### 训练 (仅适用于train.py)
 ```python
+#网络定义
+config.train.net = MyNet()
+#损失函数
+config.train.criterion = MyCriterion()
+
 #训练的batch size
 config.train.train.batch_size = 128
 #训练多少个Epoch

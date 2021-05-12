@@ -32,10 +32,10 @@ class Deepvac(object):
 
     def auditConfig(self):
         if not self.config.model_path and not self.config.jit_model_path:
-            LOG.logE("both config.model_path and config.jit_model_path are not configured, cannot do predict.", exit=True)
+            LOG.logE("both config.train.model_path and config.train.jit_model_path are not configured, cannot do predict.", exit=True)
         #audit for ema
         if self.config.is_forward_only and self.config.ema:
-            LOG.logE("Error: You must disable config.ema in test only mode.", exit=True)
+            LOG.logE("Error: You must disable config.train.ema in test only mode.", exit=True)
 
     def _parametersInfo(self):
         param_info_list = [p.numel() for p in self.config.net.parameters() ]
@@ -55,15 +55,15 @@ class Deepvac(object):
     def initStateDict(self):
         self.config.state_dict = None
         if not self.config.model_path:
-            LOG.logI("config.model_path not specified, network parametes will not be initialized from trained/pretrained model.")
+            LOG.logI("config.train.model_path not specified, network parametes will not be initialized from trained/pretrained model.")
             return
 
         if self.config.jit_model_path and self.config.is_forward_only:
-            LOG.logI("config.jit_model_path specified in forward-only mode, network parametes will be initialized from jit model rather than trained/pretrained model.")
+            LOG.logI("config.train.jit_model_path specified in forward-only mode, network parametes will be initialized from jit model rather than trained/pretrained model.")
             return
 
         if self.config.jit_model_path:
-            LOG.logW("config.jit_model_path specified in training mode, omit...")
+            LOG.logW("config.train.jit_model_path specified in training mode, omit...")
 
         LOG.logI('Loading State Dict from {}'.format(self.config.model_path))
         self.config.state_dict = torch.load(self.config.model_path, map_location=self.config.device)
@@ -92,7 +92,7 @@ class Deepvac(object):
         if len(missing_keys) > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
             if not self.config.network_audit_disabled:
-                LOG.logE("If you know this risk, set config.network_audit_disabled=True in config.py to omit this error.")
+                LOG.logE("If you know this risk, set config.train.network_audit_disabled=True in config.py to omit this error.")
 
     def castStateDict(self):
         LOG.logI("config.model_reinterpret_cast is True, Try to reinterpret cast the model")
@@ -134,7 +134,7 @@ class Deepvac(object):
     def initLoader(self):
         #only init test_loader in base class
         if self.config.test_loader is None and self.config.is_forward_only:
-            LOG.logE("You must set config.test_loader in config.py", exit=True)
+            LOG.logE("You must set config.train.test_loader in config.py", exit=True)
 
     def initEMA(self):
         if self.config.ema is not True:
@@ -172,7 +172,7 @@ class Deepvac(object):
         export3rd(self.config, output_file)
 
     def process(self):
-        LOG.logE("You must reimplement process() to process config.sample", exit=True)
+        LOG.logE("You must reimplement process() to process config.train.sample", exit=True)
 
     def __call__(self, input=None):
         self.auditConfig()
@@ -220,19 +220,19 @@ class DeepvacTrain(Deepvac):
     def auditConfig(self):
         #basic train config audit
         if not self.config.train_dataset:
-            LOG.logE("You must set config.train_dataset in config.py",exit=True)
+            LOG.logE("You must set config.train.train_dataset in config.py",exit=True)
         if not self.config.val_dataset:
-            LOG.logE("You must set config.val_dataset in config.py",exit=True)
+            LOG.logE("You must set config.train.val_dataset in config.py",exit=True)
         if not self.config.train_loader:
-            LOG.logE("You must set config.train_loader in config.py",exit=True)
+            LOG.logE("You must set config.train.train_loader in config.py",exit=True)
         if not self.config.val_loader:
-            LOG.logE("You must set config.val_loader in config.py",exit=True)
+            LOG.logE("You must set config.train.val_loader in config.py",exit=True)
         if not self.config.net:
-            LOG.logE("You must set config.net in config.py",exit=True)
+            LOG.logE("You must set config.train.net in config.py",exit=True)
         if not self.config.criterion:
-            LOG.logE("You must set config.criterion in config.py",exit=True)
+            LOG.logE("You must set config.train.criterion in config.py",exit=True)
         if not self.config.optimizer:
-            LOG.logE("You must set config.optimizer in config.py",exit=True)
+            LOG.logE("You must set config.train.optimizer in config.py",exit=True)
         
         #audit for amp
         if self.config.amp and self.config.device.type != 'cuda':
@@ -321,65 +321,25 @@ class DeepvacTrain(Deepvac):
         if self.config.scheduler:
             LOG.logI("You configured scheduler to {}".format(self.config.scheduler))
             return
-        if not self.config.optimizer:
-            LOG.logE("You must set config.optimizer or config.scheduler in config.py.",exit=True)
-        if not self.config.lr_step:
-            LOG.logE("You must set config.optimizer or config.lr_step in config.py.",exit=True)
-        if isinstance(self.config.lr_step, list):
-            self.config.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.config.optimizer, self.config.lr_step,self.config.lr_factor)
-        elif isinstance(self.config.lr_step, int):
-            self.config.scheduler = torch.optim.lr_scheduler.StepLR(self.config.optimizer, self.config.lr_step,self.config.lr_factor)
-        elif isinstance(self.config.lr_step, Callable):
-            self.config.scheduler = torch.optim.lr_scheduler.LambdaLR(self.config.optimizer, lr_lambda=self.config.lr_step)
-        else:
-            LOG.logE("You should set config.scheduler in config.py.", exit=True)
+        LOG.logE("You must set config.train.scheduler in config.py.", exit=True)
 
     def initOptimizer(self):
         if self.config.optimizer:
             LOG.logI("You set optimizer to {} in config.py".format(self.config.optimizer))
             return
-        self.initSgdOptimizer()
-        LOG.logW("You should configure config.optimizer in config.py, unless SGD is exactly what you need")
+        LOG.logE("You must set config.train.optimizer in config.py.",exit=True)
 
     def initTrainLoader(self):
         if self.config.train_loader:
             LOG.logI("You set train_loader to {} in config.py".format(self.config.train_loader))
             return
-        LOG.logE("You must set config.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass.")
+        LOG.logE("You must set config.train.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass.")
 
     def initValLoader(self):
         if self.config.val_loader:
             LOG.logI("You set val_loader to {} in config.py".format(self.config.val_loader))
             return
-        LOG.logE("You must set config.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass.")
-
-    def initSgdOptimizer(self):
-        self.config.optimizer = optim.SGD(self.config.net.parameters(),
-            lr=self.config.lr,
-            momentum=self.config.momentum,
-            weight_decay=self.config.weight_decay,
-            nesterov=self.config.nesterov
-        )
-
-    def initAdamOptimizer(self):
-        self.config.optimizer = optim.Adam(
-            self.config.net.parameters(),
-            lr=self.config.lr,
-            betas=self.config.betas if self.config.betas else (0.9, 0.999),
-            weight_decay=self.config.weight_decay if self.config.weight_decay else 0
-        )
-        for group in self.config.optimizer.param_groups:
-            group.setdefault('initial_lr', group['lr'])
-
-    def initRmspropOptimizer(self):
-        self.config.optimizer = optim.RMSprop(
-            self.config.net.parameters(),
-            lr=self.config.lr,
-            momentum=self.config.momentum,
-            weight_decay=self.config.weight_decay,
-            # alpha=self.config.rmsprop_alpha,
-            # centered=self.config.rmsprop_centered
-        )
+        LOG.logE("You must set config.train.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass.")
 
     def initEmaUpdates(self):
         if self.config.ema is not True:
