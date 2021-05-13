@@ -86,8 +86,6 @@ config.train.train_batch_size = 128
 config.train.epoch_num = 30
 #一个Epoch保存几次模型
 config.train.save_num = 5
-#使用MultiStepLR时的学习率下降Epoch idx
-config.train.milestones = [2,4,6,8,10]
 #要加载的预训练模型
 config.train.checkpoint_suffix = ''
 config.train.train_batch_size = 128
@@ -144,7 +142,7 @@ config.train.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.train.optim
 - 开启EMA；
 - 开启自动混合精度训练；
 
-以及关于配置文件的更详细解释，请阅读[config](./docs/config.md)
+以及关于配置文件的更详细解释，请阅读[config说明](./docs/config.md).
 
 
 项目根目录下的train.py中用如下方式引用config.py文件:
@@ -241,18 +239,19 @@ class MyTrain(DeepvacTrain):
 ```
 
 继承DeepvacTrain的子类可能需要重新实现以下方法才能够开始训练：
-| 类的方法（*号表示必需重新实现） | 功能 | 备注 |
+| 类的方法（*号表示用户一般要重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| preEpoch | 每轮Epoch之前的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
-| preIter | 每个batch迭代之前的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
-| postIter | 每个batch迭代之后的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
-| postEpoch | 每轮Epoch之后的操作 | 默认啥也不做，留给用户重新定义（如果需要的话） |
-| doFeedData2Device | 将sample移动到device设备上,target（标签）移动到device设备上  | 可以重写 |
-| doForward | 网络前向推理过程 | 默认会将推理得到的值赋值给self.config.output成员 |
-| doLoss | 计算loss的过程| 默认会使用self.config.output和self.config.target进行计算得到此次迭代的loss|
-| doBackward | 网络反向传播过程 | 默认调用self.config.loss.backward() |
-| doOptimize | 网络权重更新的过程 | 默认调用self.config.optimizer.step() |
-| doSchedule | 每轮Epoch之后的操作 | 默认会调用self.config.scheduler.step() |
+| preEpoch | 每轮Epoch之前的用户操作，DeepvacTrain啥也不做 | 用户可以重新定义（如果需要的话） |
+| preIter | 每个batch迭代之前的用户操作，DeepvacTrain啥也不做 | 用户可以重新定义（如果需要的话） |
+| postIter | 每个batch迭代之后的用户操作，DeepvacTrain啥也不做 | 用户可以重新定义（如果需要的话） |
+| postEpoch | 每轮Epoch之后的用户操作，DeepvacTrain啥也不做 | 用户可以重新定义（如果需要的话） |
+| doFeedData2Device | DeepvacTrain把来自dataloader的sample和target(标签)移动到device设备上  | 用户可以重新定义（如果需要的话） |
+| doForward | DeepvacTrain会进行网络推理，推理结果赋值给self.config.output成员 |用户可以重新定义（如果需要的话）  |
+| doLoss | DeepvacTrain会使用self.config.output和self.config.target进行计算得到此次迭代的loss| 用户可以重新定义（如果需要的话）|
+| doBackward | 网络反向传播过程，DeepvacTrain会调用self.config.loss.backward()进行BP| 用户可以重新定义（如果需要的话）|
+| doOptimize | 网络权重更新的过程，DeepvacTrain会调用self.config.optimizer.step() | 用户可以重新定义（如果需要的话） |
+| doSchedule | 更新学习率的过程，DeepvacTrain会调用self.config.scheduler.step() | 用户可以重新定义（如果需要的话） |
+| * doValAcc | 在val模式下计算模型的acc，DeepvacTrain啥也不做 | 用户一般要重新定义 |
 
 典型的写法如下：
 ```python
@@ -263,12 +262,10 @@ class MyTrain(DeepvacTrain):
         self.config.target = [anno.to(self.config.device) for anno in self.config.target]
         self.config.sample = self.config.sample.to(self.config.device)
 
-    #初始化config.train.accuracy
-    def postEpoch(self):
-        if self.config.is_train:
-            return
-        self.config.accuracy = 1
-        LOG.logI('Test accuray: {:.4f}'.format(self.config.accuracy))
+    #初始化config.train.acc
+    def doValAcc(self):
+        self.config.acc = your_acc
+        LOG.logI('Test accuray: {:.4f}'.format(self.config.acc))
 
 
 train = MyTrain(deepvac_config.train)
@@ -305,12 +302,12 @@ test()
 - 暂无。
 
 # DeepVAC的社区产品
-| 产品名称 | 部署形式 |当前版本 | 获取方式 |
+| 产品名称 | 简介  |当前版本 | 获取方式/部署形式 |
 | ---- | ---- | ---- |---- |
-|[deepvac](https://github.com/deepvac/deepvac)| python包 | 0.5.0 | pip install deepvac |
-|[libdeepvac](https://github.com/deepvac/libdeepvac) | 压缩包 | 1.9.0 | 下载 & 解压|
-|DeepVAC版PyTorch | conda包 |1.9.0 | conda install -c gemfield pytorch |
-|[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 压缩包 | 1.9.0 | 下载 & 解压|
+|[DeepVAC](https://github.com/deepvac/deepvac)|独树一帜的PyTorch模型训练工程规范  | 0.5.0 | pip install deepvac |
+|[libdeepvac](https://github.com/deepvac/libdeepvac) | 独树一帜的PyTorch模型部署框架 | 1.9.0 | SDK，下载 & 解压|
 |[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| 迄今为止最先进的容器化PyTorch模型训练环境 | 1.1 | docker run / k8s|
-|MLab RookPod| 迄今为止最先进的成本10万人民币以下的存储解决方案 | NA | 硬件规范 + k8s|
-|MLab BaguaLu（MLab八卦炉）| 运行MLab HomePod的硬件 | NA | 硬件规范|
+|MLab RookPod| 迄今为止最先进的成本10万人民币以下的存储解决方案 | NA | 硬件规范 + k8s yaml|
+|MLab BaguaLu（MLab八卦炉）| 适配MLab HomePod的硬件 | NA | 硬件规范|
+|DeepVAC版PyTorch | 为MLab HomePod定制的PyTorch包 |1.9.0 | conda install -c gemfield pytorch |
+|[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 为libdeepvac定制的LibTorch库 | 1.9.0 | 压缩包，下载 & 解压|

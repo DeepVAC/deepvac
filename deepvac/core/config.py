@@ -45,7 +45,7 @@ config.train.save_num = 5
 config.train.milestones = [2,4,6,8,10]
 config.train.checkpoint_suffix = ''
 #
-config.train.accuracy = 0
+config.train.acc = 0
 
 ## ------------------ val ------------------
 config.train.val_batch_size = None

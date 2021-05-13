@@ -438,7 +438,7 @@ class DeepvacTrain(Deepvac):
         LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.config.phase, self.config.epoch, self.config.step, self.config.loader_len,self.config.loss.item(),self.config.optimizer.param_groups[0]['lr']))
 
     def doSave(self, current_time):
-        file_partial_name = '{}__acc_{}__epoch_{}__step_{}__lr_{}'.format(current_time, self.config.accuracy, self.config.epoch, self.config.step, self.config.optimizer.param_groups[0]['lr'])
+        file_partial_name = '{}__acc_{}__epoch_{}__step_{}__lr_{}'.format(current_time, self.config.acc, self.config.epoch, self.config.step, self.config.optimizer.param_groups[0]['lr'])
         state_file = '{}/model__{}.pth'.format(self.config.output_dir, file_partial_name)
         checkpoint_file = '{}/checkpoint__{}.pth'.format(self.config.output_dir, file_partial_name)
 
@@ -452,7 +452,7 @@ class DeepvacTrain(Deepvac):
             'ema': self.config.ema_net.state_dict() if self.config.ema else None,
             'scaler': self.config.scaler.state_dict() if self.config.amp else None},  checkpoint_file)
         #tensorboard
-        self.addScalar('{}/Accuracy'.format(self.config.phase), self.config.accuracy, self.config.iter)
+        self.addScalar('{}/Accuracy'.format(self.config.phase), self.config.acc, self.config.iter)
 
         #export 3rd
         self.export3rd(file_partial_name)
@@ -486,6 +486,10 @@ class DeepvacTrain(Deepvac):
 
     def doIterkeeping(self):
         self.config.iter += 1
+
+    def doValAcc(self):
+        self.config.acc = 0
+        LOG.logW("You should reimplement doValAcc() to assign acc value to self.config.acc in your subclass.")
 
     def train(self):
         self.initStepAndSaveNumber()
@@ -530,6 +534,7 @@ class DeepvacTrain(Deepvac):
                     return
                 LOG.logI('{}: [{}][{}/{}]'.format(self.config.phase, self.config.epoch, i, len(self.config.loader)))
             self.postEpoch()
+            self.doValAcc()
             self.doSave(getPrintTime())
 
     def processAccept(self):
