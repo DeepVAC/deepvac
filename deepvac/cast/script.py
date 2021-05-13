@@ -26,7 +26,6 @@ class ScriptCast(DeepvacCast):
 
         LOG.logI("config.script_model_dir found, save script model to {}...".format(output_script_file))
 
-        net = self.getNet()
         script_model = FXQuantizeAndScript(self.config, output_script_file)
         script_model.save()
 

@@ -3,13 +3,12 @@ import sys
 import numpy as np
 import torch
 import time
+from ..core import ClassifierReport
+from ..utils import LOG
 try:
     import faiss
 except:
-    LOG.W("Faiss not installed. You cannot use the API implemented based on Faiss library.")
-
-from deepvac.syszux_report import ClassifierReport
-from deepvac.syszux_log import LOG
+    LOG.logW("Faiss not installed. You cannot use the API implemented based on Faiss library.")
 
 def swigPtrFromTensor(x):
     """ gets a Faiss SWIG pointer from a pytorch trensor (on CPU or GPU) """
@@ -343,8 +342,8 @@ class NamesPathsClsFeatureVectorByFaissPytorch(NamesPathsClsFeatureVector):
         report()
 
 if __name__ == "__main__":
-    from config import config
-    fv = NamesPathsClsFeatureVector(config)
+    from config import config as deepvac_config
+    fv = NamesPathsClsFeatureVector(deepvac_config.feature)
     fv.printClassifierReport()
 
 def loadDB(self, db_path):

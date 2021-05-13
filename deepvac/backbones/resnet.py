@@ -6,6 +6,7 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 from torchvision import transforms as trans
 from torchvision.models import resnet50
 from ..core.config import config
@@ -16,6 +17,7 @@ from ..utils import LOG
 from .weights_init import initWeightsKaiming
 from .bottleneck_layer import Bottleneck
 from .conv_layer import Conv2dBNReLU
+from ..core.config import AttrDict
 
 class ResnetBasicBlock(nn.Module):
     expansion: int = 1
@@ -172,22 +174,8 @@ class ResNet18OCR(ResNet18):
 
 
 class ResNet50Train(DeepvacTrain):
-    def initNetWithCode(self):
-        self.net = ResNet50()
-
-    def initTrainLoader(self):
-        self.train_dataset = FileLineDataset(self.conf.train)
-        self.train_loader = torch.utils.data.DataLoader(self.train_dataset, batch_size=self.conf.train.batch_size, pin_memory=False)
-
-    def initValLoader(self):
-        self.val_dataset = FileLineDataset(self.conf.val)
-        self.val_loader = torch.utils.data.DataLoader(self.val_dataset, batch_size=1, pin_memory=False)
-
-    def postEpoch(self):
-        if self.is_train:
-            return
-        self.accuracy = 1
-        LOG.logI('Test accuray: {:.4f}'.format(self.accuracy))
+    def __init__(self, deepvac_config):
+        super(ResNet50Train, self).__init__(deepvac_config)
 
 class ResnetClsTestDataset(OsWalkDataset):
     def __init__(self, deepvac_config):
@@ -204,15 +192,6 @@ class ResNet50Test(Deepvac):
     def __init__(self, deepvac_config):
         super(ResNet50Test, self).__init__(deepvac_config)
 
-    def initNetWithCode(self):
-        self.net = resnet50()
-    
-    def initTestLoader(self):
-        if self.conf.disable_loader:
-            return
-        self.test_dataset = ResnetClsTestDataset(self.conf)
-        self.test_loader = torch.utils.data.DataLoader(self.test_dataset, batch_size=1, pin_memory=False)
-
     def validate(self, t, img_path):
         LOG.logI('---------------VALIDATE BEGIN---------------')
         img = cv2.imread(img_path)
@@ -226,12 +205,12 @@ class ResNet50Test(Deepvac):
         ])
 
         input_t = transformer(img)
-        input_t = input_t.to(self.device)
+        input_t = input_t.to(self.config.device)
 
         torch.cuda.synchronize()
         start = time.time()
 
-        preds = self.net(input_t.unsqueeze(0))
+        preds = self.config.net(input_t.unsqueeze(0))
         torch.cuda.synchronize()
         end = time.time()
  
@@ -246,12 +225,12 @@ class ResNet50Test(Deepvac):
         LOG.logI('---------------WARMUP BEGIN---------------')
 
         for i in range(10):
-            ti = torch.rand(( t.size(1), t.size(2), t.size(3), t.size(4) ), dtype = torch.float).to(self.device)
+            ti = torch.rand(( t.size(1), t.size(2), t.size(3), t.size(4) ), dtype = torch.float).to(self.config.device)
  
             torch.cuda.synchronize()
             start = time.time()
 
-            resnet_out = self.net(ti)
+            resnet_out = self.config.net(ti)
 
             torch.cuda.synchronize()
             end = time.time()
@@ -274,7 +253,7 @@ class ResNet50Test(Deepvac):
             ti = t[i]
             torch.cuda.synchronize()
             tick = time.time()
-            resnet_out = self.net(ti)
+            resnet_out = self.config.net(ti)
             
             torch.cuda.synchronize()
             tock = time.time()
@@ -289,38 +268,35 @@ class ResNet50Test(Deepvac):
         LOG.logI('---------------BENCHMARK END---------------')
 
     def process(self):
-        for input_tensor, path in self.test_loader:
-            preds = self.net(input_tensor.to(self.device))
+        for input_tensor, path in self.config.test_loader:
+            preds = self.config.net(input_tensor.to(self.config.device))
             softmaxs = F.softmax( preds, dim=1 )
             max_res = torch.max(softmaxs, dim=1)
             max_probability, max_index = max_res
             LOG.logI("path: {}, max_probability:{}, max_index:{}".format(path[0], max_probability.item(), max_index.item()))
 
 def auditConfig():
-    config.test.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    config.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    config.test.disable_git = True
-    config.test.script_model_dir = "./gemfield_script.pt"
-    config.test.transform = trans.Compose([
-        trans.Resize((224, 224)),
-        trans.ToTensor(),
-        trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
+    config.train.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    config.train.script_model_dir = "./gemfield_script.pt"
 
-    config.disable_git = True
+    config.train.disable_git = True
     #train stuff
-    config.momentum = 0.9
-    config.weight_decay = 5e-4
-    config.gamma = 0.1
-    config.lr = 1e-3
+    config.train.epoch_num = 100
+    config.train.save_num = 1
+    config.train.log_every = 100
+    config.train.num_workers = 4
 
-    config.epoch_num = 100
-    config.save_num = 1
-    config.log_every = 100
-    config.num_workers = 4
-    config.lr_step = [50, 70, 90]
-    config.lr_factor = 0.1
+    config.train.net = ResNet50() # ResNet50() / resnet50()
 
+    config.train.optimizer = optim.SGD(
+        config.train.net.parameters(),
+        lr=1e-3,
+        momentum=0.9,
+        weight_decay=5e-4,
+        nesterov=False
+    )
+    config.train.scheduler = optim.lr_scheduler.MultiStepLR(config.train.optimizer, [50, 70, 90], 0.1)
+    
     config.train.shuffle = True
     config.train.batch_size = 1
 
@@ -328,57 +304,72 @@ def auditConfig():
         trans.ToTensor(),
         trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
-    config.val.transform = trans.Compose([
-        trans.ToTensor(),
-        trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
 
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
-        LOG.logE("Usage: python -m deepvac.syszux_resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
+        LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
     
     op = sys.argv[1]
     if op not in ('train','test','benchmark'):
-        LOG.logE("Usage: python -m deepvac.syszux_resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
+        LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
     #
     auditConfig()
 
     if op == 'train':
         if(len(sys.argv) != 6):
-            LOG.logE("Usage: python -m deepvac.syszux_resnet train <pretrained_model.pth> <train_val_data_dir_prefix> <train.txt> <val.txt>", exit=True)
+            LOG.logE("Usage: python -m deepvac.backbones.resnet train <pretrained_model.pth> <train_val_data_dir_prefix> <train.txt> <val.txt>", exit=True)
 
-        config.model_path = sys.argv[2]
+        config.train.model_path = sys.argv[2]
         config.train.fileline_data_path_prefix = sys.argv[3]
         config.train.fileline_path = sys.argv[4]
-        config.val.fileline_data_path_prefix = sys.argv[3]
-        config.val.fileline_path = sys.argv[5]
-        train = ResNet50Train(config)
+        config.train.val = AttrDict()
+        config.train.val.fileline_data_path_prefix = sys.argv[3]
+        config.train.val.fileline_path = sys.argv[5]
+        config.train.val.transform = trans.Compose([
+            trans.ToTensor(),
+            trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+        ])
+        config.train.train_dataset = FileLineDataset(config.train)
+        config.train.train_loader = torch.utils.data.DataLoader(config.train.train_dataset, batch_size=config.train.batch_size, pin_memory=False)
+        
+        config.train.val_dataset = FileLineDataset(config.train.val)
+        config.train.val_loader = torch.utils.data.DataLoader(config.train.val_dataset, batch_size=1, pin_memory=False)
+        train = ResNet50Train(config.train)
         train()
 
     if op == 'test':
         if(len(sys.argv) != 4):
-            LOG.logE("Usage: python -m deepvac.syszux_resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
+            LOG.logE("Usage: python -m deepvac.backbones.resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
 
-        config.test.model_path = sys.argv[2]
-        config.test.static_quantize_dir = "./static_quantize.pt"
-        config.test.input_dir = sys.argv[3]
-        test = ResNet50Test(config.test)
-        test()
+        config.train.model_path = sys.argv[2]
+        config.train.static_quantize_dir = "./static_quantize.pt"
+        config.train.input_dir = sys.argv[3]
+        config.train.transform = trans.Compose([
+            trans.Resize((224, 224)),
+            trans.ToTensor(),
+            trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+        ])
+        config.train.test_dataset = ResnetClsTestDataset(config.train)
+        config.train.test_loader = torch.utils.data.DataLoader(config.train.test_dataset, batch_size=1, pin_memory=False)
+        test = ResNet50Test(config.train)
+        input_tensor = torch.rand(1,3,640,640)
+        test(input_tensor)
 
     if op == 'benchmark':
         if(len(sys.argv) != 4):
-            LOG.logE("Usage: python -m deepvac.syszux_resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
+            LOG.logE("Usage: python -m deepvac.backbones.resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
 
-        config.test.model_path = sys.argv[2]
-        config.test.disable_loader = True
+        config.train.model_path = sys.argv[2]
+        config.train.device = 'cpu'
         img_path = sys.argv[3]
+        config.train.test_loader = ''
 
-        t224x224 = torch.rand((100, 1, 3, 224, 224), dtype = torch.float).to(config.test.device)
-        t640x640 = torch.rand((100, 1, 3, 640, 640), dtype = torch.float).to(config.test.device)
-        t1280x720 = torch.rand((50, 1, 3, 720, 1280), dtype = torch.float).to(config.test.device)
-        t1280x1280 = torch.rand((50, 1, 3, 1280, 1280), dtype = torch.float).to(config.test.device)
+        t224x224 = torch.rand((100, 1, 3, 224, 224), dtype = torch.float).to(config.train.device)
+        t640x640 = torch.rand((100, 1, 3, 640, 640), dtype = torch.float).to(config.train.device)
+        t1280x720 = torch.rand((50, 1, 3, 720, 1280), dtype = torch.float).to(config.train.device)
+        t1280x1280 = torch.rand((50, 1, 3, 1280, 1280), dtype = torch.float).to(config.train.device)
 
-        test = ResNet50Test(config.test)
+        test = ResNet50Test(config.train)
         test.benchmark(t224x224, img_path)
         test.benchmark(t640x640, img_path)
         test.benchmark(t1280x720, img_path)
