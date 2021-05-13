@@ -46,6 +46,7 @@ config.train.milestones = [2,4,6,8,10]
 config.train.checkpoint_suffix = ''
 #
 config.train.acc = 0
+config.train.phase = 'TRAIN'
 
 ## ------------------ val ------------------
 config.train.val_batch_size = None

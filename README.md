@@ -284,18 +284,30 @@ train()
 
 | 类的方法（*号表示必需重新实现） | 功能 | 备注 |
 | ---- | ---- | ---- |
-| * process | 网络的推理计算过程 | 在该过程中，通过report.add(gt, pred)添加测试结果，生成报告 |
+| preIter | 每个batch迭代之前的用户操作，Deepvac啥也不做 | 用户可以重新定义（如果需要的话） |
+| postIter| 每个batch迭代之后的用户操作，Deepvac啥也不做 | 用户可以重新定义（如果需要的话） |
+| doFeedData2Device | Deepvac把来自dataloader的sample和target(标签)移动到device设备上  | 用户可以重新定义（如果需要的话） |
+| doForward | Deepvac会进行网络推理，推理结果赋值给self.config.output成员 |用户可以重新定义（如果需要的话）  |
+| testFly | 用户完全自定义的test逻辑，需要通过report.add(gt, pred)添加测试结果，生成报告 | 看下面的测试逻辑 |
 
 典型的写法如下：
 ```python
 class MyTest(Deepvac):
     ...
-    def process(self):
+    def testFly(self):
         ...
 
 test = MyTest(deepvac_config.train)
 test()
+#test(input_tensor)
 ```
+
+当执行test()的时候，DeepVAC框架会按照如下的优先级进行测试：
+- 如果用户传递了参数，比如test(input_tensor)，则将针对该input_tensor进行doFeedData2Device + doForward，然后测试结束；
+- 如果用户配置了config.train.sample，则将针对config.train.sample进行doFeedData2Device + doForward，然后测试结束；
+- 如果用户重写了testFly()函数，则将执行testFly()，然后测试结束；
+- 如果用户配置了config.test_loader，则将迭代该loader，每个sample进行doFeedData2Device + doForward，然后测试结束；
+- 以上都不符合，报错退出。
 
 # 已知问题
 - 由上游PyTorch引入的问题：[问题列表](https://github.com/DeepVAC/deepvac/issues/72); 
