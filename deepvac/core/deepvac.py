@@ -573,8 +573,7 @@ class DeepvacTrain(Deepvac):
     def process(self):
         self.config.optimizer.zero_grad()
         epoch_start = self.config.epoch
-        for epoch in range(epoch_start, self.config.epoch_num):
-            self.config.epoch = epoch
+        for self.config.epoch in range(epoch_start, self.config.epoch_num):
             LOG.logI('Epoch {} started...'.format(self.config.epoch))
             self.train()
             self.val()
