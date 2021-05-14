@@ -86,7 +86,11 @@ class Deepvac(object):
         LOG.logI('Unused keys:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
 
-        if not self.config.model_reinterpret_cast and len(used_keys) == 0:
+        if self.config.model_reinterpret_cast:
+            LOG.logI("You enabled config.train.model_reinterpret_cast, omit net parameter audit.")
+            return
+
+        if len(used_keys) == 0:
             LOG.logE('Error: load NONE from pretrained model: {}'.format(self.config.model_path), exit=True)
 
         if len(missing_keys) > 0:
@@ -99,10 +103,14 @@ class Deepvac(object):
         state_dict = collections.OrderedDict()
         keys = list(self.config.state_dict.keys())
         for idx, name in enumerate(self.config.net.state_dict()):
-            if self.config.net.state_dict()[name].size() != self.config.state_dict[keys[idx]].size():
-                LOG.logE("Weights shape must be equal, {} and {} shape are not equal".format(keys[idx], name), exit=True)
-            state_dict[name] = self.config.state_dict[keys[idx]]
-            continue
+            if self.config.net.state_dict()[name].size() == self.config.state_dict[keys[idx]].size():
+                LOG.logI("cast pretrained model [{}] => config.train.net [{}]".format(keys[idx], name))
+                state_dict[name] = self.config.state_dict[keys[idx]]
+                continue
+            LOG.logE("cannot cast pretrained model [{}] => config.train.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
+            if self.config.cast_state_dict_strict is False:
+                continue
+            LOG.logE("If you know above risk, set config.train.cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
             
         self.config.state_dict = state_dict
         LOG.logI("Reinterpret cast the model succeeded.")
@@ -178,7 +186,7 @@ class Deepvac(object):
 
     def doFeedData2Device(self):
         self.config.sample = self.config.sample.to(self.config.device)
-        if self.config.target:
+        if self.config.target is not None:
             self.config.target = self.config.target.to(self.config.device)
 
     def postIter(self):

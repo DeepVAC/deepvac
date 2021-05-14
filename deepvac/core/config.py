@@ -20,6 +20,8 @@ config.train.log_dir = "log"
 config.train.log_every = 10
 config.train.disable_git = False
 config.train.cast2cpu = True
+config.train.model_reinterpret_cast=False
+config.train.cast_state_dict_strict=True
 
 ## ------------------ ddp --------------------
 config.train.dist_url = "tcp://localhost:27030"

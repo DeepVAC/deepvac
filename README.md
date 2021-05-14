@@ -63,6 +63,10 @@ config.train.log_every = 10
 config.train.disable_git = False
 #使用模型转换器的时候，网络和input是否要to到cpu上
 config.train.cast2cpu = True
+#加载预训练模型的时候，如果参数名不一致，是否进行强制转换
+config.train.model_reinterpret_cast=False
+#强制转换的时候，是否严格要求参数的shape一致
+config.train.cast_state_dict_strict=True
 
 ## -------------------- loader ------------------
 config.train.num_workers = 3
