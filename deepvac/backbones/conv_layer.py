@@ -90,7 +90,7 @@ class DepthWiseConv2d(nn.Module):
         return x
 
 class Conv2dBNLeakyReLU(nn.Sequential):
-    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, leaky=0, bias=False):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, bias=False, leaky=0):
         if padding is None:
             padding = (kernel_size - 1) // 2
         #leaky = 0.1 if out_planes <= 64 else 0
