@@ -320,6 +320,6 @@ test()
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 独树一帜的PyTorch模型部署框架 | 1.9.0 | SDK，下载 & 解压|
 |[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| 迄今为止最先进的容器化PyTorch模型训练环境 | 1.1 | docker run / k8s|
 |MLab RookPod| 迄今为止最先进的成本10万人民币以下的存储解决方案 | NA | 硬件规范 + k8s yaml|
-|MLab BaguaLu（MLab八卦炉）| 适配MLab HomePod的硬件 | NA | 硬件规范|
+|MLab HPC| 适配MLab HomePod的硬件 | NA | 硬件规范|
 |DeepVAC版PyTorch | 为MLab HomePod定制的PyTorch包 |1.9.0 | conda install -c gemfield pytorch |
 |[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 为libdeepvac定制的LibTorch库 | 1.9.0 | 压缩包，下载 & 解压|
