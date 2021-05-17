@@ -2,8 +2,8 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class TensorrtCast(DeepvacCast):
-    def __init__(self, deepvac_train_config):
-        super(TensorrtCast,self).__init__(deepvac_train_config)
+    def __init__(self, deepvac_core_config):
+        super(TensorrtCast,self).__init__(deepvac_core_config)
 
     def auditConfig(self):
         if not self.config.trt_model_dir:
@@ -24,7 +24,7 @@ class TensorrtCast(DeepvacCast):
 
         output_trt_file = self.config.trt_model_dir
         if cast_output_file:
-            output_trt_file = '{}/trt__{}.trt'.format(self.config.output_dir, cast_output_file)
+            output_trt_file = '{}/trt__{}.trt'.format(self.core_config.output_dir, cast_output_file)
             self.config.trt_model_dir = output_trt_file
         
         LOG.logI("config.trt_model_dir found, save tensorrt model to {}...".format(self.config.trt_model_dir))

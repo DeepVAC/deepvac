@@ -23,19 +23,20 @@ from ..cast import export3rd
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
-    def __init__(self, deepvac_train_config):
-        self.config = deepvac_train_config
+    def __init__(self, deepvac_config):
+        self.global_config = deepvac_config
+        self.config = self.global_config.core
         if self.config.is_forward_only is None:
             self.config.is_forward_only = True
-        self.config.branch = assertAndGetGitBranch(deepvac_train_config.is_disable_git)
+        self.config.branch = assertAndGetGitBranch(self.config.is_disable_git)
         self.init()
 
     def auditConfig(self):
         if not self.config.model_path and not self.config.jit_model_path:
-            LOG.logE("both config.train.model_path and config.train.jit_model_path are not set, cannot do predict.", exit=True)
+            LOG.logE("both config.core.model_path and config.core.jit_model_path are not set, cannot do predict.", exit=True)
         #audit for ema
         if self.config.is_forward_only and self.config.ema:
-            LOG.logE("Error: You must disable config.train.ema in test only mode.", exit=True)
+            LOG.logE("Error: You must disable config.core.ema in test only mode.", exit=True)
 
     def _parametersInfo(self):
         param_info_list = [p.numel() for p in self.config.net.parameters() ]
@@ -48,22 +49,22 @@ class Deepvac(object):
 
     def initNetWithCode(self):
         if self.config.net is None:
-            LOG.logE("You must implement and set config.train.net to a torch.nn.Module instance in config.py.", exit=True)
+            LOG.logE("You must implement and set config.core.net to a torch.nn.Module instance in config.py.", exit=True)
         if not isinstance(self.config.net, nn.Module):
-            LOG.logE("You must set config.train.net to a torch.nn.Module instance in config.py.", exit=True)
+            LOG.logE("You must set config.core.net to a torch.nn.Module instance in config.py.", exit=True)
 
     def initStateDict(self):
         self.config.state_dict = None
         if not self.config.model_path:
-            LOG.logI("config.train.model_path not specified, network parametes will not be initialized from trained/pretrained model.")
+            LOG.logI("config.core.model_path not specified, network parametes will not be initialized from trained/pretrained model.")
             return
 
         if self.config.jit_model_path and self.config.is_forward_only:
-            LOG.logI("config.train.jit_model_path specified in forward-only mode, network parametes will be initialized from jit model rather than trained/pretrained model.")
+            LOG.logI("config.core.jit_model_path specified in forward-only mode, network parametes will be initialized from jit model rather than trained/pretrained model.")
             return
 
         if self.config.jit_model_path:
-            LOG.logW("config.train.jit_model_path specified in training mode, omit...")
+            LOG.logW("config.core.jit_model_path specified in training mode, omit...")
 
         LOG.logI('Loading State Dict from {}'.format(self.config.model_path))
         self.config.state_dict = torch.load(self.config.model_path, map_location=self.config.device)
@@ -87,7 +88,7 @@ class Deepvac(object):
         LOG.logI('Used keys:{}'.format(len(used_keys)))
 
         if self.config.model_reinterpret_cast:
-            LOG.logI("You enabled config.train.model_reinterpret_cast, omit net parameter audit.")
+            LOG.logI("You enabled config.core.model_reinterpret_cast, omit net parameter audit.")
             return
 
         if len(used_keys) == 0:
@@ -96,7 +97,7 @@ class Deepvac(object):
         if len(missing_keys) > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
             if not self.config.network_audit_disabled:
-                LOG.logE("If you know this risk, set config.train.network_audit_disabled=True in config.py to omit this error.", exit=True)
+                LOG.logE("If you know this risk, set config.core.network_audit_disabled=True in config.py to omit this error.", exit=True)
 
     def castStateDict(self):
         LOG.logI("config.model_reinterpret_cast is True, Try to reinterpret cast the model")
@@ -104,13 +105,13 @@ class Deepvac(object):
         keys = list(self.config.state_dict.keys())
         for idx, name in enumerate(self.config.net.state_dict()):
             if self.config.net.state_dict()[name].size() == self.config.state_dict[keys[idx]].size():
-                LOG.logI("cast pretrained model [{}] => config.train.net [{}]".format(keys[idx], name))
+                LOG.logI("cast pretrained model [{}] => config.core.net [{}]".format(keys[idx], name))
                 state_dict[name] = self.config.state_dict[keys[idx]]
                 continue
-            LOG.logE("cannot cast pretrained model [{}] => config.train.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
+            LOG.logE("cannot cast pretrained model [{}] => config.core.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
             if self.config.cast_state_dict_strict is False:
                 continue
-            LOG.logE("If you know above risk, set config.train.cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
+            LOG.logE("If you know above risk, set config.core.cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
             
         self.config.state_dict = state_dict
         LOG.logI("Reinterpret cast the model succeeded.")
@@ -140,10 +141,10 @@ class Deepvac(object):
     def initTestLoader(self):
         #only init test_loader in base class
         if self.config.test_loader is None and self.config.is_forward_only:
-            LOG.logE("You must set config.train.test_loader in config.py", exit=True)
+            LOG.logE("You must set config.core.test_loader in config.py", exit=True)
         
         if self.config.test_loader is not None:
-            LOG.logI("You set config.train.test_loader to {} in config.py".format(self.config.test_loader)) 
+            LOG.logI("You set config.core.test_loader to {} in config.py".format(self.config.test_loader)) 
 
     def initEMA(self):
         if self.config.ema is not True:
@@ -178,7 +179,7 @@ class Deepvac(object):
         self.initTestLoader()
 
     def export3rd(self, output_file=None):
-        export3rd(self.config, output_file)
+        export3rd(self.global_config, output_file)
 
     #For Deepvac user to reimplement
     def preIter(self):
@@ -196,7 +197,7 @@ class Deepvac(object):
         self.config.output = self.config.net(self.config.sample)
 
     def test(self):
-        LOG.logI("config.train.test_load has been set, do test() with config.train.test_loader")
+        LOG.logI("config.core.test_load has been set, do test() with config.core.test_loader")
         for self.config.test_step, (self.config.sample, self.config.target) in enumerate(self.config.test_loader):
             self.preIter()
             self.doFeedData2Device()
@@ -213,7 +214,7 @@ class Deepvac(object):
     def testFly(self):
         if self.config.test_loader:
             return self.test()
-        LOG.logE("You have to reimplement testFly() if you didn't set any valid input, e.g. config.train.test_loader.", exit=True)
+        LOG.logE("You have to reimplement testFly() if you didn't set any valid input, e.g. config.core.test_loader.", exit=True)
 
     def process(self, input_tensor):
         self.config.phase = 'TEST'
@@ -225,9 +226,9 @@ class Deepvac(object):
         LOG.logI("You did not provide input_tensor at Deepvac(input_tensor)...")
 
         if self.config.sample is not None:
-            LOG.logI('You provided input with config.train.sample, do net inference with config.train.example.')
+            LOG.logI('You provided input with config.core.sample, do net inference with config.core.example.')
             return self.testSample()
-        LOG.logI("You did not provide input with config.train.sample...")
+        LOG.logI("You did not provide input with config.core.sample...")
         
         LOG.logI("testFly() is your last chance, you must have already reimplemented testFly(), right?")
         return self.testFly()
@@ -265,17 +266,17 @@ class deepvac_val_mode(object):
 
 #base class for train pipeline    
 class DeepvacTrain(Deepvac):
-    def __init__(self, deepvac_train_config):
-        deepvac_train_config.is_forward_only=False
-        super(DeepvacTrain, self).__init__(deepvac_train_config)
+    def __init__(self, deepvac_core_config):
+        deepvac_core_config.is_forward_only=False
+        super(DeepvacTrain, self).__init__(deepvac_core_config)
         self.initTrainContext()
 
     def auditConfig(self):
         #basic train config audit
         if self.config.train_dataset is None:
-            LOG.logE("You must set config.train.train_dataset in config.py",exit=True)
+            LOG.logE("You must set config.core.train_dataset in config.py",exit=True)
         if self.config.val_dataset is None:
-            LOG.logE("You must set config.train.val_dataset in config.py",exit=True)
+            LOG.logE("You must set config.core.val_dataset in config.py",exit=True)
 
         #audit for amp
         if self.config.amp and self.config.device.type != 'cuda':
@@ -355,28 +356,28 @@ class DeepvacTrain(Deepvac):
 
     def initCriterion(self):
         if self.config.criterion is None:
-            LOG.logE("You should set config.train.criterion in config.py, e.g. config.train.criterion=torch.nn.CrossEntropyLoss()",exit=True)
-        LOG.logI("You set config.train.criterion to {}".format(self.config.criterion))
+            LOG.logE("You should set config.core.criterion in config.py, e.g. config.core.criterion=torch.nn.CrossEntropyLoss()",exit=True)
+        LOG.logI("You set config.core.criterion to {}".format(self.config.criterion))
 
     def initScheduler(self):
         if self.config.scheduler is None:
-            LOG.logE("You must set config.train.scheduler in config.py.", exit=True)
-        LOG.logI("You set config.train.scheduler to {}".format(self.config.scheduler))
+            LOG.logE("You must set config.core.scheduler in config.py.", exit=True)
+        LOG.logI("You set config.core.scheduler to {}".format(self.config.scheduler))
         
     def initOptimizer(self):
         if self.config.optimizer is None:
-            LOG.logE("You must set config.train.optimizer in config.py.",exit=True)
-        LOG.logI("You set config.train.optimizer to {} in config.py".format(self.config.optimizer))
+            LOG.logE("You must set config.core.optimizer in config.py.",exit=True)
+        LOG.logI("You set config.core.optimizer to {} in config.py".format(self.config.optimizer))
 
     def initTrainLoader(self):
         if self.config.train_loader is None:
-            LOG.logE("You must set config.train.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass.", exit=True)
-        LOG.logI("You set config.train.train_loader to {} in config.py".format(self.config.train_loader)) 
+            LOG.logE("You must set config.core.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass.", exit=True)
+        LOG.logI("You set config.core.train_loader to {} in config.py".format(self.config.train_loader)) 
 
     def initValLoader(self):
         if self.config.val_loader is None:
-            LOG.logE("You must set config.train.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass.", exit=True)
-        LOG.logI("You set config.train.val_loader to {} in config.py".format(self.config.val_loader))
+            LOG.logE("You must set config.core.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass.", exit=True)
+        LOG.logI("You set config.core.val_loader to {} in config.py".format(self.config.val_loader))
 
     def initEmaUpdates(self):
         if self.config.ema is not True:
@@ -585,9 +586,9 @@ class DeepvacTrain(Deepvac):
         self.process()
 
 class DeepvacDDP(DeepvacTrain):
-    def __init__(self, deepvac_train_config):
-        super(DeepvacDDP,self).__init__(deepvac_train_config)
-        assert self.config.train_sampler is not None, "You should define config.train.train_sampler in config.py when training with DDP mode."
+    def __init__(self, deepvac_core_config):
+        super(DeepvacDDP,self).__init__(deepvac_core_config)
+        assert self.config.train_sampler is not None, "You should define config.core.train_sampler in config.py when training with DDP mode."
 
     def initDevice(self):
         super(DeepvacDDP, self).initDevice()
@@ -653,5 +654,5 @@ class DeepvacDDP(DeepvacTrain):
 
 if __name__ == "__main__":
     from config import config as deepvac_config
-    vac = DeepvacTrain(deepvac_config.train)
+    vac = DeepvacTrain(deepvac_config)
     vac()

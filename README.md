@@ -49,86 +49,86 @@ sys.path.insert(0,'/home/gemfield/github/deepvac')
 
 ## 5. 编写配置文件
 配置文件的文件名均为 config.py，位于你项目的根目录。在代码开始处添加```from deepvac import config```；
-所有用户的配置都存放在这个文件里。config模块提供了2个预定义的作用域：config.train和config.aug。使用方法如下：
-- 所有和trainer相关（包括train、val、test）的配置都定义在config.train中；
+所有用户的配置都存放在这个文件里。config模块提供了2个预定义的作用域：config.core和config.aug。使用方法如下：
+- 所有和trainer相关（包括train、val、test）的配置都定义在config.core中；
 - 所有和deepvac.aug中增强模块相关的配置都定义在config.aug中；
 - 用户可以开辟自己的作用域，比如config.my_stuff = AttrDict()，然后config.my_stuff.name = 'gemfield'；
 
 Deepvac的config模块内置了如下的配置，而且用户一般不需要修改（如果想修改也可以）：
 ```python
 ## ------------------ common ------------------
-config.train.output_dir = "output"
-config.train.log_dir = "log"
-config.train.log_every = 10
-config.train.disable_git = False
+config.core.output_dir = "output"
+config.core.log_dir = "log"
+config.core.log_every = 10
+config.core.disable_git = False
 #使用模型转换器的时候，网络和input是否要to到cpu上
-config.train.cast2cpu = True
+config.core.cast2cpu = True
 #加载预训练模型的时候，如果参数名不一致，是否进行强制转换
-config.train.model_reinterpret_cast=False
+config.core.model_reinterpret_cast=False
 #强制转换的时候，是否严格要求参数的shape一致
-config.train.cast_state_dict_strict=True
+config.core.cast_state_dict_strict=True
 
 ## -------------------- loader ------------------
-config.train.num_workers = 3
+config.core.num_workers = 3
 ```
 
 Deepvac的config模块内置了如下的配置，但是用户一般需要修改（如果用到的话）：
 ```python
 ## ------------------ common ------------------
-config.train.device = "cuda:0"
+config.core.device = "cuda:0"
 
 ## ------------------ ddp --------------------
-config.train.dist_url = "tcp://localhost:27030"
-config.train.world_size = 2
+config.core.dist_url = "tcp://localhost:27030"
+config.core.world_size = 2
 
 ## ------------------ optimizer  ------------------
 #多少个batch更新一次权重
-config.train.nominal_batch_factor = 1
+config.core.nominal_batch_factor = 1
 
 ## ------------------- train ------------------
-config.train.train_batch_size = 128
-config.train.epoch_num = 30
+config.core.train_batch_size = 128
+config.core.epoch_num = 30
 #一个Epoch保存几次模型
-config.train.save_num = 5
+config.core.save_num = 5
 #要加载的预训练模型
-config.train.checkpoint_suffix = ''
-config.train.train_batch_size = 128
+config.core.checkpoint_suffix = ''
+config.core.train_batch_size = 128
 
 ## ------------------ val ------------------
-config.train.val_batch_size = 32
+config.core.val_batch_size = 32
 ```
 
 Deepvac的config模块没有预定义，但是用户必须要定义的配置：
 ```python
 ## -------------------- loader ------------------
 #dataloader的collate_fn参数
-config.train.collate_fn = None
+config.core.collate_fn = None
 #MyTrainDataset为Dataset的子类
-config.train.train_dataset = MyTrainDataset(config.train)
-config.train.train_loader = torch.utils.data.DataLoader(
-    config.train.train_dataset,
-    batch_size=config.train.batch_size,
-    num_workers=config.train.num_workers,
+config.core.train_dataset = MyTrainDataset(config.core)
+config.core.train_loader = torch.utils.data.DataLoader(
+    config.core.train_dataset,
+    batch_size=config.core.batch_size,
+    num_workers=config.core.num_workers,
     shuffle= True,
-    collate_fn=config.train.collate_fn
+    collate_fn=config.core.collate_fn
 )
 #MyValDataset为Dataset的子类
-config.train.val_dataset = MyValDataset(config.train)
-config.train.val_loader = torch.utils.data.DataLoader(config.train.val_dataset, batch_size=1, pin_memory=False)
+config.core.val_dataset = MyValDataset(config.core)
+config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, batch_size=1, pin_memory=False)
 
 #MyTestDataset为Dataset的子类
-config.train.test_dataset = MyTestDataset(config.train)
-config.train.test_loader = torch.utils.data.DataLoader(config.train.test_dataset, batch_size=1, pin_memory=False)
+config.core.test_dataset = MyTestDataset(config.core)
+config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
 
 ## ------------------- train ------------------
 #网络定义
-config.train.net = MyNet()
+config.core.net = MyNet()
 #损失函数
-config.train.criterion = MyCriterion()
+config.core.criterion = MyCriterion()
 
 ## ------------------ optimizer  ------------------
-config.train.optimizer = optim.SGD(config.train.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)
-config.train.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.train.optimizer, [2,4,6,8,10], 0.27030)
+config.core.optimizer = optim.SGD(config.core.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)
+config.core.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.core.optimizer, [2,4,6,8,10], 0.27030)
 ```
 
 以上只是基础配置，更多配置：
@@ -158,7 +158,7 @@ from deepvac import DeepvacTrain
 class MyTrain(DeepvacTrain):
     ......
 
-my_train = MyTrain(deepvac_config.train)
+my_train = MyTrain(deepvac_config.core)
 my_train()
 ```
 
@@ -170,11 +170,11 @@ from deepvac import Deepvac
 class MyTest(Deepvac)
     ......
 
-my_test = MyTest(deepvac_config.train)
+my_test = MyTest(deepvac_config.core)
 my_test()
 ```
 
-之后，train.py/test.py代码中通过如下方式来读写config.train中的配置项
+之后，train.py/test.py代码中通过如下方式来读写config.core中的配置项
 ```python
 print(self.config.log_dir)
 print(self.config.batch_size)
@@ -266,13 +266,13 @@ class MyTrain(DeepvacTrain):
         self.config.target = [anno.to(self.config.device) for anno in self.config.target]
         self.config.sample = self.config.sample.to(self.config.device)
 
-    #初始化config.train.acc
+    #初始化config.core.acc
     def doValAcc(self):
         self.config.acc = your_acc
         LOG.logI('Test accuray: {:.4f}'.format(self.config.acc))
 
 
-train = MyTrain(deepvac_config.train)
+train = MyTrain(deepvac_config.core)
 train()
 ```
 ## 10. 编写测试脚本
@@ -301,14 +301,14 @@ class MyTest(Deepvac):
     def testFly(self):
         ...
 
-test = MyTest(deepvac_config.train)
+test = MyTest(deepvac_config.core)
 test()
 #test(input_tensor)
 ```
 
 当执行test()的时候，DeepVAC框架会按照如下的优先级进行测试：
 - 如果用户传递了参数，比如test(input_tensor)，则将针对该input_tensor进行doFeedData2Device + doForward，然后测试结束；
-- 如果用户配置了config.train.sample，则将针对config.train.sample进行doFeedData2Device + doForward，然后测试结束；
+- 如果用户配置了config.core.sample，则将针对config.core.sample进行doFeedData2Device + doForward，然后测试结束；
 - 如果用户重写了testFly()函数，则将执行testFly()，然后测试结束；
 - 如果用户配置了config.test_loader，则将迭代该loader，每个sample进行doFeedData2Device + doForward，然后测试结束；
 - 以上都不符合，报错退出。

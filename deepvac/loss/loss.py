@@ -8,10 +8,21 @@ import torch.distributed as dist
 
 class LossBase(object):
     def __init__(self, deepvac_config):
+        self.core_config = deepvac_config.core
+        self.config = deepvac_config.loss
         self.auditConfig()
 
     def auditConfig(self):
         raise Exception("Not implemented!")
+
+    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
+        if user_give is None and is_user_mandatory:
+            LOG.logE("You must set mandatory config.aug.{} in config.py. Developer advised value:{}".format(config_name, developer_give),exit=True)
+        if user_give:
+            return user_give
+        if developer_give:
+            return developer_give
+        LOG.logE("value missing for configuration: {}".format(config_name), exit=True)
 
     def __call__(self,img):
         raise Exception("Not implemented!")
@@ -22,7 +33,7 @@ class MaskL1Loss(LossBase):
         super(MaskL1Loss, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.eps = 1e-6
+        self.eps = self.addUserConfig('eps', self.config.eps, 1e-6)
 
     def __call__(self, pred: torch.Tensor, gt, mask):
         loss = (torch.abs(pred - gt) * mask).sum() / (mask.sum() + self.eps)
@@ -33,7 +44,7 @@ class DiceLoss(LossBase):
         super(DiceLoss, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.eps = 1e-6
+        self.eps = self.addUserConfig('eps', self.config.eps, 1e-6)
 
     def __call__(self, pred: torch.Tensor, gt, mask, weights=None):
         return self._compute(pred, gt, mask, weights)
@@ -58,8 +69,8 @@ class BalanceCrossEntropyLoss(LossBase):
         super(BalanceCrossEntropyLoss, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.negative_ratio = 3.0
-        self.eps = 1e-6
+        self.negative_ratio = self.addUserConfig('negative_ratio', self.config.negative_ratio, 3.0)
+        self.eps = self.addUserConfig('eps', self.config.eps, 1e-6)
 
     def __call__(self,
                 pred: torch.Tensor,
@@ -83,11 +94,11 @@ class BCEBlurWithLogitsLoss(LossBase):
     # BCEwithLogitLoss() with reduced missing label effects.
     def __init__(self, deepvac_config):
         super(BCEBlurWithLogitsLoss, self).__init__(deepvac_config)
-        self.loss_fcn = nn.BCEWithLogitsLoss(reduction=self.reduction)
 
     def auditConfig(self):
-        self.alpha = 0.05
-        self.reduction = 'none'
+        self.alpha = self.addUserConfig('alpha', self.config.alpha, 0.05)
+        self.reduction = self.addUserConfig('reduction', self.config.reduction, 'none')
+        self.loss_fcn = nn.BCEWithLogitsLoss(reduction=self.reduction)
 
     def __call__(self, pred, true):
         loss = self.loss_fcn(pred, true)
@@ -102,13 +113,12 @@ class FocalLoss(LossBase):
     # Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
         super(FocalLoss, self).__init__(deepvac_config)
-        # must be nn.BCEWithLogitsLoss()
-        self.reduction = deepvac_config.reduction
-        self.loss_fcn = nn.BCEWithLogitsLoss(reduction='none')
 
     def auditConfig(self):
-        self.gamma = 1.5
-        self.alpha = 0.25
+        self.alpha = self.addUserConfig('alpha', self.config.alpha, 0.25)
+        self.gamma = self.addUserConfig('gamma', self.config.gamma, 1.5)
+        self.reduction = self.addUserConfig('reduction', self.config.reduction, 'none')
+        self.loss_fcn = nn.BCEWithLogitsLoss(reduction=self.reduction)
 
     def __call__(self, pred, true):
         loss = self.loss_fcn(pred, true)
@@ -130,13 +140,12 @@ class QFocalLoss(LossBase):
     # Wraps Quality focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
     def __init__(self, deepvac_config):
         super(QFocalLoss, self).__init__(deepvac_config)
-        # must be nn.BCEWithLogitsLoss()
-        self.loss_fcn = deepvac_config.loss_fcn
 
     def auditConfig(self):
-        self.gamma = 1.5
-        self.alpha = 0.25
-        self.reduction = 'none'
+        self.alpha = self.addUserConfig('alpha', self.config.alpha, 0.25)
+        self.gamma = self.addUserConfig('gamma', self.config.gamma, 1.5)
+        self.reduction = self.addUserConfig('reduction', self.config.reduction, 'none')
+        self.loss_fcn = nn.BCEWithLogitsLoss()
 
     def __call__(self, pred, true):
         loss = self.loss_fcn(pred, true)

@@ -7,8 +7,8 @@ from ..utils import LOG
 from .warp_mls_helper import WarpMLS
 
 class AugBase(object):
-    def __init__(self, deepvac_aug_config):
-        self.config = deepvac_aug_config
+    def __init__(self, deepvac_config):
+        self.config = deepvac_config.aug
         self.auditConfig()
 
     def auditConfig(self):

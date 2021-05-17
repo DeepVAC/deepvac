@@ -4,18 +4,18 @@ import cv2
 from torch.utils.data import Dataset
 
 class CocoCVDataset(Dataset):
-    def __init__(self, deepvac_config):
+    def __init__(self, deepvac_config, sample_path, target_path):
         super(CocoCVDataset, self).__init__()
-        self.conf = deepvac_config
-        self.transform = deepvac_config.transform
-        self.img_folder = deepvac_config.img_folder
-        self.aug_composer = deepvac_config.aug_composer
-
+        self.config = deepvac_config.datasets
+        self.transform = self.config.transform
+        self.composer = self.config.composer
+        
         try:
             from pycocotools.coco import COCO
         except:
             raise Exception("pycocotools module not found, you should try 'pip3 install pycocotools' first!")
-        self.coco = COCO(deepvac_config.annotation)
+        self.sample_path = sample_path
+        self.coco = COCO(target_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
         self.cats = list(sorted(self.coco.cats.keys()))
 
@@ -25,8 +25,8 @@ class CocoCVDataset(Dataset):
     def __getitem__(self, index):
         sample, label = self._getSample(index)
         # augment for numpy
-        if self.aug_composer:
-            sample = self.aug_composer(sample)
+        if self.composer is not None:
+            sample = self.composer(sample)
         # pytorch offical transform for PIL Image or numpy
         if self.transform is not None:
             # rewrite method: '_buildSample' first
@@ -52,7 +52,7 @@ class CocoCVDataset(Dataset):
 
     def loadImgs(self, index):
         file_name = self.coco.loadImgs(self.ids[index])[0]['file_name']
-        img = cv2.imread(os.path.join(self.img_folder, file_name), 1)
+        img = cv2.imread(os.path.join(self.sample_path, file_name), 1)
         assert img is not None, "Image {} not found!".format(file_name)
         return img
 

@@ -4,8 +4,8 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class NcnnCast(DeepvacCast):
-    def __init__(self, deepvac_train_config):
-        super(NcnnCast,self).__init__(deepvac_train_config)
+    def __init__(self, deepvac_core_config):
+        super(NcnnCast,self).__init__(deepvac_core_config)
 
     def auditConfig(self):
         if not self.config.ncnn_model_dir:

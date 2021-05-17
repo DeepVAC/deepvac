@@ -10,8 +10,9 @@ import torch.nn as nn
 from ..utils import LOG
 
 class DeepvacCast(object):
-    def __init__(self, deepvac_train_config):
-        self.config = deepvac_train_config
+    def __init__(self, deepvac_config):
+        self.core_config = deepvac_config.core
+        self.config = deepvac_config.cast
         self.proceed = False
         self.auditFinalConfig()
 
@@ -21,16 +22,16 @@ class DeepvacCast(object):
     def auditFinalConfig(self):
         if not self.auditConfig():
             return
-        if self.config.net is None:
-            LOG.logE("You must set config.train.net in config.py", exit=True)
+        if self.core_config.net is None:
+            LOG.logE("You must set config.core.net in config.py", exit=True)
 
-        if self.config.sample is None:
-            LOG.logE("You must set config.train.sample, in general, this is done be Deepvac Framework.", exit=True)
+        if self.core_config.sample is None:
+            LOG.logE("You must set config.core.sample, in general, this is done be Deepvac Framework.", exit=True)
         
-        self.net = copy.deepcopy(self.config.ema if self.config.ema else self.config.net)
-        if self.config.cast2cpu:
+        self.net = copy.deepcopy(self.core_config.ema if self.core_config.ema else self.core_config.net)
+        if self.core_config.cast2cpu:
             self.net.cpu()
-            self.config.sample = self.config.sample.to('cpu')
+            self.core_config.sample = self.core_config.sample.to('cpu')
         
         self.proceed = True
         
@@ -48,7 +49,7 @@ class DeepvacCast(object):
             f = tempfile.NamedTemporaryFile(delete=False)
             self.config.onnx_model_dir = f.name
 
-        torch.onnx.export(self.net, self.config.sample, self.config.onnx_model_dir, 
+        torch.onnx.export(self.net, self.core_config.sample, self.config.onnx_model_dir, 
             input_names=self.config.onnx_input_names, output_names=self.config.onnx_output_names, 
             dynamic_axes=self.config.onnx_dynamic_ax, opset_version=self.config.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.config.onnx_model_dir))
@@ -65,8 +66,8 @@ def calibrate(model, data_loader):
             model(sample)
             
 class ScriptModel(object):
-    def __init__(self, deepvac_train_config, output_file, backend = 'fbgemm'):
-        self.config = deepvac_train_config
+    def __init__(self, deepvac_core_config, output_file, backend = 'fbgemm'):
+        self.config = deepvac_core_config
         self.input_net = copy.deepcopy(self.config.ema if self.config.ema else self.config.net)
         self.input_net.to(self.config.sample.device)
         self.input_net.eval()

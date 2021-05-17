@@ -67,27 +67,27 @@ def calibrate(model, data_loader):
         for sample, target in data_loader:
             model(sample)
 
-def prepareQAT(deepvac_train_config):
-    if not deepvac_train_config.qat_dir:
+def prepareQAT(deepvac_core_config):
+    if not deepvac_core_config.qat_dir:
         return
 
-    if deepvac_train_config.is_forward_only:
+    if deepvac_core_config.is_forward_only:
         LOG.logI("You are in forward_only mode, omit the parepareQAT()")
         return
 
     LOG.logI("You have enabled QAT, this step is only for prepare.")
 
-    if deepvac_train_config.qat_net_prepared:
+    if deepvac_core_config.qat_net_prepared:
         LOG.logE("Error: You have already prepared the model for QAT.", exit=True)
 
     backend = 'fbgemm'
-    if deepvac_train_config.quantize_backend:
-        backend = deepvac_train_config.quantize_backend
-    deepvac_train_config.qat_net_prepared = DeepvacQAT(deepvac_train_config.net).to(deepvac_train_config.device)
-    deepvac_train_config.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
-    torch.quantization.prepare_qat(deepvac_train_config.qat_net_prepared, inplace=True)
+    if deepvac_core_config.quantize_backend:
+        backend = deepvac_core_config.quantize_backend
+    deepvac_core_config.qat_net_prepared = DeepvacQAT(deepvac_core_config.net).to(deepvac_core_config.device)
+    deepvac_core_config.qat_net_prepared.qconfig = torch.quantization.get_default_qat_qconfig(backend)
+    torch.quantization.prepare_qat(deepvac_core_config.qat_net_prepared, inplace=True)
     #after this, train net will be transfered to QAT !
-    deepvac_train_config.net = deepvac_train_config.qat_net_prepared
+    deepvac_core_config.net = deepvac_core_config.qat_net_prepared
 
 class DeepvacQAT(torch.nn.Module):
     def __init__(self, net2qat):

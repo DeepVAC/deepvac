@@ -61,22 +61,22 @@ date: <测试日期>
 
 #### 部署目标为x86+CUDA Linux的训练
 开启如下开关：
-- config.train.script_model_dir（必须）
-- config.train.trace_model_dir（可选）
-- config.train.static_quantize_dir（必须）
-- config.train.dynamic_quantize_dir（可选）
-- config.train.ema（可选）
-- config.train.tensorboard_*（可选）
-- config.train.amp（可选）
-- config.train.dist_url（可选）
+- config.core.script_model_dir（必须）
+- config.core.trace_model_dir（可选）
+- config.core.static_quantize_dir（必须）
+- config.core.dynamic_quantize_dir（可选）
+- config.core.ema（可选）
+- config.core.tensorboard_*（可选）
+- config.core.amp（可选）
+- config.core.dist_url（可选）
 
 
 #### 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
 在部署目标为x86+CUDA Linux的训练基础上，开启如下开关：
-- config.train.qat_dir（必须，该功能还未开发完毕）
-- config.train.onnx_model_dir（可选，需要ONNX时开启）
-- config.train.ncnn_model_dir, config.train.onnx2ncnn（可选，需要NCNN时开启）
-- config.train.coreml_model_dir, config.train.coreml_preprocessing_args（可选，需要CoreML时开启）
+- config.core.qat_dir（必须，该功能还未开发完毕）
+- config.core.onnx_model_dir（可选，需要ONNX时开启）
+- config.core.ncnn_model_dir, config.core.onnx2ncnn（可选，需要NCNN时开启）
+- config.core.coreml_model_dir, config.core.coreml_preprocessing_args（可选，需要CoreML时开启）
 
 ## 部署方式
 所有的AI产品默认进行3种部署测试：
