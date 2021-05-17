@@ -23,7 +23,7 @@ class ImageWithMasksRandomRotateAug(AugBase):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.image_with_masks_random_rotate_max_angle = self.addUserConfig('image_with_masks_random_rotate_max_angle', self.config.image_with_masks_random_rotate_max_angle, 10)
+        self.config.image_with_masks_random_rotate_max_angle = addUserConfig('image_with_masks_random_rotate_max_angle', self.config.image_with_masks_random_rotate_max_angle, 10)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
@@ -44,7 +44,7 @@ class ImageWithMasksRandomCropAug(AugBase):
         self.auditUserConfig("img_size")
 
     def auditConfig(self):
-        self.config.image_with_masks_random_crop_p = self.addUserConfig('image_with_masks_random_crop_p', self.config.image_with_masks_random_crop_p, 3.0 / 8.0)
+        self.config.image_with_masks_random_crop_p = addUserConfig('image_with_masks_random_crop_p', self.config.image_with_masks_random_crop_p, 3.0 / 8.0)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)

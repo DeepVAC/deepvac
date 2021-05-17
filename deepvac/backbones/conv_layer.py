@@ -99,3 +99,18 @@ class Conv2dBNLeakyReLU(nn.Sequential):
             nn.BatchNorm2d(out_planes),
             nn.LeakyReLU(negative_slope=leaky, inplace=True)
         )
+
+class BNPReLU(nn.Sequential):
+    def __init__(self, out_planes):
+        super(BNPReLU, self).__init__(
+            nn.BatchNorm2d(out_planes),
+            nn.PReLU(out_planes)
+    )
+
+class Conv2dDilatedBN(nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, dilation=1, padding=None, groups=1, bias=False):
+        padding = ((kernel_size - 1) // 2) * dilation
+        super(Conv2dDilatedBN, self).__init__(
+            nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, dilation=dilation, groups=groups, bias=bias),
+            nn.BatchNorm2d(out_planes)
+    )

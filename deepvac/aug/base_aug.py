@@ -3,7 +3,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
-from ..utils import LOG
+from ..utils import LOG, addUserConfig
 from .warp_mls_helper import WarpMLS
 
 class AugBase(object):
@@ -13,15 +13,6 @@ class AugBase(object):
 
     def auditConfig(self):
         raise Exception("Not implemented!")
-
-    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
-        if user_give is None and is_user_mandatory:
-            LOG.logE("You must set mandatory config.aug.{} in config.py. Developer advised value:{}".format(config_name, developer_give),exit=True)
-        if user_give:
-            return user_give
-        if developer_give:
-            return developer_give
-        LOG.logE("value missing for configuration: {}".format(config_name), exit=True)
 
     def __call__(self,img):
         raise Exception("Not implemented!")
@@ -60,7 +51,7 @@ class SpeckleAug(AugBase):
         super(SpeckleAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.speckle_severity = self.addUserConfig('speckle_severity', self.config.speckle_severity, np.random.uniform(0, 0.6*255))
+        self.config.speckle_severity = addUserConfig('speckle_severity', self.config.speckle_severity, np.random.uniform(0, 0.6*255))
 
     def __call__(self, img):
         input_type = img.dtype
@@ -79,10 +70,10 @@ class AffineAug(AugBase):
 
     def auditConfig(self):
         # 空白填充色
-        self.config.affine_borderValue = self.addUserConfig('affine_borderValue', self.config.affine_borderValue, (255,255,255))
+        self.config.affine_borderValue = addUserConfig('affine_borderValue', self.config.affine_borderValue, (255,255,255))
         # x方向和y方向的伸缩率
-        self.config.affine_shear_x = self.addUserConfig('affine_shear_x', self.config.affine_shear_x, 30)
-        self.config.affine_shear_y = self.addUserConfig('affine_shear_y', self.config.affine_shear_y, 1)
+        self.config.affine_shear_x = addUserConfig('affine_shear_x', self.config.affine_shear_x, 30)
+        self.config.affine_shear_y = addUserConfig('affine_shear_y', self.config.affine_shear_y, 1)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -100,13 +91,13 @@ class PerspectAug(AugBase):
 
     def auditConfig(self):
         # b空白填充色
-        self.config.perspect_borderValue = self.addUserConfig('perspect_borderValue', self.config.perspect_borderValue, (255,255,255))
+        self.config.perspect_borderValue = addUserConfig('perspect_borderValue', self.config.perspect_borderValue, (255,255,255))
         # 高h方向伸缩范围
-        self.config.perspect_sh_lower = self.addUserConfig('perspect_sh_lower', self.config.perspect_sh_lower, 6)
-        self.config.perspect_sh_upper = self.addUserConfig('perspect_sh_upper', self.config.perspect_sh_upper, 11)
+        self.config.perspect_sh_lower = addUserConfig('perspect_sh_lower', self.config.perspect_sh_lower, 6)
+        self.config.perspect_sh_upper = addUserConfig('perspect_sh_upper', self.config.perspect_sh_upper, 11)
         # 宽w方向伸缩范围
-        self.config.perspect_sw_lower = self.addUserConfig('perspect_sw_lower', self.config.perspect_sw_lower, 20)
-        self.config.perspect_sw_upper = self.addUserConfig('perspect_sw_upper', self.config.perspect_sw_upper, 31)
+        self.config.perspect_sw_lower = addUserConfig('perspect_sw_lower', self.config.perspect_sw_lower, 20)
+        self.config.perspect_sw_upper = addUserConfig('perspect_sw_upper', self.config.perspect_sw_upper, 31)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -131,7 +122,7 @@ class GaussianAug(AugBase):
         super(GaussianAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.gaussian_ks = self.addUserConfig('gaussian_ks', self.config.gaussian_ks, [9,11,13,15,17])
+        self.config.gaussian_ks = addUserConfig('gaussian_ks', self.config.gaussian_ks, [9,11,13,15,17])
 
     def __call__(self, img):
         self.auditInput(img)
@@ -146,11 +137,11 @@ class HorlineAug(AugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.horline_space = self.addUserConfig('horline_space', self.config.horline_space, 4)
+        self.config.horline_space = addUserConfig('horline_space', self.config.horline_space, 4)
         # 线条颜色
-        self.config.horline_color = self.addUserConfig('horline_color', self.config.horline_color, 0)
+        self.config.horline_color = addUserConfig('horline_color', self.config.horline_color, 0)
         # 线宽
-        self.config.horline_thickness = self.addUserConfig('horline_thickness', self.config.horline_thickness, 1)
+        self.config.horline_thickness = addUserConfig('horline_thickness', self.config.horline_thickness, 1)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -166,11 +157,11 @@ class VerlineAug(AugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.verline_space = self.addUserConfig('verline_space', self.config.verline_space, 4)
+        self.config.verline_space = addUserConfig('verline_space', self.config.verline_space, 4)
         # 线条颜色
-        self.config.verline_color = self.addUserConfig('verline_color', self.config.verline_color, 0)
+        self.config.verline_color = addUserConfig('verline_color', self.config.verline_color, 0)
         # 线宽
-        self.config.verline_thickness = self.addUserConfig('verline_thickness', self.config.verline_thickness, 1)
+        self.config.verline_thickness = addUserConfig('verline_thickness', self.config.verline_thickness, 1)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -185,7 +176,7 @@ class LRmotionAug(AugBase):
         super(LRmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.lrmotion_ks = self.addUserConfig('lrmotion_ks', self.config.lrmotion_ks, [3,5,7,9])
+        self.config.lrmotion_ks = addUserConfig('lrmotion_ks', self.config.lrmotion_ks, [3,5,7,9])
 
     def __call__(self,img):
         self.auditInput(img)
@@ -202,7 +193,7 @@ class UDmotionAug(AugBase):
         super(UDmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.udmotion_ks = self.addUserConfig('udmotion_ks', self.config.udmotion_ks, [3,5,7,9])
+        self.config.udmotion_ks = addUserConfig('udmotion_ks', self.config.udmotion_ks, [3,5,7,9])
 
     def __call__(self, img):
         self.auditInput(img)
@@ -219,8 +210,8 @@ class NoisyAug(AugBase):
         super(NoisyAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.noisy_mean = self.addUserConfig('noisy_mean', self.config.noisy_mean, 0)
-        self.config.noisy_sigma = self.addUserConfig('noisy_sigma', self.config.noisy_sigma, 1)
+        self.config.noisy_mean = addUserConfig('noisy_mean', self.config.noisy_mean, 0)
+        self.config.noisy_sigma = addUserConfig('noisy_sigma', self.config.noisy_sigma, 1)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -237,7 +228,7 @@ class DistortAug(AugBase):
         super(DistortAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.distort_segment = self.addUserConfig('distort_segment', self.config.distort_segment, 4)
+        self.config.distort_segment = addUserConfig('distort_segment', self.config.distort_segment, 4)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -279,7 +270,7 @@ class StretchAug(AugBase):
         super(StretchAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.stretch_segment = self.addUserConfig('stretch_segment', self.config.stretch_segment, 4)
+        self.config.stretch_segment = addUserConfig('stretch_segment', self.config.stretch_segment, 4)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -355,8 +346,8 @@ class MotionAug(AugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.motion_degree = self.addUserConfig('motion_degree', self.config.motion_degree, 18)
-        self.config.motion_angle = self.addUserConfig('motion_angle', self.config.motion_angle, 45)
+        self.config.motion_degree = addUserConfig('motion_degree', self.config.motion_degree, 18)
+        self.config.motion_angle = addUserConfig('motion_angle', self.config.motion_angle, 45)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -377,7 +368,7 @@ class DarkAug(AugBase):
         super(DarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.dark_gamma = self.addUserConfig('dark_gamma', self.config.dark_gamma, 3)
+        self.config.dark_gamma = addUserConfig('dark_gamma', self.config.dark_gamma, 3)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -403,7 +394,7 @@ class HalfDarkAug(AugBase):
         super(HalfDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.halfdark_gamma = self.addUserConfig('halfdark_gamma', self.config.halfdark_gamma, 1.5)
+        self.config.halfdark_gamma = addUserConfig('halfdark_gamma', self.config.halfdark_gamma, 1.5)
 
     def __call__(self, img):
         self.auditInput(img)
@@ -447,7 +438,7 @@ class RandomCropDarkAug(AugBase):
         super(RandomCropDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.random_crop_dark_gamma = self.addUserConfig('random_crop_dark_gamma', self.config.random_crop_dark_gamma, 1.2)
+        self.config.random_crop_dark_gamma = addUserConfig('random_crop_dark_gamma', self.config.random_crop_dark_gamma, 1.2)
 
     def __call__(self, img):
         self.auditInput(img)

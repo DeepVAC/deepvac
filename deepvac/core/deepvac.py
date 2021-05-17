@@ -53,33 +53,33 @@ class Deepvac(object):
         if not isinstance(self.config.net, nn.Module):
             LOG.logE("You must set config.core.net to a torch.nn.Module instance in config.py.", exit=True)
 
-    def initStateDict(self):
-        self.config.state_dict = None
-        if not self.config.model_path:
-            LOG.logI("config.core.model_path not specified, network parametes will not be initialized from trained/pretrained model.")
-            return
+    def auditStateDict(self, config):
+        state_dict = None
+        if not config.model_path:
+            LOG.logI("model_path not specified in config.py, network parametes will not be initialized from trained/pretrained model.")
+            return state_dict
 
-        if self.config.jit_model_path and self.config.is_forward_only:
-            LOG.logI("config.core.jit_model_path specified in forward-only mode, network parametes will be initialized from jit model rather than trained/pretrained model.")
-            return
+        if config.jit_model_path and config.is_forward_only:
+            LOG.logI("jit_model_path set in forward-only mode in config.py, network parametes will be initialized from jit model rather than trained/pretrained model.")
+            return state_dict
 
-        if self.config.jit_model_path:
-            LOG.logW("config.core.jit_model_path specified in training mode, omit...")
+        if config.jit_model_path:
+            LOG.logW("jit_model_path set in training mode in config.py, omit...")
 
-        LOG.logI('Loading State Dict from {}'.format(self.config.model_path))
-        self.config.state_dict = torch.load(self.config.model_path, map_location=self.config.device)
+        LOG.logI('Loading State Dict from {}'.format(config.model_path))
+        state_dict = torch.load(config.model_path, map_location=self.config.device)
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
-        if "state_dict" in self.config.state_dict.keys():
-            self.config.state_dict = {f(key): value for key, value in self.config.state_dict['state_dict'].items()}
+        if "state_dict" in state_dict.keys():
+            state_dict = {f(key): value for key, value in state_dict['state_dict'].items()}
         else:
-            self.config.state_dict = {f(key): value for key, value in self.config.state_dict.items()}
+            state_dict = {f(key): value for key, value in state_dict.items()}
         #remove prefix end
 
         #audit on model file
-        state_dict_keys = set(self.config.state_dict.keys())
-        code_net_keys = set(self.config.net.state_dict().keys())
+        state_dict_keys = set(state_dict.keys())
+        code_net_keys = set(config.net.state_dict().keys())
         used_keys = code_net_keys & state_dict_keys
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
@@ -87,34 +87,38 @@ class Deepvac(object):
         LOG.logI('Unused keys:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys:{}'.format(len(used_keys)))
 
-        if self.config.model_reinterpret_cast:
-            LOG.logI("You enabled config.core.model_reinterpret_cast, omit net parameter audit.")
-            return
+        if config.model_reinterpret_cast:
+            LOG.logI("You enabled model_reinterpret_cast in config.py, omit net parameter audit.")
+            return state_dict
 
         if len(used_keys) == 0:
-            LOG.logE('Error: load NONE from pretrained model: {}'.format(self.config.model_path), exit=True)
+            LOG.logE('Error: load NONE from pretrained model: {}'.format(config.model_path), exit=True)
 
         if len(missing_keys) > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
-            if not self.config.network_audit_disabled:
-                LOG.logE("If you know this risk, set config.core.network_audit_disabled=True in config.py to omit this error.", exit=True)
+            if not config.network_audit_disabled:
+                LOG.logE("If you know this risk, set network_audit_disabled=True in config.py to omit this error.", exit=True)
+        return state_dict
 
-    def castStateDict(self):
-        LOG.logI("config.model_reinterpret_cast is True, Try to reinterpret cast the model")
+    def initStateDict(self):
+        self.config.state_dict = self.auditStateDict(self.config)
+
+    def castStateDict(self, config):
+        LOG.logI("model_reinterpret_cast set to True in config.py, Try to reinterpret cast the model")
         state_dict = collections.OrderedDict()
-        keys = list(self.config.state_dict.keys())
-        for idx, name in enumerate(self.config.net.state_dict()):
-            if self.config.net.state_dict()[name].size() == self.config.state_dict[keys[idx]].size():
+        keys = list(config.state_dict.keys())
+        for idx, name in enumerate(config.net.state_dict()):
+            if config.net.state_dict()[name].size() == config.state_dict[keys[idx]].size():
                 LOG.logI("cast pretrained model [{}] => config.core.net [{}]".format(keys[idx], name))
-                state_dict[name] = self.config.state_dict[keys[idx]]
+                state_dict[name] = config.state_dict[keys[idx]]
                 continue
-            LOG.logE("cannot cast pretrained model [{}] => config.core.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
-            if self.config.cast_state_dict_strict is False:
+            LOG.logE("cannot cast pretrained model [{}] => config.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
+            if config.cast_state_dict_strict is False:
                 continue
-            LOG.logE("If you know above risk, set config.core.cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
+            LOG.logE("If you know above risk, set cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
             
-        self.config.state_dict = state_dict
         LOG.logI("Reinterpret cast the model succeeded.")
+        return state_dict
 
     def loadStateDict(self):
         self.config.net = self.config.net.to(self.config.device)
@@ -123,7 +127,7 @@ class Deepvac(object):
             return
         
         if self.config.model_reinterpret_cast:
-            self.castStateDict()
+            self.config.state_dict = self.castStateDict(self.config)
             
         self.config.net.load_state_dict(self.config.state_dict, strict=False)
 

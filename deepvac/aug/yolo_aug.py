@@ -10,9 +10,9 @@ class HSVAug(AugBase):
         super(HSVAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.hsv_hgain = self.addUserConfig('dark_gamma', self.config.dark_gamma, 0.015)
-        self.config.hsv_sgain = self.addUserConfig('dark_gamma', self.config.dark_gamma, 0.7)
-        self.config.hsv_vgain = self.addUserConfig('dark_gamma', self.config.dark_gamma, 0.4)
+        self.config.hsv_hgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.015)
+        self.config.hsv_sgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.7)
+        self.config.hsv_vgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.4)
 
     def __call__(self, img):
         img, label = self.auditInput(img, has_label=True)
@@ -65,11 +65,11 @@ class YoloPerspectiveAug(AugBase):
         self.border = deepvac_config.border
 
     def auditConfig(self):
-        self.config.yolo_perspective_scale = self.addUserConfig('yolo_perspective_scale', self.config.yolo_perspective_scale, 0.5)
-        self.config.yolo_perspective_shear = self.addUserConfig('yolo_perspective_shear', self.config.yolo_perspective_shear, 0.0)
-        self.config.yolo_perspective_degrees = self.addUserConfig('yolo_perspective_degrees', self.config.yolo_perspective_degrees, 0.0)
-        self.config.yolo_perspective_translate = self.addUserConfig('yolo_perspective_translate', self.config.yolo_perspective_translate, 0.1)
-        self.config.yolo_perspective_perspective = self.addUserConfig('yolo_perspective_perspective', self.config.yolo_perspective_perspective, 0.0)
+        self.config.yolo_perspective_scale = addUserConfig('yolo_perspective_scale', self.config.yolo_perspective_scale, 0.5)
+        self.config.yolo_perspective_shear = addUserConfig('yolo_perspective_shear', self.config.yolo_perspective_shear, 0.0)
+        self.config.yolo_perspective_degrees = addUserConfig('yolo_perspective_degrees', self.config.yolo_perspective_degrees, 0.0)
+        self.config.yolo_perspective_translate = addUserConfig('yolo_perspective_translate', self.config.yolo_perspective_translate, 0.1)
+        self.config.yolo_perspective_perspective = addUserConfig('yolo_perspective_perspective', self.config.yolo_perspective_perspective, 0.0)
 
     def _box_candidates(self, box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1):
         w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
