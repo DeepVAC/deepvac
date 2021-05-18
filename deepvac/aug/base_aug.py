@@ -12,7 +12,7 @@ class AugBase(object):
         self.auditConfig()
 
     def auditConfig(self):
-        raise Exception("Not implemented!")
+        pass
 
     def __call__(self,img):
         raise Exception("Not implemented!")
@@ -70,12 +70,32 @@ class CvAugBase(AugBase):
 class PilAugBase(AugBase):
     def auditImg(self, img):
         if self.isNumpy(img):
-            img = self.pillow2cv(img)
+            img = self.cv2pillow(img)
 
         if self.isPil(img):
             return img
 
         LOG.logE("PilAugBase subclass expect numpy ndarray as input, make sure you read img with cv2.", exit=True)
+
+class Cv2PilAug(CvAugBase):
+    def __call__(self, img):
+        img = self.auditInput(img)
+        return self.cv2pillow(img)
+
+class Pil2CvAug(PilAugBase):
+    def __call__(self, img):
+        img = self.auditInput(img)
+        return self.pillow2cv(img)
+
+class RGB2BGR(CvAugBase):
+    def __call__(self, img):
+        img = self.auditInput(img)
+        return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+class BGR2RGB(CvAugBase):
+    def __call__(self, img):
+        img = self.auditInput(img)
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 # 图像添加随机斑点
 class SpeckleAug(CvAugBase):
@@ -246,12 +266,13 @@ class NoisyAug(CvAugBase):
         self.config.noisy_sigma = addUserConfig('noisy_sigma', self.config.noisy_sigma, 1)
 
     def __call__(self, img):
+        input_type = img.dtype
         img = self.auditInput(img)
         row, col = img.shape[:2]
         gauss = np.random.normal(self.config.noisy_mean, self.config.noisy_sigma, (row, col,3))
         gauss = gauss.reshape(row, col,3)
         noisy = img + gauss
-        img_noisy= noisy.astype(np.uint8)
+        img_noisy = noisy.astype(input_type)
         return img_noisy
 
 # 扭曲变换
@@ -403,21 +424,16 @@ class DarkAug(CvAugBase):
         self.config.dark_gamma = addUserConfig('dark_gamma', self.config.dark_gamma, 3)
 
     def __call__(self, img):
+        input_type = img.dtype
         img = self.auditInput(img)
-        is_gray = img.ndim == 2 or img.shape[1] == 1
-        if is_gray:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         illum = hsv[..., 2] / 255.
         illum = np.power(illum, self.config.dark_gamma)
         v = illum * 255.
         v[v > 255] = 255
         v[v < 0] = 0
-        hsv[..., 2] = v.astype(np.uint8)
+        hsv[..., 2] = v.astype(input_type)
         img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-        if is_gray:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
         return img
 
 # 降低图片半边亮度
@@ -429,22 +445,17 @@ class HalfDarkAug(CvAugBase):
         self.config.halfdark_gamma = addUserConfig('halfdark_gamma', self.config.halfdark_gamma, 1.5)
 
     def __call__(self, img):
+        input_type = img.dtype
         img = self.auditInput(img)
         h, w, _ = img.shape
-        is_gray = img.ndim == 2 or img.shape[1] == 1
-        if is_gray:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         illum = hsv[..., 2] / 255.
         illum[:, w//2:] = np.power(illum[:, w//2:], self.config.halfdark_gamma)
         v = illum * 255
         v[v > 255] = 255
         v[v < 0] = 0
-        hsv[..., 2] = v.astype(np.uint8)
+        hsv[..., 2] = v.astype(input_type)
         img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-        if is_gray:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
         return img
 
 # 模拟IPC场景增强
@@ -473,6 +484,7 @@ class RandomCropDarkAug(CvAugBase):
         self.config.random_crop_dark_gamma = addUserConfig('random_crop_dark_gamma', self.config.random_crop_dark_gamma, 1.2)
 
     def __call__(self, img):
+        input_type = img.dtype
         img = self.auditInput(img)
         height, width, _ = img.shape
         w = np.random.uniform(0.3 * width, width)
@@ -490,7 +502,7 @@ class RandomCropDarkAug(CvAugBase):
         v = illum * 255.
         v[v > 255] = 255
         v[v < 0] = 0
-        hsv[..., 2] = v.astype(np.uint8)
+        hsv[..., 2] = v.astype(input_type)
         dark_img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
         for x in range(rect[1], rect[3]):
