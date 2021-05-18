@@ -97,6 +97,10 @@ class BGR2RGB(CvAugBase):
         img = self.auditInput(img)
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+class GatherToListAug(AugBase):
+    def __call__(self, *args):
+        return [*args]
+
 # 图像添加随机斑点
 class SpeckleAug(CvAugBase):
     def __init__(self, deepvac_config):

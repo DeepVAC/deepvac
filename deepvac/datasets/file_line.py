@@ -33,15 +33,17 @@ class FileLineDataset(Dataset):
     def __getitem__(self, index):
         path, target = self.samples[index]
         abs_path = os.path.join(self.sample_path_prefix, path)
-        return self._buildSampleFromPath(abs_path), target
+        sample = self._buildSampleFromPath(abs_path)
+
+        if self.config.transform is not None:
+            sample = self.config.transform(sample)
+        if self.config.composer is not None:
+            sample = self.config.composer(sample)
+        return sample, target
 
     def _buildSampleFromPath(self, abs_path):
         #we just set default loader with Pillow Image
         sample = Image.open(abs_path).convert('RGB')
-        if self.transform is not None:
-            sample = self.transform(sample)
-        if self.composer is not None:
-            sample = self.composer(sample)
         return sample
 
     def __len__(self):
@@ -55,6 +57,21 @@ class FileLineCvStrDataset(FileLineDataset):
     def _buildSampleFromPath(self, abs_path):
         #we just set default loader with Pillow Image
         sample = cv2.imread(abs_path)
-        if self.transform is not None:
-            sample = self.transform(sample)
         return sample
+
+class FileLineCvSegDataset(FileLineCvStrDataset):
+    def _buildLabelFromPath(self, abs_path):
+        sample = cv2.imread(abs_path, cv2.IMREAD_GRAYSCALE)
+        return sample
+
+    def __getitem__(self, index):
+        image_path, label_path = self.samples[index]
+        sample = self._buildSampleFromPath(os.path.join(self.sample_path_prefix, image_path.strip()))
+        label = self._buildLabelFromPath(os.path.join(self.sample_path_prefix, label_path.strip()))
+
+        if self.config.transform is not None:
+            sample, label = self.config.transform(sample, label)
+        if self.config.composer is not None:
+            sample, label = self.config.composer(sample, label)
+
+        return image, label

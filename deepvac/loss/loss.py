@@ -6,6 +6,7 @@ from ..utils import LOG, addUserConfig
 
 class LossBase(nn.Module):
     def __init__(self, deepvac_config):
+        super(LossBase, self).__init__()
         self.core_config = deepvac_config.core
         self.config = deepvac_config.loss
         self.auditConfig()

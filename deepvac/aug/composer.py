@@ -44,6 +44,15 @@ class PickOneComposer(Composer):
             return self._graph[k](img)
         return self._graph[k](img)
 
+class MultiInputCompose(object):
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, *args):
+        for t in self.transforms:
+            args = t(*args)
+        return args
+
 class FaceAugComposer(Composer):
     def __init__(self, deepvac_config):
         super(FaceAugComposer, self).__init__(deepvac_config)
