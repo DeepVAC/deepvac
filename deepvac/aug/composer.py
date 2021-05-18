@@ -34,7 +34,7 @@ class Composer(object):
 class DiceComposer(Composer):
     def __call__(self, img):
         i = random.randrange(len(self._graph_p))
-        return list(self._graph.values())[i]
+        return list(self._graph.values())[i](img)
 
 class PickOneComposer(Composer):
     def __call__(self, img):
