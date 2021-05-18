@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .loss import LossBase
 
-class MultiBoxLoss(nn.Module):
+class MultiBoxLoss(LossBase):
     def __init__(self, num_classes, overlap_thresh, prior_for_matching, bkg_label, neg_mining, neg_pos, neg_overlap, encode_target, device='cpu'):
         super(MultiBoxLoss, self).__init__()
         self.num_classes = num_classes

@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 import random
-from .base_aug import AugBase
+from .base_aug import CvAugBase
 
 # 随机旋转（针对于人脸关键点任务）
-class RandomRotateFacialKpListAug(AugBase):
+class RandomRotateFacialKpListAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(RandomRotateFacialKpListAug, self).__init__(deepvac_config)
 
@@ -30,7 +30,7 @@ class RandomRotateFacialKpListAug(AugBase):
         return [dest_img, dest_landmarks]
 
 # 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
-class RandomFilpFacialKpListAug(AugBase):
+class RandomFilpFacialKpListAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(RandomFilpFacialKpListAug, self).__init__(deepvac_config)
 
@@ -75,7 +75,7 @@ class RandomFilpFacialKpListAug(AugBase):
 
         return [dest_img, dest_landmarks]
 
-class CropFacialWithBoxesAndLmksAug(AugBase):
+class CropFacialWithBoxesAndLmksAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(CropFacialWithBoxesAndLmksAug, self).__init__(deepvac_config)
 
@@ -161,7 +161,7 @@ class CropFacialWithBoxesAndLmksAug(AugBase):
         return image, [boxes, landms, labels]
 
 
-class DistortFacialAugBase(AugBase):
+class DistortFacialAugBase(CvAugBase):
     def __init__(self, deepvac_config):
         super(DistortFacialAugBase, self).__init__(deepvac_config)
 
@@ -252,7 +252,7 @@ class HueDistortFacialAug(DistortFacialAugBase):
 
         return image, label
 
-class MirrorFacialAug(AugBase):
+class MirrorFacialAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(MirrorFacialAug, self).__init__(deepvac_config)
 
@@ -286,7 +286,7 @@ class MirrorFacialAug(AugBase):
 
         return image, [boxes, landms, labels]
 
-class Pad2SquareFacialAug(AugBase):
+class Pad2SquareFacialAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(Pad2SquareFacialAug, self).__init__(deepvac_config)
 
@@ -309,7 +309,7 @@ class Pad2SquareFacialAug(AugBase):
         image_t[0:0 + height, 0:0 + width] = image
         return image, label
 
-class ResizeSubtractMeanFacialAug(AugBase):
+class ResizeSubtractMeanFacialAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(ResizeSubtractMeanFacialAug, self).__init__(deepvac_config)
 

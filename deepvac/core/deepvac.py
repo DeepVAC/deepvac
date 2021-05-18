@@ -24,8 +24,8 @@ from ..cast import export3rd
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
     def __init__(self, deepvac_config):
-        self.global_config = deepvac_config
-        self.config = self.global_config.core
+        self.deepvac_config = deepvac_config
+        self.config = self.deepvac_config.core
         if self.config.is_forward_only is None:
             self.config.is_forward_only = True
         self.config.branch = assertAndGetGitBranch(self.config.is_disable_git)
@@ -183,7 +183,7 @@ class Deepvac(object):
         self.initTestLoader()
 
     def export3rd(self, output_file=None):
-        export3rd(self.global_config, output_file)
+        export3rd(self.deepvac_config, output_file)
 
     #For Deepvac user to reimplement
     def preIter(self):

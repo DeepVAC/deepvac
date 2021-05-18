@@ -2,10 +2,10 @@ import math
 import cv2
 import numpy as np
 import random
-from .base_aug import AugBase
+from .base_aug import CvAugBase
 
 ### yolov5 dataset aug
-class HSVAug(AugBase):
+class HSVAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(HSVAug, self).__init__(deepvac_config)
 
@@ -29,7 +29,7 @@ class HSVAug(AugBase):
         cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)
         return img, label
 
-class YoloHFlipAug(AugBase):
+class YoloHFlipAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(YoloHFlipAug, self).__init__(deepvac_config)
 
@@ -44,7 +44,7 @@ class YoloHFlipAug(AugBase):
             label[:, 1] = 1 - label[:, 1]
         return img, label
 
-class YoloVFlipAug(AugBase):
+class YoloVFlipAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(YoloVFlipAug, self).__init__(deepvac_config)
 
@@ -59,7 +59,7 @@ class YoloVFlipAug(AugBase):
             label[:, 2] = 1 - label[:, 2]
         return img, label
 
-class YoloPerspectiveAug(AugBase):
+class YoloPerspectiveAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(YoloPerspectiveAug, self).__init__(deepvac_config)
         self.border = deepvac_config.border
@@ -173,7 +173,7 @@ class YoloPerspectiveAug(AugBase):
         return img, label
 
 
-class YoloNormalizeAug(AugBase):
+class YoloNormalizeAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(YoloNormalizeAug, self).__init__(deepvac_config)
 

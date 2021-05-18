@@ -17,19 +17,20 @@ class AugBase(object):
     def __call__(self,img):
         raise Exception("Not implemented!")
 
-    @staticmethod
-    def auditInput(img, has_label=False):
+    def auditImg(self, img):
+        LOG.logE("You must reimplement auditImg in subclass.", exit=True)
+
+    def auditInput(self, img, has_label=False):
         if not has_label:
-            assert isinstance(img, np.ndarray) and img.ndim == 3, "image must be cv2 image"
-            return
+            return self.auditImg(img)
 
         if not isinstance(img, (list, tuple)):
             assert False, "parameter img must be [image, labels]"
-            return
+            return None
 
         assert len(img) == 2, "parameter img must be [image, labels]"
         img, label = img
-        assert isinstance(img, np.ndarray) and img.ndim == 3, "image must be cv2 image"
+        img = self.auditImg(img)
         return img, label
 
     @staticmethod
@@ -45,8 +46,39 @@ class AugBase(object):
             cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
         return Image.fromarray(cv_img)
 
+    @staticmethod
+    def isPil(img):
+        return isinstance(img, Image.Image)
+
+    @staticmethod
+    def isNumpy(img):
+        return isinstance(img, np.ndarray)
+
+#expect cv numpy as input
+class CvAugBase(AugBase):
+    def auditImg(self, img):
+        if self.isPil(img):
+            img = self.pillow2cv(img)
+        
+        if self.isNumpy(img):
+            assert img.ndim == 3, "image must has 3 channels rather than {}.".format(img.ndim)
+            return img
+
+        LOG.logE("CvAugBase subclass expect numpy ndarray as input, make sure you read img with cv2.", exit=True)
+
+#expect PIL Image as input
+class PilAugBase(AugBase):
+    def auditImg(self, img):
+        if self.isNumpy(img):
+            img = self.pillow2cv(img)
+
+        if self.isPil(img):
+            return img
+
+        LOG.logE("PilAugBase subclass expect numpy ndarray as input, make sure you read img with cv2.", exit=True)
+
 # 图像添加随机斑点
-class SpeckleAug(AugBase):
+class SpeckleAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(SpeckleAug,self).__init__(deepvac_config)
 
@@ -55,7 +87,7 @@ class SpeckleAug(AugBase):
 
     def __call__(self, img):
         input_type = img.dtype
-        self.auditInput(img)
+        img = self.auditInput(img)
         blur = ndimage.gaussian_filter(np.random.randn(*img.shape) * self.config.speckle_severity, 1)
         img_speck = (img + blur)
         img_speck[img_speck > 255] = 255
@@ -64,7 +96,7 @@ class SpeckleAug(AugBase):
         return img_speck
 
 # 仿射变换
-class AffineAug(AugBase):
+class AffineAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(AffineAug,self).__init__(deepvac_config)
 
@@ -76,7 +108,7 @@ class AffineAug(AugBase):
         self.config.affine_shear_y = addUserConfig('affine_shear_y', self.config.affine_shear_y, 1)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         rows,cols=img.shape[:2]
         shear_x = float(np.random.randint(-self.config.affine_shear_x, self.config.affine_shear_x + 1))/100
         shear_y = float(np.random.randint(-self.config.affine_shear_y, self.config.affine_shear_y + 1))/100
@@ -85,7 +117,7 @@ class AffineAug(AugBase):
         return img_affine
 
 # 透视变换
-class PerspectAug(AugBase):
+class PerspectAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(PerspectAug,self).__init__(deepvac_config)
 
@@ -100,7 +132,7 @@ class PerspectAug(AugBase):
         self.config.perspect_sw_upper = addUserConfig('perspect_sw_upper', self.config.perspect_sw_upper, 31)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         h,w=img.shape[:2]
         scale_h = np.random.randint(self.config.perspect_sh_lower ,self.config.perspect_sh_upper)
         scale_w = np.random.randint(self.config.perspect_sw_lower ,self.config.perspect_sw_upper)
@@ -117,7 +149,7 @@ class PerspectAug(AugBase):
         return img_perspect
 
 # 高斯模糊
-class GaussianAug(AugBase):
+class GaussianAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(GaussianAug,self).__init__(deepvac_config)
 
@@ -125,13 +157,13 @@ class GaussianAug(AugBase):
         self.config.gaussian_ks = addUserConfig('gaussian_ks', self.config.gaussian_ks, [9,11,13,15,17])
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         ks = self.config.gaussian_ks[np.random.randint(0,len(self.config.gaussian_ks))]
         img_gaussian = cv2.GaussianBlur(img,(ks, ks), 0)
         return img_gaussian
 
 # 添加横线增强
-class HorlineAug(AugBase):
+class HorlineAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(HorlineAug,self).__init__(deepvac_config)
 
@@ -144,14 +176,14 @@ class HorlineAug(AugBase):
         self.config.horline_thickness = addUserConfig('horline_thickness', self.config.horline_thickness, 1)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
         for i in range(0,img_h,self.config.horline_space):
             cv2.line(img, (0, i), (img_w, i), self.config.horline_color, self.config.horline_thickness)
         return img
 
 # 添加竖线增强
-class VerlineAug(AugBase):
+class VerlineAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(VerlineAug,self).__init__(deepvac_config)
 
@@ -164,14 +196,14 @@ class VerlineAug(AugBase):
         self.config.verline_thickness = addUserConfig('verline_thickness', self.config.verline_thickness, 1)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
         for i in range(0,img_w,self.config.verline_space):
             cv2.line(img, (i, 0), (i, img_h), self.config.verline_color, self.config.verline_thickness)
         return img
 
 # 左右运动模糊
-class LRmotionAug(AugBase):
+class LRmotionAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(LRmotionAug,self).__init__(deepvac_config)
 
@@ -179,7 +211,7 @@ class LRmotionAug(AugBase):
         self.config.lrmotion_ks = addUserConfig('lrmotion_ks', self.config.lrmotion_ks, [3,5,7,9])
 
     def __call__(self,img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         ks = self.config.lrmotion_ks[np.random.randint(0,len(self.config.lrmotion_ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[int((ks - 1) / 2), :] = np.ones(ks)
@@ -188,7 +220,7 @@ class LRmotionAug(AugBase):
         return img_lrmotion
 
 # 上下运动模糊
-class UDmotionAug(AugBase):
+class UDmotionAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(UDmotionAug,self).__init__(deepvac_config)
 
@@ -196,7 +228,7 @@ class UDmotionAug(AugBase):
         self.config.udmotion_ks = addUserConfig('udmotion_ks', self.config.udmotion_ks, [3,5,7,9])
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         ks = self.config.udmotion_ks[np.random.randint(0,len(self.config.udmotion_ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[:, int((ks - 1) / 2)] = np.ones(ks)
@@ -205,7 +237,7 @@ class UDmotionAug(AugBase):
         return img_udmotion
 
 # 添加噪声
-class NoisyAug(AugBase):
+class NoisyAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(NoisyAug,self).__init__(deepvac_config)
 
@@ -214,7 +246,7 @@ class NoisyAug(AugBase):
         self.config.noisy_sigma = addUserConfig('noisy_sigma', self.config.noisy_sigma, 1)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         row, col = img.shape[:2]
         gauss = np.random.normal(self.config.noisy_mean, self.config.noisy_sigma, (row, col,3))
         gauss = gauss.reshape(row, col,3)
@@ -223,7 +255,7 @@ class NoisyAug(AugBase):
         return img_noisy
 
 # 扭曲变换
-class DistortAug(AugBase):
+class DistortAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(DistortAug,self).__init__(deepvac_config)
 
@@ -231,7 +263,7 @@ class DistortAug(AugBase):
         self.config.distort_segment = addUserConfig('distort_segment', self.config.distort_segment, 4)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
         cut = img_w // self.config.distort_segment
         thresh = cut // 3
@@ -265,7 +297,7 @@ class DistortAug(AugBase):
         return img_distort
 
 # 随机伸缩变换
-class StretchAug(AugBase):
+class StretchAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(StretchAug,self).__init__(deepvac_config)
 
@@ -273,7 +305,7 @@ class StretchAug(AugBase):
         self.config.stretch_segment = addUserConfig('stretch_segment', self.config.stretch_segment, 4)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
 
         cut = img_w // self.config.stretch_segment
@@ -308,7 +340,7 @@ class StretchAug(AugBase):
         return img_stretch
 
 # 透视变换
-class PerspectiveAug(AugBase):
+class PerspectiveAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(PerspectiveAug,self).__init__(deepvac_config)
 
@@ -316,7 +348,7 @@ class PerspectiveAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
 
         thresh = img_h // 2
@@ -341,7 +373,7 @@ class PerspectiveAug(AugBase):
         return img_perspective
 
 # 运动模糊
-class MotionAug(AugBase):
+class MotionAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(MotionAug, self).__init__(deepvac_config)
 
@@ -350,7 +382,7 @@ class MotionAug(AugBase):
         self.config.motion_angle = addUserConfig('motion_angle', self.config.motion_angle, 45)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         m = cv2.getRotationMatrix2D((self.config.motion_degree / 2, self.config.motion_degree / 2), self.config.motion_angle, 1)
         motion_blur_kernel = np.diag(np.ones(self.config.motion_degree))
         motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.config.motion_degree, self.config.motion_degree))
@@ -363,7 +395,7 @@ class MotionAug(AugBase):
         return blurred
 
 # 降低图片亮度
-class DarkAug(AugBase):
+class DarkAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(DarkAug, self).__init__(deepvac_config)
 
@@ -371,7 +403,7 @@ class DarkAug(AugBase):
         self.config.dark_gamma = addUserConfig('dark_gamma', self.config.dark_gamma, 3)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         is_gray = img.ndim == 2 or img.shape[1] == 1
         if is_gray:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -389,7 +421,7 @@ class DarkAug(AugBase):
         return img
 
 # 降低图片半边亮度
-class HalfDarkAug(AugBase):
+class HalfDarkAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(HalfDarkAug, self).__init__(deepvac_config)
 
@@ -397,7 +429,7 @@ class HalfDarkAug(AugBase):
         self.config.halfdark_gamma = addUserConfig('halfdark_gamma', self.config.halfdark_gamma, 1.5)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         h, w, _ = img.shape
         is_gray = img.ndim == 2 or img.shape[1] == 1
         if is_gray:
@@ -416,7 +448,7 @@ class HalfDarkAug(AugBase):
         return img
 
 # 模拟IPC场景增强
-class IPCFaceAug(AugBase):
+class IPCFaceAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(IPCFaceAug, self).__init__(deepvac_config)
         self.deepvac_config = deepvac_config
@@ -425,7 +457,7 @@ class IPCFaceAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         half_dark = HalfDarkAug(self.deepvac_config)
         half_darked = half_dark(img)
         motion = MotionAug(self.deepvac_config)
@@ -433,7 +465,7 @@ class IPCFaceAug(AugBase):
         return motioned
 
 # 随机crop框降低亮度
-class RandomCropDarkAug(AugBase):
+class RandomCropDarkAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(RandomCropDarkAug, self).__init__(deepvac_config)
 
@@ -441,7 +473,7 @@ class RandomCropDarkAug(AugBase):
         self.config.random_crop_dark_gamma = addUserConfig('random_crop_dark_gamma', self.config.random_crop_dark_gamma, 1.2)
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         height, width, _ = img.shape
         w = np.random.uniform(0.3 * width, width)
         h = np.random.uniform(0.3 * height, height)
@@ -471,7 +503,7 @@ class RandomCropDarkAug(AugBase):
         return img
 
 # 随机颜色扰动
-class ColorJitterAug(AugBase):
+class ColorJitterAug(PilAugBase):
     def __init__(self, deepvac_config):
         super(ColorJitterAug, self).__init__(deepvac_config)
 
@@ -479,12 +511,10 @@ class ColorJitterAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
-        img = self.cv2pillow(img)
-        img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
-        return self.pillow2cv(img)
+        img = self.auditInput(img)
+        return ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
 
-class BrightnessJitterAug(AugBase):
+class BrightnessJitterAug(PilAugBase):
     def __init__(self, deepvac_config):
         super(BrightnessJitterAug, self).__init__(deepvac_config)
 
@@ -492,12 +522,10 @@ class BrightnessJitterAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
-        img = self.cv2pillow(img)
-        img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
-        return self.pillow2cv(img)
+        img = self.auditInput(img)
+        return ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
 
-class ContrastJitterAug(AugBase):
+class ContrastJitterAug(PilAugBase):
     def __init__(self, deepvac_config):
         super(ContrastJitterAug, self).__init__(deepvac_config)
 
@@ -505,12 +533,10 @@ class ContrastJitterAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
-        img = self.cv2pillow(img)
-        img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
-        return self.pillow2cv(img)
+        img = self.auditInput(img)
+        return ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
 
-class RandomColorJitterAug(AugBase):
+class RandomColorJitterAug(PilAugBase):
     def __init__(self, deepvac_config):
         super(RandomColorJitterAug, self).__init__(deepvac_config)
 
@@ -518,17 +544,16 @@ class RandomColorJitterAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
-        img = self.cv2pillow(img)
+        img = self.auditInput(img)
         if random.randint(0, 1):
             img = ImageEnhance.Color(img).enhance(np.random.uniform(0.8, 1.3))
         if random.randint(0, 1):
             img = ImageEnhance.Brightness(img).enhance(np.random.uniform(0.6, 1.5))
         if random.randint(0, 1):
             img = ImageEnhance.Contrast(img).enhance(np.random.uniform(0.5, 1.8))
-        return self.pillow2cv(img)
+        return img
 
-class MosaicAug(AugBase):
+class MosaicAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(MosaicAug, self).__init__(deepvac_config)
         self.neighbor = 2
@@ -537,7 +562,7 @@ class MosaicAug(AugBase):
         pass
 
     def __call__(self, img):
-        self.auditInput(img)
+        img = self.auditInput(img)
         neighbor = self.neighbor
         h, w = img.shape[0], img.shape[1]
         for i in range(0, h - neighbor -1, neighbor):

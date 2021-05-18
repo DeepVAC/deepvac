@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 import random
-from .base_aug import AugBase
+from .base_aug import CvAugBase
 
-class ImageWithMasksRandomHorizontalFlipAug(AugBase):
+class ImageWithMasksRandomHorizontalFlipAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
 
@@ -18,7 +18,7 @@ class ImageWithMasksRandomHorizontalFlipAug(AugBase):
             imgs[i] = np.flip(imgs[i], axis=1)
         return [imgs[0],imgs[1:]]
 
-class ImageWithMasksRandomRotateAug(AugBase):
+class ImageWithMasksRandomRotateAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
 
@@ -38,7 +38,7 @@ class ImageWithMasksRandomRotateAug(AugBase):
             imgs[i] = img_rotation
         return [imgs[0],imgs[1:]]
 
-class ImageWithMasksRandomCropAug(AugBase):
+class ImageWithMasksRandomCropAug(CvAugBase):
     def __init__(self, deepvac_config):
         super(ImageWithMasksRandomCropAug, self).__init__(deepvac_config)
         self.auditUserConfig("img_size")

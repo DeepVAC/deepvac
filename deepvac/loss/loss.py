@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from ..utils import LOG, addUserConfig
 
-class LossBase(object):
+class LossBase(nn.Module):
     def __init__(self, deepvac_config):
         self.core_config = deepvac_config.core
         self.config = deepvac_config.loss
