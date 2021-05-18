@@ -48,10 +48,10 @@ class MultiInputCompose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, *args):
+    def __call__(self, img):
         for t in self.transforms:
-            args = t(*args)
-        return args
+            img = t(img)
+        return img
 
 class FaceAugComposer(Composer):
     def __init__(self, deepvac_config):

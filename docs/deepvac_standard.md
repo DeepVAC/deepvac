@@ -36,8 +36,8 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 #### 使用DeepVAC代码规范
 访问：[代码规范](./code_standard.md)
 
-#### 使用DeepVAC项目组织规范
-访问：[项目组织规范](./arch.md)
+#### 使用DeepVAC软件工程规范
+访问：[软件工程规范](./arch.md)
 
 
 ## 训练

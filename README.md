@@ -1,6 +1,6 @@
 # DeepVAC
 DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一目标，DeepVAC包含了：
-- 项目组织规范：[项目组织规范](./docs/arch.md)；
+- 软件工程规范：[软件工程规范](./docs/arch.md)；
 - 代码规范：[代码规范](./docs/code_standard.md)；
 - deepvac库：[deepvac库](./docs/lib.md)。
 
@@ -104,7 +104,7 @@ Deepvac的config模块没有预定义，但是用户必须要定义的配置：
 #dataloader的collate_fn参数
 config.core.collate_fn = None
 #MyTrainDataset为Dataset的子类
-config.core.train_dataset = MyTrainDataset(config.core)
+config.core.train_dataset = MyTrainDataset(config)
 config.core.train_loader = torch.utils.data.DataLoader(
     config.core.train_dataset,
     batch_size=config.core.batch_size,
@@ -113,11 +113,11 @@ config.core.train_loader = torch.utils.data.DataLoader(
     collate_fn=config.core.collate_fn
 )
 #MyValDataset为Dataset的子类
-config.core.val_dataset = MyValDataset(config.core)
+config.core.val_dataset = MyValDataset(config)
 config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, batch_size=1, pin_memory=False)
 
 #MyTestDataset为Dataset的子类
-config.core.test_dataset = MyTestDataset(config.core)
+config.core.test_dataset = MyTestDataset(config)
 config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
 
 ## ------------------- train ------------------
@@ -158,7 +158,7 @@ from deepvac import DeepvacTrain
 class MyTrain(DeepvacTrain):
     ......
 
-my_train = MyTrain(deepvac_config.core)
+my_train = MyTrain(deepvac_config)
 my_train()
 ```
 
@@ -170,7 +170,7 @@ from deepvac import Deepvac
 class MyTest(Deepvac)
     ......
 
-my_test = MyTest(deepvac_config.core)
+my_test = MyTest(deepvac_config)
 my_test()
 ```
 
@@ -272,7 +272,7 @@ class MyTrain(DeepvacTrain):
         LOG.logI('Test accuray: {:.4f}'.format(self.config.acc))
 
 
-train = MyTrain(deepvac_config.core)
+train = MyTrain(deepvac_config)
 train()
 ```
 ## 10. 编写测试脚本
@@ -301,7 +301,7 @@ class MyTest(Deepvac):
     def testFly(self):
         ...
 
-test = MyTest(deepvac_config.core)
+test = MyTest(deepvac_config)
 test()
 #test(input_tensor)
 ```
