@@ -90,7 +90,7 @@ class ImageWithMasksScaleAug(CvAugBase):
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, input_len=2)
         img = cv2.resize(img, (self.config.w, self.config.h))
-        label = cv2.resize(label, (self.w, self.h), interpolation=cv2.INTER_NEAREST)
+        label = cv2.resize(label, (self.config.w, self.config.h), interpolation=cv2.INTER_NEAREST)
         return [img, label]
 
 class ImageWithMasksRandomCropResizeAug(CvAugBase):
