@@ -17,7 +17,10 @@ class DeepvacCast(object):
         self.auditFinalConfig()
 
     def auditConfig(self):
-        LOG.logW("You should reimplement auditConfig in your subclass.")
+        LOG.logW("You should reimplement auditConfig in your subclass {}.".format(self.name()))
+
+    def name(self):
+        return self.__class__.__name__
 
     def auditFinalConfig(self):
         if not self.auditConfig():
@@ -36,7 +39,7 @@ class DeepvacCast(object):
         self.proceed = True
         
     def process(self, cast_output_file=None):
-        LOG.logE("You must reimplement process() in your subclass.", exit=True)
+        LOG.logE("You must reimplement process() in your subclass {}.".format(self.name()), exit=True)
 
     def exportOnnx(self):
         if self.config.onnx_input_names is None:
@@ -79,10 +82,10 @@ class ScriptModel(object):
         self.s_qconfig_dict = {'': get_default_qconfig(self.backend) }
 
     def _freeze_jit(self, model):
-        LOG.logE("You must reimplement _freeze_jit() in subclass.", exit=True)
+        LOG.logE("You must reimplement _freeze_jit() in ScriptModel subclass.", exit=True)
     
     def _jit(self, model):
-        LOG.logE("You must reimplement _jit() in subclass.", exit=True)
+        LOG.logE("You must reimplement _jit() in ScriptModel subclass.", exit=True)
 
     def getCalibrateLoader(self):
         loader = self.config.test_loader if self.config.is_forward_only else self.config.val_loader

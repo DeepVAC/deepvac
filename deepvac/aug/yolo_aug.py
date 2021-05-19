@@ -10,9 +10,9 @@ class HSVAug(CvAugBase):
         super(HSVAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.hgain = addUserConfig('hgain', self.config.hgain, 0.015)
-        self.config.sgain = addUserConfig('sgain', self.config.sgain, 0.7)
-        self.config.vgain = addUserConfig('vgain', self.config.vgain, 0.4)
+        self.config.hgain = self.addUserConfig('hgain', self.config.hgain, 0.015)
+        self.config.sgain = self.addUserConfig('sgain', self.config.sgain, 0.7)
+        self.config.vgain = self.addUserConfig('vgain', self.config.vgain, 0.4)
 
     def __call__(self, img):
         img, label = self.auditInput(img, input_len=2)
@@ -65,11 +65,11 @@ class YoloPerspectiveAug(CvAugBase):
         self.border = deepvac_config.border
 
     def auditConfig(self):
-        self.config.scale = addUserConfig('scale', self.config.scale, 0.5)
-        self.config.shear = addUserConfig('shear', self.config.shear, 0.0)
-        self.config.degrees = addUserConfig('degrees', self.config.degrees, 0.0)
-        self.config.translate = addUserConfig('translate', self.config.translate, 0.1)
-        self.config.perspective = addUserConfig('perspective', self.config.perspective, 0.0)
+        self.config.scale = self.addUserConfig('scale', self.config.scale, 0.5)
+        self.config.shear = self.addUserConfig('shear', self.config.shear, 0.0)
+        self.config.degrees = self.addUserConfig('degrees', self.config.degrees, 0.0)
+        self.config.translate = self.addUserConfig('translate', self.config.translate, 0.1)
+        self.config.perspective = self.addUserConfig('perspective', self.config.perspective, 0.0)
 
     def _box_candidates(self, box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1):
         w1, h1 = box1[2] - box1[0], box1[3] - box1[1]

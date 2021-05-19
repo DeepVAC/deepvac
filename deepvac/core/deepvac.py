@@ -31,6 +31,9 @@ class Deepvac(object):
         self.config.branch = assertAndGetGitBranch(self.config.is_disable_git)
         self.init()
 
+    def name(self):
+        return self.__class__.__name__
+
     def auditConfig(self):
         if not self.config.model_path and not self.config.jit_model_path:
             LOG.logE("both config.core.model_path and config.core.jit_model_path are not set, cannot do predict.", exit=True)
@@ -218,7 +221,7 @@ class Deepvac(object):
     def testFly(self):
         if self.config.test_loader:
             return self.test()
-        LOG.logE("You have to reimplement testFly() if you didn't set any valid input, e.g. config.core.test_loader.", exit=True)
+        LOG.logE("You have to reimplement testFly() in subclass {} if you didn't set any valid input, e.g. config.core.test_loader.".format(self.name()), exit=True)
 
     def process(self, input_tensor):
         self.config.phase = 'TEST'
@@ -234,7 +237,7 @@ class Deepvac(object):
             return self.testSample()
         LOG.logI("You did not provide input with config.core.sample...")
         
-        LOG.logI("testFly() is your last chance, you must have already reimplemented testFly(), right?")
+        LOG.logI("testFly() is your last chance, you must have already reimplemented testFly() in subclass {}, right?".format(self.name()))
         return self.testFly()
 
     def __call__(self, input_tensor=None):
@@ -375,12 +378,12 @@ class DeepvacTrain(Deepvac):
 
     def initTrainLoader(self):
         if self.config.train_loader is None:
-            LOG.logE("You must set config.core.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass.", exit=True)
+            LOG.logE("You must set config.core.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass {}.".format(self.name()), exit=True)
         LOG.logI("You set config.core.train_loader to {} in config.py".format(self.config.train_loader)) 
 
     def initValLoader(self):
         if self.config.val_loader is None:
-            LOG.logE("You must set config.core.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass.", exit=True)
+            LOG.logE("You must set config.core.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass {}.".format(self.name()), exit=True)
         LOG.logI("You set config.core.val_loader to {} in config.py".format(self.config.val_loader))
 
     def initEmaUpdates(self):
@@ -402,7 +405,7 @@ class DeepvacTrain(Deepvac):
             self.config.writer.add_graph(self.config.net, self.config.sample)
         except:
             LOG.logW("Tensorboard doGraph failed. You network foward may have more than one parameters?")
-            LOG.logW("Seems you need to reimplement preIter function.")
+            LOG.logW("Seems you need to reimplement preIter function in subclass {}.".format(self.name()))
 
     def updateEMA(self):
         if self.config.ema is not True:
@@ -522,7 +525,7 @@ class DeepvacTrain(Deepvac):
 
     def doValAcc(self):
         self.config.acc = 0
-        LOG.logW("You should reimplement doValAcc() to assign acc value to self.config.acc in your subclass.")
+        LOG.logW("You should reimplement doValAcc() to assign acc value to self.config.acc in your subclass {}.".format(self.name()))
 
     def train(self):
         self.config.net.train()
@@ -613,7 +616,7 @@ class DeepvacDDP(DeepvacTrain):
         LOG.logI("Finish dist.init_process_group {} {}@{} on {}".format(self.config.dist_url, self.config.args.rank, self.config.world_size - 1, self.config.args.gpu))
         self.config.train_sampler = torch.utils.data.distributed.DistributedSampler(self.config.train_dataset)
         if self.config.train_loader is not None:
-            LOG.logW("Warning: config.train_loader will be override by Deepvac DDP is enabled. reimplement initDDP() API in your DeepvacTrain subclass to change this behaviour.")
+            LOG.logW("Warning: config.train_loader will be override by Deepvac DDP is enabled. reimplement initDDP() API in your DeepvacTrain subclass {} to change this behaviour.".format(self.name()))
         self.config.train_loader = DataLoader(
             self.config.train_dataset,
             batch_size=self.config.batch_size,

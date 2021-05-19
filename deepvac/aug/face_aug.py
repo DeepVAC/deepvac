@@ -80,7 +80,7 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
         super(CropFacialWithBoxesAndLmksAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.img_dim = addUserConfig('img_dim', self.config.img_dim, 640, True)
+        self.config.img_dim = self.addUserConfig('img_dim', self.config.img_dim, 640, True)
 
     def _matrix_iof(self, a, b):
         lt = np.maximum(a[:, np.newaxis, :2], b[:, :2])
@@ -291,7 +291,7 @@ class Pad2SquareFacialAug(CvAugBase):
         super(Pad2SquareFacialAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.rgb_means = addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
+        self.config.rgb_means = self.addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
     def __call__(self, image):
         image, label = self.auditInput(image, input_len=2)
@@ -314,8 +314,8 @@ class ResizeSubtractMeanFacialAug(CvAugBase):
         super(ResizeSubtractMeanFacialAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.img_dim = addUserConfig('img_dim', self.config.img_dim, 640, True)
-        self.config.rgb_means = addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
+        self.config.img_dim = self.addUserConfig('img_dim', self.config.img_dim, 640, True)
+        self.config.rgb_means = self.addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
     def __call__(self, image):
         image, label = self.auditInput(image, input_len=2)

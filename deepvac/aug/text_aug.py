@@ -11,9 +11,9 @@ class TextRendererPerspectiveAug(CvAugBase):
         super(TextRendererPerspectiveAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.max_x = addUserConfig('max_x', self.config.max_x, 10)
-        self.config.max_y = addUserConfig('max_y', self.config.max_y, 10)
-        self.config.max_z = addUserConfig('max_z', self.config.max_z, 5)
+        self.config.max_x = self.addUserConfig('max_x', self.config.max_x, 10)
+        self.config.max_y = self.addUserConfig('max_y', self.config.max_y, 10)
+        self.config.max_z = self.addUserConfig('max_z', self.config.max_z, 5)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -37,7 +37,7 @@ class TextRendererLineAug(CvAugBase):
         super(TextRendererLineAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.offset = addUserConfig('offset', self.config.offset, 5)
+        self.config.offset = self.addUserConfig('offset', self.config.offset, 5)
 
     def __call__(self, img):
         img = self.auditInput(img)

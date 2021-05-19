@@ -77,10 +77,10 @@ class SyszuxFactory(object):
             raise Exception("token not supported: ", self.chain_kind)
 
     def initProducts(self):
-        LOG.logE("You must reimplement initProducts() function.", exit=True)
+        LOG.logE("You must reimplement initProducts() function in sublcass {}.".format(self.name()), exit=True)
 
     def addProduct(self, name, ins):
-        LOG.logE("You must reimplement addProduct() function in subclass.", exit=True)
+        LOG.logE("You must reimplement addProduct() function in subclass {}.".format(self.name()), exit=True)
 
     def initSym(self, module):
         return dir(module)

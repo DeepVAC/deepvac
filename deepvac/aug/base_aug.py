@@ -22,6 +22,10 @@ class AugBase(object):
     def auditConfig(self):
         pass
 
+    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
+        module_name = 'config.aug.{}'.format(self.name())
+        return addUserConfig(module_name, config_name, user_give=user_give, developer_give=developer_give, is_user_mandatory=is_user_mandatory)
+
     def name(self):
         return self.__class__.__name__
 
@@ -80,7 +84,7 @@ class CvAugBase(AugBase):
             assert img.ndim == 3, "image must has 3 channels rather than {}.".format(img.ndim)
             return img
 
-        LOG.logE("CvAugBase subclass expect numpy ndarray as input, make sure you read img with cv2.", exit=True)
+        LOG.logE("CvAugBase subclass {} expect numpy ndarray as input, make sure you read img with cv2.".format(self.name()), exit=True)
 
 #expect PIL Image as input
 class PilAugBase(AugBase):
@@ -91,7 +95,7 @@ class PilAugBase(AugBase):
         if self.isPil(img):
             return img
 
-        LOG.logE("PilAugBase subclass expect numpy ndarray as input, make sure you read img with cv2.", exit=True)
+        LOG.logE("PilAugBase subclass {} expect PIL.Image as input, make sure you read img with PIL.".format(self.name()), exit=True)
 
 class Cv2PilAug(CvAugBase):
     def __call__(self, img):
@@ -123,7 +127,7 @@ class SpeckleAug(CvAugBase):
         super(SpeckleAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.severity = addUserConfig('severity', self.config.severity, np.random.uniform(0, 0.6*255))
+        self.config.severity = self.addUserConfig('severity', self.config.severity, np.random.uniform(0, 0.6*255))
 
     def __call__(self, img):
         input_type = img.dtype
@@ -142,10 +146,10 @@ class AffineAug(CvAugBase):
 
     def auditConfig(self):
         # 空白填充色
-        self.config.borderValue = addUserConfig('borderValue', self.config.borderValue, (255,255,255))
+        self.config.borderValue = self.addUserConfig('borderValue', self.config.borderValue, (255,255,255))
         # x方向和y方向的伸缩率
-        self.config.shear_x = addUserConfig('shear_x', self.config.shear_x, 30)
-        self.config.shear_y = addUserConfig('shear_y', self.config.shear_y, 1)
+        self.config.shear_x = self.addUserConfig('shear_x', self.config.shear_x, 30)
+        self.config.shear_y = self.addUserConfig('shear_y', self.config.shear_y, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -163,13 +167,13 @@ class PerspectAug(CvAugBase):
 
     def auditConfig(self):
         # b空白填充色
-        self.config.borderValue = addUserConfig('borderValue', self.config.borderValue, (255,255,255))
+        self.config.borderValue = self.addUserConfig('borderValue', self.config.borderValue, (255,255,255))
         # 高h方向伸缩范围
-        self.config.sh_lower = addUserConfig('sh_lower', self.config.sh_lower, 6)
-        self.config.sh_upper = addUserConfig('sh_upper', self.config.sh_upper, 11)
+        self.config.sh_lower = self.addUserConfig('sh_lower', self.config.sh_lower, 6)
+        self.config.sh_upper = self.addUserConfig('sh_upper', self.config.sh_upper, 11)
         # 宽w方向伸缩范围
-        self.config.sw_lower = addUserConfig('sw_lower', self.config.sw_lower, 20)
-        self.config.sw_upper = addUserConfig('sw_upper', self.config.sw_upper, 31)
+        self.config.sw_lower = self.addUserConfig('sw_lower', self.config.sw_lower, 20)
+        self.config.sw_upper = self.addUserConfig('sw_upper', self.config.sw_upper, 31)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -194,7 +198,7 @@ class GaussianAug(CvAugBase):
         super(GaussianAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.ks = addUserConfig('ks', self.config.ks, [9,11,13,15,17])
+        self.config.ks = self.addUserConfig('ks', self.config.ks, [9,11,13,15,17])
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -209,11 +213,11 @@ class HorlineAug(CvAugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.space = addUserConfig('space', self.config.space, 4)
+        self.config.space = self.addUserConfig('space', self.config.space, 4)
         # 线条颜色
-        self.config.color = addUserConfig('color', self.config.color, 0)
+        self.config.color = self.addUserConfig('color', self.config.color, 0)
         # 线宽
-        self.config.thickness = addUserConfig('thickness', self.config.thickness, 1)
+        self.config.thickness = self.addUserConfig('thickness', self.config.thickness, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -229,11 +233,11 @@ class VerlineAug(CvAugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.space = addUserConfig('space', self.config.space, 4)
+        self.config.space = self.addUserConfig('space', self.config.space, 4)
         # 线条颜色
-        self.config.color = addUserConfig('color', self.config.color, 0)
+        self.config.color = self.addUserConfig('color', self.config.color, 0)
         # 线宽
-        self.config.thickness = addUserConfig('thickness', self.config.thickness, 1)
+        self.config.thickness = self.addUserConfig('thickness', self.config.thickness, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -248,7 +252,7 @@ class LRmotionAug(CvAugBase):
         super(LRmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.ks = addUserConfig('ks', self.config.ks, [3,5,7,9])
+        self.config.ks = self.addUserConfig('ks', self.config.ks, [3,5,7,9])
 
     def __call__(self,img):
         img = self.auditInput(img)
@@ -265,7 +269,7 @@ class UDmotionAug(CvAugBase):
         super(UDmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.ks = addUserConfig('ks', self.config.ks, [3,5,7,9])
+        self.config.ks = self.addUserConfig('ks', self.config.ks, [3,5,7,9])
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -282,8 +286,8 @@ class NoisyAug(CvAugBase):
         super(NoisyAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.mean = addUserConfig('mean', self.config.mean, 0)
-        self.config.sigma = addUserConfig('sigma', self.config.sigma, 1)
+        self.config.mean = self.addUserConfig('mean', self.config.mean, 0)
+        self.config.sigma = self.addUserConfig('sigma', self.config.sigma, 1)
 
     def __call__(self, img):
         input_type = img.dtype
@@ -301,7 +305,7 @@ class DistortAug(CvAugBase):
         super(DistortAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.segment = addUserConfig('segment', self.config.segment, 4)
+        self.config.segment = self.addUserConfig('segment', self.config.segment, 4)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -343,7 +347,7 @@ class StretchAug(CvAugBase):
         super(StretchAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.segment = addUserConfig('segment', self.config.segment, 4)
+        self.config.segment = self.addUserConfig('segment', self.config.segment, 4)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -419,8 +423,8 @@ class MotionAug(CvAugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.degree = addUserConfig('degree', self.config.degree, 18)
-        self.config.angle = addUserConfig('angle', self.config.angle, 45)
+        self.config.degree = self.addUserConfig('degree', self.config.degree, 18)
+        self.config.angle = self.addUserConfig('angle', self.config.angle, 45)
 
     def __call__(self, img):
         img = self.auditInput(img)
@@ -441,7 +445,7 @@ class DarkAug(CvAugBase):
         super(DarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.gamma = addUserConfig('gamma', self.config.gamma, 3)
+        self.config.gamma = self.addUserConfig('gamma', self.config.gamma, 3)
 
     def __call__(self, img):
         input_type = img.dtype
@@ -462,7 +466,7 @@ class HalfDarkAug(CvAugBase):
         super(HalfDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.gamma = addUserConfig('gamma', self.config.gamma, 1.5)
+        self.config.gamma = self.addUserConfig('gamma', self.config.gamma, 1.5)
 
     def __call__(self, img):
         input_type = img.dtype
@@ -501,7 +505,7 @@ class RandomCropDarkAug(CvAugBase):
         super(RandomCropDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.gamma = addUserConfig('gamma', self.config.gamma, 1.2)
+        self.config.gamma = self.addUserConfig('gamma', self.config.gamma, 1.2)
 
     def __call__(self, img):
         input_type = img.dtype

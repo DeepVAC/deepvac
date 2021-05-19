@@ -24,7 +24,7 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.max_angle = addUserConfig('max_angle', self.config.max_angle, 10)
+        self.config.max_angle = self.addUserConfig('max_angle', self.config.max_angle, 10)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, input_len=2)
@@ -45,7 +45,7 @@ class ImageWithMasksRandomCropAug(CvAugBase):
         self.auditUserConfig("img_size")
 
     def auditConfig(self):
-        self.config.p = addUserConfig('p', self.config.p, 3.0 / 8.0)
+        self.config.p = self.addUserConfig('p', self.config.p, 3.0 / 8.0)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, input_len=2)
@@ -84,8 +84,8 @@ class ImageWithMasksRandomCropAug(CvAugBase):
 
 class ImageWithMasksScaleAug(CvAugBase):
     def auditConfig(self):
-        self.config.w = addUserConfig('w', self.config.w, 384, True)
-        self.config.h = addUserConfig('h', self.config.h, 384, True)
+        self.config.w = self.addUserConfig('w', self.config.w, 384, True)
+        self.config.h = self.addUserConfig('h', self.config.h, 384, True)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs)
@@ -95,8 +95,8 @@ class ImageWithMasksScaleAug(CvAugBase):
 
 class ImageWithMasksRandomCropResizeAug(CvAugBase):
     def auditConfig(self):
-        self.config.size = addUserConfig('size', self.config.size, 384, True)
-        self.config.max_crop_ratio = addUserConfig('max_crop_ratio', self.config.max_crop_ratio, 0.1)
+        self.config.size = self.addUserConfig('size', self.config.size, 384, True)
+        self.config.max_crop_ratio = self.addUserConfig('max_crop_ratio', self.config.max_crop_ratio, 0.1)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs)
@@ -114,21 +114,21 @@ class ImageWithMasksRandomCropResizeAug(CvAugBase):
 class ImageWithMasksHFlipAug(CvAugBase):
     def __call__(self, imgs):
         img, label = self.auditInput(imgs)
-        image = cv2.flip(image, 0) # horizontal flip
-        label = cv2.flip(label, 0) # horizontal flip
+        image = cv2.flip(image, 1) # horizontal flip
+        label = cv2.flip(label, 1) # horizontal flip
         return [image, label]
 
 class ImageWithMasksVFlipAug(CvAugBase):
     def __call__(self, imgs):
         img, label = self.auditInput(imgs)
-        image = cv2.flip(image, 1) # veritcal flip
-        label = cv2.flip(label, 1)  # veritcal flip
+        image = cv2.flip(image, 0) # veritcal flip
+        label = cv2.flip(label, 0)  # veritcal flip
         return [image, label]
 
 class ImageWithMasksNormalizeAug(CvAugBase):
     def auditConfig(self):
-        self.config.mean = addUserConfig('mean', self.config.mean, 0, True)
-        self.config.std = addUserConfig('std', self.config.std, 0, True)
+        self.config.mean = self.addUserConfig('mean', self.config.mean, 0, True)
+        self.config.std = self.addUserConfig('std', self.config.std, 0, True)
 
     def __call__(self, imgs):
         image, label = self.auditInput(imgs)
@@ -141,7 +141,7 @@ class ImageWithMasksNormalizeAug(CvAugBase):
 
 class ImageWithMasksToTensorAug(CvAugBase):
     def auditConfig(self):
-        self.config.scale = addUserConfig('scale', self.config.scale, 1)
+        self.config.scale = self.addUserConfig('scale', self.config.scale, 1)
 
     def __call__(self, imgs):
         image, label = self.auditInput(imgs)

@@ -49,7 +49,7 @@ class DeepvacDistill(DeepvacTrain):
 
     def doLoss(self):
         super(DeepvacDistill, self).doLoss()
-        LOG.logE("You have to reimplement doLoss() in DeepvacDistill subclass and set config.train.teacher.loss", exit=True)
+        LOG.logE("You have to reimplement doLoss() in DeepvacDistill subclass {} and set config.train.teacher.loss".format(self.name()), exit=True)
 
     def doBackward(self):
         super(DeepvacDistill, self).doBackward()
