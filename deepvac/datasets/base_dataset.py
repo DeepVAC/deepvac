@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset
 from ..utils import LOG
+from ..core import AttrDict
 
 class DatasetBase(Dataset):
     def __init__(self, deepvac_config):
