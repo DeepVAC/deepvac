@@ -1,3 +1,4 @@
+import copy
 class AttrDict(dict):
     def __getattr__(self, key):
         return self.get(key)
@@ -8,15 +9,40 @@ class AttrDict(dict):
         else:
             self[key] = value
 
-config = AttrDict()
-config.core = AttrDict()
-config.feature = AttrDict()
-config.aug = AttrDict()
-config.composer = AttrDict()
-config.cast = AttrDict()
-config.backbones = AttrDict()
-config.loss = AttrDict()
-config.datasets = AttrDict()
+    def __deepcopy__(self, memo=None):
+        return AttrDict(copy.deepcopy(dict(self), memo=memo))
+
+    def clone(self):
+        return copy.deepcopy(self)
+
+def fork(name):
+    fields = name.split('.')
+    c = AttrDict()
+    if len(fields) < 2:
+        return c
+    cd = c
+    for f in fields[1:]:
+        cd[f] = AttrDict()
+        cd=cd[f]
+    return c
+
+def newDict():
+    return AttrDict()
+
+def new():
+    config = AttrDict()
+    config.core = AttrDict()
+    config.feature = AttrDict()
+    config.aug = AttrDict()
+    config.composer = AttrDict()
+    config.cast = AttrDict()
+    config.backbones = AttrDict()
+    config.loss = AttrDict()
+    config.datasets = AttrDict()
+    return config
+
+config = new()
+
 
 ## ------------------ common ------------------
 config.core.device = "cuda"

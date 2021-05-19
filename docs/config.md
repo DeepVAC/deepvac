@@ -84,7 +84,20 @@ deepvac_config.composer.GemfieldAugFactory.trans1 = transforms.Compose([
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         transforms.RandomErasing(),
     ])
+#GemfieldComposer使用了GemfieldAugFactory
+mycomposer = GemfieldComposer(deepvac_config)
 ```
+注意：一个composer实例封装了一个/多个AugFactory实例，一个AugFactory实例封装一个/多个Aug实例。但是，实例之间的config是共享的。如果多个实例之间不想共享config，则可以：
+```python
+from deepvac import config as deepvac_config, AttrDict, fork, new, newDict
+deepvac_config2 = new()
+#只克隆需要的部分
+deepvac_config2.aug = deepvac_config.aug.clone()
+deepvac_config2.composer = deepvac_config.composer.clone()
+deepvac_config2.aug.GemfieldAug.gemfield_age = 22
+mycomposer2 = GemfieldComposer(deepvac_config2)
+```
+这样mycomposer2和mycomposer就不共享deepvac.aug和deepvac.composer的配置项了。
 ### 优化器 (仅适用于train.py)
 ```python
 config.core.optimizer = optim.SGD(config.core.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)

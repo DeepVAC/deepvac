@@ -5,5 +5,5 @@ if is_ddp:
 else:
     from .deepvac import DeepvacTrain, Deepvac
 
-from .config import config, AttrDict
+from .config import config, AttrDict, fork, new, newDict
 from .report import *
