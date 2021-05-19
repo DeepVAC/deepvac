@@ -142,6 +142,7 @@ class ImageWithMasksNormalizeAug(CvAugBase):
 class ImageWithMasksToTensorAug(CvAugBase):
     def auditConfig(self):
         self.config.scale = self.addUserConfig('scale', self.config.scale, 1)
+        self.config.force_div255 = self.addUserConfig('force_div255', self.config.force_div255, True)
 
     def __call__(self, imgs):
         image, label = self.auditInput(imgs, input_len=2)
@@ -154,7 +155,7 @@ class ImageWithMasksToTensorAug(CvAugBase):
         default_float_dtype = torch.get_default_dtype()
         image_tensor = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
         # backward compatibility
-        if isinstance(image_tensor, torch.ByteTensor):
+        if isinstance(image_tensor, torch.ByteTensor) or self.config.force_div255:
             image_tensor = image_tensor.to(dtype=default_float_dtype).div(255)
         label_tensor = torch.LongTensor(np.array(label, dtype=np.int)) #torch.from_numpy(label)
 

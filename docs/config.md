@@ -53,6 +53,38 @@ config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, ba
 config.core.test_dataset = MyTestDataset(config.core)
 config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
 ```
+
+### aug
+aug算子的配置项有哪些是这个aug算子的作者确定的
+```python
+#增强算子的配置需要使用AttrDict()进行初始化
+deepvac_config.aug.GemfieldAug = AttrDict()
+#为GemfieldAug算子配置属性
+deepvac_config.aug.GemfieldAug.gemfield_age = 20
+```
+### Dataset子类
+dataset的配置项一般只有composer和transform这个，分别代表deepvac.aug和torchvision.transform这两个实例。
+```python
+#dataset的配置需要使用AttrDict()进行初始化
+config.datasets.FileLineCvSegDataset = AttrDict()
+#为该dataset配置一个composer
+config.datasets.FileLineCvSegDataset.composer = ESPNetMainComposer(config)
+train_loader = torch.utils.data.DataLoader(
+    FileLineCvSegDataset(config, config.fileline_path, ',', config.sample_path_prefix),
+    batch_size=config.core.batch_size, shuffle=True, num_workers=config.core.num_workers, pin_memory=True)
+```
+### composer
+composer中AugFactory的配置项有哪些是这个AugFactory的作者确定的
+```python
+#composer的配置需要使用AttrDict()进行初始化
+deepvac_config.composer.GemfieldAugFactory = AttrDict()
+deepvac_config.composer.GemfieldAugFactory.trans1 = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        transforms.RandomErasing(),
+    ])
+```
 ### 优化器 (仅适用于train.py)
 ```python
 config.core.optimizer = optim.SGD(config.core.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)

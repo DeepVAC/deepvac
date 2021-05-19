@@ -7,6 +7,7 @@ DeepVAC提供了基于PyTorch的AI项目的工程化规范。为了达到这一�
 诸多PyTorch AI项目的内在逻辑都大同小异，因此DeepVAC致力于把更通用的逻辑剥离出来，从而使得工程代码的准确性、易读性、可维护性上更具优势。
 
 如果想使得AI项目符合DeepVAC规范，需要仔细阅读[DeepVAC标准](./docs/deepvac_standard.md)。
+如果想了解deepvac库的设计，请阅读[deepvac库的设计](./docs/design.md)。
 
 
 # 如何基于DeepVAC构建自己的PyTorch AI项目
@@ -187,20 +188,25 @@ print(self.config.batch_size)
 
 ## 7. 编写aug/aug.py（可选）
 编写该文件，用于实现数据增强策略。
-数据增强的逻辑要封装在Composer子类中，具体来说就是继承Composer基类，比如：
+deepvac.aug模块为数据增强设计了特有的语法，在两个层面实现了复用：aug 和 composer。比如说，我想复用添加随机斑点的SpeckleAug：
 ```python
-from deepvac.aug import Composer, AugChain
-
-class MyAugComposer(Composer):
-    def __init__(self, deepvac_aug_config):
-        super(MyAugComposer, self).__init__(deepvac_aug_config)
-
-        ac1 = AugChain('RandomColorJitterAug@0.5 => MosaicAug@0.5',deepvac_config)
-        ac2 = AugChain('MotionAug || GaussianAug',deepvac_config)
-
-        self.addAugChain('ac1', ac1, 1)
-        self.addAugChain('ac2', ac2, 0.5)
+from deepvac.aug.base_aug import SpeckleAug
 ```
+
+这是对底层aug算子的复用。我们还可以直接复用别人写好的composer，并且是以直截了当的方式。比如deepvac.aug提供了一个用于人脸检测数据增强的RetinaAugComposer：
+
+```python
+from deepvac.aug import RetinaAugComposer
+```
+
+以上说的是直接复用，但项目中更多的是自定义扩展，而且大部分情况下也需要复用torchvision的transform的compose，又该怎么办呢？这里解释下，composer是deepvac.aug模块的概念，compose是torchvision transform模块的概念，之所以这么相似纯粹是因为巧合。
+
+要扩展自己的composer也是很简单的，比如我可以自定义一个composer（我把它命名为GemfieldComposer），这个composer可以使用/复用以下增强逻辑：
+- torchvision transform定义的compose；
+- deepvac内置的aug；
+- 我自己写的aug。
+
+更详细的步骤请访问：[deepvac.aug模块使用](./docs/design.md#aug)
 
 ## 8. 编写Dataset类
 代码编写在data/dataloader.py文件中。继承deepvac.datasets类体系，比如FileLineDataset类提供了对如下train.txt这种格式的封装：
