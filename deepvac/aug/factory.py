@@ -9,7 +9,7 @@ from . import base_aug, face_aug, seg_aug, text_aug, yolo_aug
 class SyszuxFactory(object):
     def __init__(self, syntax, deepvac_config):
         self.deepvac_config = deepvac_config
-        self.config = deepvac_config.aug
+        self.config = deepvac_config.composer
         self.factory_dict = dict()
         self.auditConfig()
         self.initSyntax(syntax)

@@ -72,4 +72,4 @@ class FileLineCvSegDataset(FileLineCvStrDataset):
         if self.config.composer is not None:
             sample, label = self.config.composer([sample, label])
 
-        return image, label
+        return sample, label

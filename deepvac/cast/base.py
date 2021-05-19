@@ -26,7 +26,7 @@ class DeepvacCast(object):
             LOG.logE("You must set config.core.net in config.py", exit=True)
 
         if self.core_config.sample is None:
-            LOG.logE("You must set config.core.sample, in general, this is done be Deepvac Framework.", exit=True)
+            LOG.logE("You must set config.core.sample, in general, this is done by Deepvac Framework.", exit=True)
         
         self.net = copy.deepcopy(self.core_config.ema if self.core_config.ema else self.core_config.net)
         if self.core_config.cast2cpu:

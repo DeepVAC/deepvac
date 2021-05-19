@@ -206,7 +206,7 @@ class Deepvac(object):
             self.preIter()
             self.doFeedData2Device()
             self.doForward()
-            LOG.logI('{}: [input shape: {}] [{}/{}]'.format(self.config.phase, self.config.sample.shape, self.config.test_step, len(self.config.test_loader)))
+            LOG.logI('{}: [input shape: {}] [{}/{}]'.format(self.config.phase, self.config.sample.shape, self.config.test_step + 1, len(self.config.test_loader)))
             self.postIter()
 
     def testSample(self):
@@ -461,7 +461,7 @@ class DeepvacTrain(Deepvac):
     def doValLog(self):
         if self.config.val_step % self.config.log_every != 0:
             return
-        LOG.logI('{}: [{}][{}/{}]'.format(self.config.phase, self.config.epoch, self.config.val_step, len(self.config.loader)))
+        LOG.logI('{}: [{}][{}/{}]'.format(self.config.phase, self.config.epoch, self.config.val_step + 1, len(self.config.loader)))
 
     def doLog(self):
         if self.config.step % self.config.log_every != 0:
@@ -469,7 +469,7 @@ class DeepvacTrain(Deepvac):
         self.addScalar('{}/Loss'.format(self.config.phase), self.config.loss.item(), self.config.iter)
         self.addScalar('{}/LoadDataTime(secs/batch)'.format(self.config.phase), self.config.loader_time.val, self.config.iter)
         self.addScalar('{}/TrainTime(secs/batch)'.format(self.config.phase), self.config.train_time.val, self.config.iter)
-        LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.config.phase, self.config.epoch, self.config.step, len(self.config.loader),self.config.loss.item(),self.config.optimizer.param_groups[0]['lr']))
+        LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.config.phase, self.config.epoch, self.config.step + 1, len(self.config.loader),self.config.loss.item(),self.config.optimizer.param_groups[0]['lr']))
 
     def doSave(self, current_time):
         file_partial_name = '{}__acc_{}__epoch_{}__step_{}__lr_{}'.format(current_time, self.config.acc, self.config.epoch, self.config.step, self.config.optimizer.param_groups[0]['lr'])

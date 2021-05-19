@@ -6,7 +6,7 @@ class Composer(object):
     def __init__(self,deepvac_config):
         self._graph = OrderedDict()
         self._graph_p = OrderedDict()
-        self.config = deepvac_config
+        self.config = deepvac_config.composer
         self.auditConfig()
 
     def addAugFactory(self, name, chain, p=1.0):
