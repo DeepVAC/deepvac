@@ -10,9 +10,9 @@ class HSVAug(CvAugBase):
         super(HSVAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.hsv_hgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.015)
-        self.config.hsv_sgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.7)
-        self.config.hsv_vgain = addUserConfig('dark_gamma', self.config.dark_gamma, 0.4)
+        self.config.hgain = addUserConfig('hgain', self.config.hgain, 0.015)
+        self.config.sgain = addUserConfig('sgain', self.config.sgain, 0.7)
+        self.config.vgain = addUserConfig('vgain', self.config.vgain, 0.4)
 
     def __call__(self, img):
         img, label = self.auditInput(img, has_label=True)
@@ -21,7 +21,7 @@ class HSVAug(CvAugBase):
         dtype = img.dtype
         x = np.arange(0, 256, dtype=np.int16)
         # 随机增幅
-        r = np.random.uniform(-1, 1, 3) * [self.config.hsv_hgain, self.config.hsv_sgain, self.config.hsv_vgain] + 1
+        r = np.random.uniform(-1, 1, 3) * [self.config.hgain, self.config.sgain, self.config.vgain] + 1
         lut_hue = ((x * r[0]) % 180).astype(dtype)
         lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
         lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
@@ -65,11 +65,11 @@ class YoloPerspectiveAug(CvAugBase):
         self.border = deepvac_config.border
 
     def auditConfig(self):
-        self.config.yolo_perspective_scale = addUserConfig('yolo_perspective_scale', self.config.yolo_perspective_scale, 0.5)
-        self.config.yolo_perspective_shear = addUserConfig('yolo_perspective_shear', self.config.yolo_perspective_shear, 0.0)
-        self.config.yolo_perspective_degrees = addUserConfig('yolo_perspective_degrees', self.config.yolo_perspective_degrees, 0.0)
-        self.config.yolo_perspective_translate = addUserConfig('yolo_perspective_translate', self.config.yolo_perspective_translate, 0.1)
-        self.config.yolo_perspective_perspective = addUserConfig('yolo_perspective_perspective', self.config.yolo_perspective_perspective, 0.0)
+        self.config.scale = addUserConfig('scale', self.config.scale, 0.5)
+        self.config.shear = addUserConfig('shear', self.config.shear, 0.0)
+        self.config.degrees = addUserConfig('degrees', self.config.degrees, 0.0)
+        self.config.translate = addUserConfig('translate', self.config.translate, 0.1)
+        self.config.perspective = addUserConfig('perspective', self.config.perspective, 0.0)
 
     def _box_candidates(self, box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1):
         w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
@@ -102,8 +102,8 @@ class YoloPerspectiveAug(CvAugBase):
              [p, p, 1]]
         '''
         P = np.eye(3)
-        P[2, 0] = random.uniform(-self.config.yolo_perspective_perspective, self.config.yolo_perspective_perspective)
-        P[2, 1] = random.uniform(-self.config.yolo_perspective_perspective, self.config.yolo_perspective_perspective)
+        P[2, 0] = random.uniform(-self.config.perspective, self.config.perspective)
+        P[2, 1] = random.uniform(-self.config.perspective, self.config.perspective)
         # Rotation and Scale
         '''
             [[r, r, r],
@@ -111,8 +111,8 @@ class YoloPerspectiveAug(CvAugBase):
              [0, 0, 1]]
         '''
         R = np.eye(3)
-        a = random.uniform(-self.config.yolo_perspective_degrees, self.config.yolo_perspective_degrees)
-        s = random.uniform(1 - self.config.yolo_perspective_scale, 1 + self.config.yolo_perspective_scale)
+        a = random.uniform(-self.config.degrees, self.config.degrees)
+        s = random.uniform(1 - self.config.scale, 1 + self.config.scale)
         R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
         # Shear
         '''
@@ -121,8 +121,8 @@ class YoloPerspectiveAug(CvAugBase):
              [0, 0, 1]]
         '''
         S = np.eye(3)
-        S[0, 1] = math.tan(random.uniform(-self.config.yolo_perspective_shear, self.config.yolo_perspective_shear) * math.pi / 180)
-        S[1, 0] = math.tan(random.uniform(-self.config.yolo_perspective_shear, self.config.yolo_perspective_shear) * math.pi / 180)
+        S[0, 1] = math.tan(random.uniform(-self.config.shear, self.config.shear) * math.pi / 180)
+        S[1, 0] = math.tan(random.uniform(-self.config.shear, self.config.shear) * math.pi / 180)
         # Translation
         '''
             [[1, 0, t],
@@ -130,13 +130,13 @@ class YoloPerspectiveAug(CvAugBase):
              [0, 0, 1]]
         '''
         T = np.eye(3)
-        T[0, 2] = random.uniform(0.5 - self.config.yolo_perspective_translate, 0.5 + self.config.yolo_perspective_translate) * width
-        T[1, 2] = random.uniform(0.5 - self.config.yolo_perspective_translate, 0.5 + self.config.yolo_perspective_translate) * height
+        T[0, 2] = random.uniform(0.5 - self.config.translate, 0.5 + self.config.translate) * width
+        T[1, 2] = random.uniform(0.5 - self.config.translate, 0.5 + self.config.translate) * height
         # Combined rotation matrix
         M = T @ S @ R @ P @ C
         # img augment and resize to img_size
         if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():
-            if self.config.yolo_perspective_perspective:
+            if self.config.perspective:
                 img = cv2.warpPerspective(img, M, dsize=(width, height), borderValue=(114, 114, 114))
             else:
                 img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
@@ -153,7 +153,7 @@ class YoloPerspectiveAug(CvAugBase):
             '''
             xy[:, :2] = label[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)
             xy = xy @ M.T
-            if self.config.yolo_perspective_perspective:
+            if self.config.perspective:
                 xy = (xy[:, :2] / xy[:, 2:3]).reshape(n, 8)
             else:
                 xy = xy[:, :2].reshape(n, 8)

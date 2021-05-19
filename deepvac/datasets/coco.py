@@ -1,15 +1,11 @@
 import os
 import numpy as np
 import cv2
-from torch.utils.data import Dataset
+from .base_dataset import DatasetBase
 
-class CocoCVDataset(Dataset):
+class CocoCVDataset(DatasetBase):
     def __init__(self, deepvac_config, sample_path, target_path):
-        super(CocoCVDataset, self).__init__()
-        self.config = deepvac_config.datasets
-        self.transform = self.config.transform
-        self.composer = self.config.composer
-        
+        super(CocoCVDataset, self).__init__(deepvac_config)
         try:
             from pycocotools.coco import COCO
         except:
@@ -25,12 +21,12 @@ class CocoCVDataset(Dataset):
     def __getitem__(self, index):
         sample, label = self._getSample(index)
         # augment for numpy
-        if self.composer is not None:
-            sample = self.composer(sample)
+        if self.config.composer is not None:
+            sample = self.config.composer(sample)
         # pytorch offical transform for PIL Image or numpy
-        if self.transform is not None:
+        if self.config.transform is not None:
             # rewrite method: '_buildSample' first
-            sample = self.transform(sample)
+            sample = self.config.transform(sample)
         # post process
         img, label = self._buildSample(sample, label)
         return img, label

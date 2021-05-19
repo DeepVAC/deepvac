@@ -23,13 +23,13 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
         super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.image_with_masks_random_rotate_max_angle = addUserConfig('image_with_masks_random_rotate_max_angle', self.config.image_with_masks_random_rotate_max_angle, 10)
+        self.config.max_angle = addUserConfig('max_angle', self.config.max_angle, 10)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
         imgs = [img]
         imgs.extend(label)
-        angle = random.random() * 2 * self.config.image_with_masks_random_rotate_max_angle - self.config.image_with_masks_random_rotate_max_angle
+        angle = random.random() * 2 * self.config.max_angle - self.config.max_angle
         for i in range(len(imgs)):
             img = imgs[i]
             w, h = img.shape[:2]
@@ -44,7 +44,7 @@ class ImageWithMasksRandomCropAug(CvAugBase):
         self.auditUserConfig("img_size")
 
     def auditConfig(self):
-        self.config.image_with_masks_random_crop_p = addUserConfig('image_with_masks_random_crop_p', self.config.image_with_masks_random_crop_p, 3.0 / 8.0)
+        self.config.p = addUserConfig('p', self.config.p, 3.0 / 8.0)
 
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, has_label=True)
@@ -59,7 +59,7 @@ class ImageWithMasksRandomCropAug(CvAugBase):
         th = min(h, img_size[0])
         tw = min(w, img_size[0])
 
-        if random.random() > self.config.image_with_masks_random_crop_p and np.max(imgs[1]) > 0:
+        if random.random() > self.config.p and np.max(imgs[1]) > 0:
             tl = np.min(np.where(imgs[1] > 0), axis = 1) - img_size
             tl[tl < 0] = 0
             br = np.max(np.where(imgs[1] > 0), axis = 1) - img_size
@@ -80,4 +80,3 @@ class ImageWithMasksRandomCropAug(CvAugBase):
             else:
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw]
         return [imgs[0],imgs[1:]]
-

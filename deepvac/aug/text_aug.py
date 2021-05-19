@@ -11,13 +11,13 @@ class TextRendererPerspectiveAug(CvAugBase):
         super(TextRendererPerspectiveAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.text_renderer_perspective_max_x = addUserConfig('text_renderer_perspective_max_x', self.config.text_renderer_perspective_max_x, 10)
-        self.config.text_renderer_perspective_max_y = addUserConfig('text_renderer_perspective_max_y', self.config.text_renderer_perspective_max_y, 10)
-        self.config.text_renderer_perspective_max_z = addUserConfig('text_renderer_perspective_max_z', self.config.text_renderer_perspective_max_z, 5)
+        self.config.max_x = addUserConfig('max_x', self.config.max_x, 10)
+        self.config.max_y = addUserConfig('max_y', self.config.max_y, 10)
+        self.config.max_z = addUserConfig('max_z', self.config.max_z, 5)
 
     def __call__(self, img):
         img = self.auditInput(img)
-        return apply_perspective_transform(img, self.config.text_renderer_perspective_max_x, self.config.text_renderer_perspective_max_y, self.config.text_renderer_perspective_max_z)
+        return apply_perspective_transform(img, self.config.max_x, self.config.max_y, self.config.max_z)
 
 class TextRendererCurveAug(CvAugBase):
     def __init__(self, deepvac_config):
@@ -37,12 +37,12 @@ class TextRendererLineAug(CvAugBase):
         super(TextRendererLineAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.text_renderer_line_offset = addUserConfig('text_renderer_line_offset', self.config.text_renderer_line_offset, 5)
+        self.config.offset = addUserConfig('offset', self.config.offset, 5)
 
     def __call__(self, img):
         img = self.auditInput(img)
         h, w = img.shape[:2]
-        offset = self.config.text_renderer_line_offset
+        offset = self.config.offset
         pos = [[offset,offset],[w-offset,offset],[w-offset,h-offset],[offset,h-offset]]
         re_img, text_box_pnts = Liner().apply(img, pos)
         return re_img

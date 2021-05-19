@@ -3,35 +3,50 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
+from ..core import AttrDict
 from ..utils import LOG, addUserConfig
 from .warp_mls_helper import WarpMLS
 
 class AugBase(object):
     def __init__(self, deepvac_config):
-        self.config = deepvac_config.aug
+        self.deepvac_aug_config = deepvac_config.aug
+        self.initConfig()
         self.auditConfig()
+
+    def initConfig(self):
+        if self.name() not in self.deepvac_aug_config.keys():
+            self.deepvac_aug_config[self.name()] = AttrDict()
+        self.config = self.deepvac_aug_config[self.name()]
 
     def auditConfig(self):
         pass
+
+    def name(self):
+        return self.__class__.__name__
+
+    def setAttr(self, k, v):
+        self.config[k] = v
+
+    def getAttr(self,k):
+        return self.config[k]
 
     def __call__(self,img):
         raise Exception("Not implemented!")
 
     def auditImg(self, img):
-        LOG.logE("You must reimplement auditImg in subclass.", exit=True)
+        LOG.logE("You must reimplement auditImg in subclass {}.".format(self.name()), exit=True)
 
-    def auditInput(self, img, has_label=False):
-        if not has_label:
+    def auditInput(self, img, args_len=1):
+        if args_len == 1:
             return self.auditImg(img)
 
         if not isinstance(img, (list, tuple)):
-            assert False, "parameter img must be [image, labels]"
+            assert False, "input args must be list or tuple in {} if args_len={}".format(self.name(), args_len)
             return None
 
-        assert len(img) == 2, "parameter img must be [image, labels]"
-        img, label = img
-        img = self.auditImg(img)
-        return img, label
+        assert len(img) == args_len, "input must has {} args in {}".format(args_len, self.name())
+        img[0] = self.auditImg(img[0])
+        return img
 
     @staticmethod
     def pillow2cv(pillow_img, is_rgb2bgr=True):
@@ -107,12 +122,12 @@ class SpeckleAug(CvAugBase):
         super(SpeckleAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.speckle_severity = addUserConfig('speckle_severity', self.config.speckle_severity, np.random.uniform(0, 0.6*255))
+        self.config.severity = addUserConfig('severity', self.config.severity, np.random.uniform(0, 0.6*255))
 
     def __call__(self, img):
         input_type = img.dtype
         img = self.auditInput(img)
-        blur = ndimage.gaussian_filter(np.random.randn(*img.shape) * self.config.speckle_severity, 1)
+        blur = ndimage.gaussian_filter(np.random.randn(*img.shape) * self.config.severity, 1)
         img_speck = (img + blur)
         img_speck[img_speck > 255] = 255
         img_speck[img_speck <= 0] = 0
@@ -126,18 +141,18 @@ class AffineAug(CvAugBase):
 
     def auditConfig(self):
         # 空白填充色
-        self.config.affine_borderValue = addUserConfig('affine_borderValue', self.config.affine_borderValue, (255,255,255))
+        self.config.borderValue = addUserConfig('borderValue', self.config.borderValue, (255,255,255))
         # x方向和y方向的伸缩率
-        self.config.affine_shear_x = addUserConfig('affine_shear_x', self.config.affine_shear_x, 30)
-        self.config.affine_shear_y = addUserConfig('affine_shear_y', self.config.affine_shear_y, 1)
+        self.config.shear_x = addUserConfig('shear_x', self.config.shear_x, 30)
+        self.config.shear_y = addUserConfig('shear_y', self.config.shear_y, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
         rows,cols=img.shape[:2]
-        shear_x = float(np.random.randint(-self.config.affine_shear_x, self.config.affine_shear_x + 1))/100
-        shear_y = float(np.random.randint(-self.config.affine_shear_y, self.config.affine_shear_y + 1))/100
+        shear_x = float(np.random.randint(-self.config.shear_x, self.config.shear_x + 1))/100
+        shear_y = float(np.random.randint(-self.config.shear_y, self.config.shear_y + 1))/100
         M = np.float32([[1.0, shear_x ,0.0],[shear_y, 1.0,0.0]])
-        img_affine = cv2.warpAffine(img,M,(cols,rows),borderValue=self.config.affine_borderValue)
+        img_affine = cv2.warpAffine(img,M,(cols,rows),borderValue=self.config.borderValue)
         return img_affine
 
 # 透视变换
@@ -147,19 +162,19 @@ class PerspectAug(CvAugBase):
 
     def auditConfig(self):
         # b空白填充色
-        self.config.perspect_borderValue = addUserConfig('perspect_borderValue', self.config.perspect_borderValue, (255,255,255))
+        self.config.borderValue = addUserConfig('borderValue', self.config.borderValue, (255,255,255))
         # 高h方向伸缩范围
-        self.config.perspect_sh_lower = addUserConfig('perspect_sh_lower', self.config.perspect_sh_lower, 6)
-        self.config.perspect_sh_upper = addUserConfig('perspect_sh_upper', self.config.perspect_sh_upper, 11)
+        self.config.sh_lower = addUserConfig('sh_lower', self.config.sh_lower, 6)
+        self.config.sh_upper = addUserConfig('sh_upper', self.config.sh_upper, 11)
         # 宽w方向伸缩范围
-        self.config.perspect_sw_lower = addUserConfig('perspect_sw_lower', self.config.perspect_sw_lower, 20)
-        self.config.perspect_sw_upper = addUserConfig('perspect_sw_upper', self.config.perspect_sw_upper, 31)
+        self.config.sw_lower = addUserConfig('sw_lower', self.config.sw_lower, 20)
+        self.config.sw_upper = addUserConfig('sw_upper', self.config.sw_upper, 31)
 
     def __call__(self, img):
         img = self.auditInput(img)
         h,w=img.shape[:2]
-        scale_h = np.random.randint(self.config.perspect_sh_lower ,self.config.perspect_sh_upper)
-        scale_w = np.random.randint(self.config.perspect_sw_lower ,self.config.perspect_sw_upper)
+        scale_h = np.random.randint(self.config.sh_lower ,self.config.sh_upper)
+        scale_w = np.random.randint(self.config.sw_lower ,self.config.sw_upper)
         point1 = np.array([[0,0],[w,0],[0,h],[w,h]],dtype = "float32")
         point2_list = [
             np.array([[w/scale_w,0],[(scale_w-1)*w/scale_w,0],[0,h],[w,h]],dtype = "float32"),
@@ -169,7 +184,7 @@ class PerspectAug(CvAugBase):
 
         pt_idx = np.random.randint(0,4)
         M = cv2.getPerspectiveTransform(point1,point2_list[pt_idx])
-        img_perspect = cv2.warpPerspective(img,M,(w,h),borderValue=self.config.perspect_borderValue)
+        img_perspect = cv2.warpPerspective(img,M,(w,h),borderValue=self.config.borderValue)
         return img_perspect
 
 # 高斯模糊
@@ -178,11 +193,11 @@ class GaussianAug(CvAugBase):
         super(GaussianAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.gaussian_ks = addUserConfig('gaussian_ks', self.config.gaussian_ks, [9,11,13,15,17])
+        self.config.ks = addUserConfig('ks', self.config.ks, [9,11,13,15,17])
 
     def __call__(self, img):
         img = self.auditInput(img)
-        ks = self.config.gaussian_ks[np.random.randint(0,len(self.config.gaussian_ks))]
+        ks = self.config.ks[np.random.randint(0,len(self.config.ks))]
         img_gaussian = cv2.GaussianBlur(img,(ks, ks), 0)
         return img_gaussian
 
@@ -193,17 +208,17 @@ class HorlineAug(CvAugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.horline_space = addUserConfig('horline_space', self.config.horline_space, 4)
+        self.config.space = addUserConfig('space', self.config.space, 4)
         # 线条颜色
-        self.config.horline_color = addUserConfig('horline_color', self.config.horline_color, 0)
+        self.config.color = addUserConfig('color', self.config.color, 0)
         # 线宽
-        self.config.horline_thickness = addUserConfig('horline_thickness', self.config.horline_thickness, 1)
+        self.config.thickness = addUserConfig('thickness', self.config.thickness, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
-        for i in range(0,img_h,self.config.horline_space):
-            cv2.line(img, (0, i), (img_w, i), self.config.horline_color, self.config.horline_thickness)
+        for i in range(0,img_h,self.config.space):
+            cv2.line(img, (0, i), (img_w, i), self.config.color, self.config.thickness)
         return img
 
 # 添加竖线增强
@@ -213,17 +228,17 @@ class VerlineAug(CvAugBase):
 
     def auditConfig(self):
         # 线条间隔
-        self.config.verline_space = addUserConfig('verline_space', self.config.verline_space, 4)
+        self.config.space = addUserConfig('space', self.config.space, 4)
         # 线条颜色
-        self.config.verline_color = addUserConfig('verline_color', self.config.verline_color, 0)
+        self.config.color = addUserConfig('color', self.config.color, 0)
         # 线宽
-        self.config.verline_thickness = addUserConfig('verline_thickness', self.config.verline_thickness, 1)
+        self.config.thickness = addUserConfig('thickness', self.config.thickness, 1)
 
     def __call__(self, img):
         img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
-        for i in range(0,img_w,self.config.verline_space):
-            cv2.line(img, (i, 0), (i, img_h), self.config.verline_color, self.config.verline_thickness)
+        for i in range(0,img_w,self.config.space):
+            cv2.line(img, (i, 0), (i, img_h), self.config.color, self.config.thickness)
         return img
 
 # 左右运动模糊
@@ -232,11 +247,11 @@ class LRmotionAug(CvAugBase):
         super(LRmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.lrmotion_ks = addUserConfig('lrmotion_ks', self.config.lrmotion_ks, [3,5,7,9])
+        self.config.ks = addUserConfig('ks', self.config.ks, [3,5,7,9])
 
     def __call__(self,img):
         img = self.auditInput(img)
-        ks = self.config.lrmotion_ks[np.random.randint(0,len(self.config.lrmotion_ks))]
+        ks = self.config.ks[np.random.randint(0,len(self.config.ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[int((ks - 1) / 2), :] = np.ones(ks)
         kernel_motion_blur = kernel_motion_blur / ks
@@ -249,11 +264,11 @@ class UDmotionAug(CvAugBase):
         super(UDmotionAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.udmotion_ks = addUserConfig('udmotion_ks', self.config.udmotion_ks, [3,5,7,9])
+        self.config.ks = addUserConfig('ks', self.config.ks, [3,5,7,9])
 
     def __call__(self, img):
         img = self.auditInput(img)
-        ks = self.config.udmotion_ks[np.random.randint(0,len(self.config.udmotion_ks))]
+        ks = self.config.ks[np.random.randint(0,len(self.config.ks))]
         kernel_motion_blur = np.zeros((ks, ks))
         kernel_motion_blur[:, int((ks - 1) / 2)] = np.ones(ks)
         kernel_motion_blur = kernel_motion_blur / ks
@@ -266,14 +281,14 @@ class NoisyAug(CvAugBase):
         super(NoisyAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.noisy_mean = addUserConfig('noisy_mean', self.config.noisy_mean, 0)
-        self.config.noisy_sigma = addUserConfig('noisy_sigma', self.config.noisy_sigma, 1)
+        self.config.mean = addUserConfig('mean', self.config.mean, 0)
+        self.config.sigma = addUserConfig('sigma', self.config.sigma, 1)
 
     def __call__(self, img):
         input_type = img.dtype
         img = self.auditInput(img)
         row, col = img.shape[:2]
-        gauss = np.random.normal(self.config.noisy_mean, self.config.noisy_sigma, (row, col,3))
+        gauss = np.random.normal(self.config.mean, self.config.sigma, (row, col,3))
         gauss = gauss.reshape(row, col,3)
         noisy = img + gauss
         img_noisy = noisy.astype(input_type)
@@ -285,12 +300,12 @@ class DistortAug(CvAugBase):
         super(DistortAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.distort_segment = addUserConfig('distort_segment', self.config.distort_segment, 4)
+        self.config.segment = addUserConfig('segment', self.config.segment, 4)
 
     def __call__(self, img):
         img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
-        cut = img_w // self.config.distort_segment
+        cut = img_w // self.config.segment
         thresh = cut // 3
         if thresh == 0:
             return img
@@ -309,7 +324,7 @@ class DistortAug(CvAugBase):
         dst_pts.append([np.random.randint(thresh), img_h - np.random.randint(thresh)])
 
         half_thresh = thresh * 0.5
-        for cut_idx in np.arange(1, self.config.distort_segment, 1):
+        for cut_idx in np.arange(1, self.config.segment, 1):
             src_pts.append([cut * cut_idx, 0])
             src_pts.append([cut * cut_idx, img_h])
             dst_pts.append([cut * cut_idx + np.random.randint(thresh) - half_thresh,
@@ -327,13 +342,13 @@ class StretchAug(CvAugBase):
         super(StretchAug,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.stretch_segment = addUserConfig('stretch_segment', self.config.stretch_segment, 4)
+        self.config.segment = addUserConfig('segment', self.config.segment, 4)
 
     def __call__(self, img):
         img = self.auditInput(img)
         img_h, img_w = img.shape[:2]
 
-        cut = img_w // self.config.stretch_segment
+        cut = img_w // self.config.segment
         thresh = cut * 4 // 5
         if thresh==0:
             return img
@@ -353,7 +368,7 @@ class StretchAug(CvAugBase):
 
         half_thresh = thresh * 0.5
 
-        for cut_idx in np.arange(1, self.config.stretch_segment, 1):
+        for cut_idx in np.arange(1, self.config.segment, 1):
             move = np.random.randint(thresh) - half_thresh
             src_pts.append([cut * cut_idx, 0])
             src_pts.append([cut * cut_idx, img_h])
@@ -403,15 +418,15 @@ class MotionAug(CvAugBase):
         super(MotionAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.motion_degree = addUserConfig('motion_degree', self.config.motion_degree, 18)
-        self.config.motion_angle = addUserConfig('motion_angle', self.config.motion_angle, 45)
+        self.config.degree = addUserConfig('degree', self.config.degree, 18)
+        self.config.angle = addUserConfig('angle', self.config.angle, 45)
 
     def __call__(self, img):
         img = self.auditInput(img)
-        m = cv2.getRotationMatrix2D((self.config.motion_degree / 2, self.config.motion_degree / 2), self.config.motion_angle, 1)
-        motion_blur_kernel = np.diag(np.ones(self.config.motion_degree))
-        motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.config.motion_degree, self.config.motion_degree))
-        motion_blur_kernel = motion_blur_kernel / self.config.motion_degree
+        m = cv2.getRotationMatrix2D((self.config.degree / 2, self.config.degree / 2), self.config.angle, 1)
+        motion_blur_kernel = np.diag(np.ones(self.config.degree))
+        motion_blur_kernel = cv2.warpAffine(motion_blur_kernel, m, (self.config.degree, self.config.degree))
+        motion_blur_kernel = motion_blur_kernel / self.config.degree
         blurred = cv2.filter2D(img, -1, motion_blur_kernel)
 
         cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
@@ -425,14 +440,14 @@ class DarkAug(CvAugBase):
         super(DarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.dark_gamma = addUserConfig('dark_gamma', self.config.dark_gamma, 3)
+        self.config.gamma = addUserConfig('gamma', self.config.gamma, 3)
 
     def __call__(self, img):
         input_type = img.dtype
         img = self.auditInput(img)
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         illum = hsv[..., 2] / 255.
-        illum = np.power(illum, self.config.dark_gamma)
+        illum = np.power(illum, self.config.gamma)
         v = illum * 255.
         v[v > 255] = 255
         v[v < 0] = 0
@@ -446,7 +461,7 @@ class HalfDarkAug(CvAugBase):
         super(HalfDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.halfdark_gamma = addUserConfig('halfdark_gamma', self.config.halfdark_gamma, 1.5)
+        self.config.gamma = addUserConfig('gamma', self.config.gamma, 1.5)
 
     def __call__(self, img):
         input_type = img.dtype
@@ -454,7 +469,7 @@ class HalfDarkAug(CvAugBase):
         h, w, _ = img.shape
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         illum = hsv[..., 2] / 255.
-        illum[:, w//2:] = np.power(illum[:, w//2:], self.config.halfdark_gamma)
+        illum[:, w//2:] = np.power(illum[:, w//2:], self.config.gamma)
         v = illum * 255
         v[v > 255] = 255
         v[v < 0] = 0
@@ -485,7 +500,7 @@ class RandomCropDarkAug(CvAugBase):
         super(RandomCropDarkAug, self).__init__(deepvac_config)
 
     def auditConfig(self):
-        self.config.random_crop_dark_gamma = addUserConfig('random_crop_dark_gamma', self.config.random_crop_dark_gamma, 1.2)
+        self.config.gamma = addUserConfig('gamma', self.config.gamma, 1.2)
 
     def __call__(self, img):
         input_type = img.dtype
@@ -502,7 +517,7 @@ class RandomCropDarkAug(CvAugBase):
         current_img = img[rect[1]:rect[3], rect[0]:rect[2], :]
         hsv = cv2.cvtColor(current_img, cv2.COLOR_BGR2HSV)
         illum = hsv[..., 2] / 255.
-        illum = np.power(illum, self.config.random_crop_dark_gamma)
+        illum = np.power(illum, self.config.gamma)
         v = illum * 255.
         v[v > 255] = 255
         v[v < 0] = 0

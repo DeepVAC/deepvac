@@ -2,14 +2,12 @@ import os
 import numpy as np
 import cv2
 from PIL import Image
-from torch.utils.data import Dataset
 from ..utils import LOG
+from .base_dataset import DatasetBase
 
-class FileLineDataset(Dataset):
+class FileLineDataset(DatasetBase):
     def __init__(self, deepvac_config, fileline_path, delimiter=' ', sample_path_prefix=''):
-        self.config = deepvac_config.datasets
-        self.transform = self.config.transform
-        self.composer = self.config.composer
+        super(FileLineDataset, self).__init__(deepvac_config)
         self.sample_path_prefix = sample_path_prefix
         self.fileline_path = fileline_path
         self.delimiter = delimiter
@@ -70,8 +68,8 @@ class FileLineCvSegDataset(FileLineCvStrDataset):
         label = self._buildLabelFromPath(os.path.join(self.sample_path_prefix, label_path.strip()))
 
         if self.config.transform is not None:
-            sample, label = self.config.transform(sample, label)
+            sample, label = self.config.transform([sample, label])
         if self.config.composer is not None:
-            sample, label = self.config.composer(sample, label)
+            sample, label = self.config.composer([sample, label])
 
         return image, label
