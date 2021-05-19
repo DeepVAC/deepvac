@@ -1,13 +1,29 @@
 import random
 from collections import OrderedDict
+from ..core import AttrDict
 from .factory import AugFactory
 
 class Composer(object):
     def __init__(self,deepvac_config):
         self._graph = OrderedDict()
         self._graph_p = OrderedDict()
-        self.config = deepvac_config.composer
+        self.deepvac_composer_config = deepvac_config.composer
+        self.initConfig()
         self.auditConfig()
+
+    def initConfig(self):
+        if self.name() not in self.deepvac_composer_config.keys():
+            self.deepvac_composer_config[self.name()] = AttrDict()
+        self.config = self.deepvac_composer_config[self.name()]
+
+    def name(self):
+        return self.__class__.__name__
+
+    def setAttr(self, k, v):
+        self.config[k] = v
+
+    def getAttr(self,k):
+        return self.config[k]
 
     def addAugFactory(self, name, chain, p=1.0):
         self._graph[name] = chain

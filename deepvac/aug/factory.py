@@ -4,16 +4,32 @@ import random
 import cv2
 from torchvision import transforms as trans
 from ..utils import LOG
+from ..core import AttrDict
 from . import base_aug, face_aug, seg_aug, text_aug, yolo_aug
 
 class SyszuxFactory(object):
     def __init__(self, syntax, deepvac_config):
         self.deepvac_config = deepvac_config
-        self.config = deepvac_config.composer
+        self.deepvac_composer_config = deepvac_config.composer
         self.factory_dict = dict()
+        self.initConfig()
         self.auditConfig()
         self.initSyntax(syntax)
         self.initProducts()
+
+    def initConfig(self):
+        if self.name() not in self.deepvac_composer_config.keys():
+            self.deepvac_composer_config[self.name()] = AttrDict()
+        self.config = self.deepvac_composer_config[self.name()]
+
+    def name(self):
+        return self.__class__.__name__
+
+    def setAttr(self, k, v):
+        self.config[k] = v
+
+    def getAttr(self,k):
+        return self.config[k]
 
     def auditConfig(self):
         pass
@@ -102,7 +118,7 @@ class SyszuxFactory(object):
         if ins_name in self.config:
             return self.config[ins_name]
         
-        LOG.logE("ERROR! {} not found in factory.".format(ins_name), exit=True)
+        LOG.logE("ERROR! {} not found in factory {}.".format(ins_name, self.name()), exit=True)
 
 
 class AugFactory(SyszuxFactory):
