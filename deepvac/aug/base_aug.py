@@ -3,6 +3,7 @@ import numpy as np
 import random
 from PIL import Image, ImageEnhance
 from scipy import ndimage
+import torch
 from ..core import AttrDict
 from ..utils import LOG, addUserConfig
 from .warp_mls_helper import WarpMLS
@@ -36,15 +37,15 @@ class AugBase(object):
     def auditImg(self, img):
         LOG.logE("You must reimplement auditImg in subclass {}.".format(self.name()), exit=True)
 
-    def auditInput(self, img, args_len=1):
-        if args_len == 1:
+    def auditInput(self, img, input_len=1):
+        if input_len == 1:
             return self.auditImg(img)
 
         if not isinstance(img, (list, tuple)):
-            assert False, "input args must be list or tuple in {} if args_len={}".format(self.name(), args_len)
+            assert False, "input args must be list or tuple in {} if input_len={}".format(self.name(), input_len)
             return None
 
-        assert len(img) == args_len, "input must has {} args in {}".format(args_len, self.name())
+        assert len(img) == input_len, "input must has {} args in {}".format(input_len, self.name())
         img[0] = self.auditImg(img[0])
         return img
 

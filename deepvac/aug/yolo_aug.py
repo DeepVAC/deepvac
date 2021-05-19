@@ -15,7 +15,7 @@ class HSVAug(CvAugBase):
         self.config.vgain = addUserConfig('vgain', self.config.vgain, 0.4)
 
     def __call__(self, img):
-        img, label = self.auditInput(img, has_label=True)
+        img, label = self.auditInput(img, input_len=2)
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
         dtype = img.dtype
@@ -37,7 +37,7 @@ class YoloHFlipAug(CvAugBase):
         pass
 
     def __call__(self, img):
-        img, label = self.auditInput(img, has_label=True)
+        img, label = self.auditInput(img, input_len=2)
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.fliplr(img)
         if label.size:
@@ -52,7 +52,7 @@ class YoloVFlipAug(CvAugBase):
         pass
 
     def __call__(self, img):
-        img, label = self.auditInput(img, has_label=True)
+        img, label = self.auditInput(img, input_len=2)
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.flipud(img)
         if label.size:
@@ -78,7 +78,7 @@ class YoloPerspectiveAug(CvAugBase):
         return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr) & (ar < ar_thr)
 
     def __call__(self, img):
-        img, label = self.auditInput(img, has_label=True)
+        img, label = self.auditInput(img, input_len=2)
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
 
         border = self.border
@@ -185,7 +185,7 @@ class YoloNormalizeAug(CvAugBase):
             1. [cls, x1, y1, x2, y2] -> [cls, cx, cy, w, h]
             2. cx, w normalized by img width, cy, h normalized by img height
         '''
-        img, label = self.auditInput(img, has_label=True)
+        img, label = self.auditInput(img, input_len=2)
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         if not label.size:
             return img, label

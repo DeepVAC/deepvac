@@ -15,7 +15,7 @@ class RandomRotateFacialKpListAug(CvAugBase):
     # img[0] -> img
     # img[1] -> keypoint info (scale to 0-1)
     def __call__(self, img):
-        img,landmarks = self.auditInput(img, has_label=True)
+        img,landmarks = self.auditInput(img, input_len=2)
         angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
         h, w, _ = img.shape
         M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
@@ -53,7 +53,7 @@ class RandomFilpFacialKpListAug(CvAugBase):
     # img[0] -> img
     # img[1] -> keypoint info(scale to 0-1)
     def __call__(self, img):
-        img,landmarks = self.auditInput(img, has_label=True)
+        img,landmarks = self.auditInput(img, input_len=2)
         h, w, _ = img.shape
         dest_img = cv2.flip(img, 1)
         flip_landmarks = []
@@ -90,7 +90,7 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
         return area_i / np.maximum(area_a[:, np.newaxis], 1)
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -182,7 +182,7 @@ class BrightDistortFacialAug(DistortFacialAugBase):
         pass
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -200,7 +200,7 @@ class ContrastDistortFacialAug(DistortFacialAugBase):
         pass
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -218,7 +218,7 @@ class SaturationDistortFacialAug(DistortFacialAugBase):
         pass
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -238,7 +238,7 @@ class HueDistortFacialAug(DistortFacialAugBase):
         pass
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -260,7 +260,7 @@ class MirrorFacialAug(CvAugBase):
         pass
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -294,7 +294,7 @@ class Pad2SquareFacialAug(CvAugBase):
         self.config.rgb_means = addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -318,7 +318,7 @@ class ResizeSubtractMeanFacialAug(CvAugBase):
         self.config.rgb_means = addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
     def __call__(self, image):
-        image, label = self.auditInput(image, has_label=True)
+        image, label = self.auditInput(image, input_len=2)
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
