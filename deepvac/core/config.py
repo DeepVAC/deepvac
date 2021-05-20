@@ -15,7 +15,7 @@ class AttrDict(dict):
     def clone(self):
         return copy.deepcopy(self)
 
-def fork(name):
+def interpret(name):
     fields = name.split('.')
     c = AttrDict()
     if len(fields) < 2:
@@ -41,8 +41,18 @@ def new():
     config.datasets = AttrDict()
     return config
 
-config = new()
+def fork(deepvac_config, field=['aug','composer','datasets']):
+    if not isinstance(field, list):
+        field = [field]
+    c = new()
+    for f in field:
+        if f not in deepvac_config.keys():
+            print("ERROR: found unsupport field: {}".format(f))
+            return None
+        c[f] = deepvac_config[f].clone()
+    return c
 
+config = new()
 
 ## ------------------ common ------------------
 config.core.device = "cuda"
