@@ -114,16 +114,16 @@ class ImageWithMasksRandomCropResizeAug(CvAugBase):
 class ImageWithMasksHFlipAug(CvAugBase):
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, input_len=2)
-        image = cv2.flip(image, 1) # horizontal flip
+        img = cv2.flip(img, 1) # horizontal flip
         label = cv2.flip(label, 1) # horizontal flip
-        return [image, label]
+        return [img, label]
 
 class ImageWithMasksVFlipAug(CvAugBase):
     def __call__(self, imgs):
         img, label = self.auditInput(imgs, input_len=2)
-        image = cv2.flip(image, 0) # veritcal flip
+        img = cv2.flip(img, 0) # veritcal flip
         label = cv2.flip(label, 0)  # veritcal flip
-        return [image, label]
+        return [img, label]
 
 class ImageWithMasksNormalizeAug(CvAugBase):
     def auditConfig(self):
@@ -131,13 +131,13 @@ class ImageWithMasksNormalizeAug(CvAugBase):
         self.config.std = self.addUserConfig('std', self.config.std, [62.98702,63.34315,62.743645], True)
 
     def __call__(self, imgs):
-        image, label = self.auditInput(imgs, input_len=2)
-        image = image.astype(np.float32)
+        img, label = self.auditInput(imgs, input_len=2)
+        img = img.astype(np.float32)
         for i in range(3):
-            image[:,:,i] -= self.config.mean[i]
+            img[:,:,i] -= self.config.mean[i]
         for i in range(3):
-            image[:,:, i] /= self.config.std[i]
-        return [image, label]
+            img[:,:, i] /= self.config.std[i]
+        return [img, label]
 
 class ImageWithMasksToTensorAug(CvAugBase):
     def auditConfig(self):
@@ -145,15 +145,15 @@ class ImageWithMasksToTensorAug(CvAugBase):
         self.config.force_div255 = self.addUserConfig('force_div255', self.config.force_div255, True)
 
     def __call__(self, imgs):
-        image, label = self.auditInput(imgs, input_len=2)
+        img, label = self.auditInput(imgs, input_len=2)
 
         if self.config.scale != 1:
             h, w = label.shape[:2]
-            image = cv2.resize(image, (int(w), int(h)))
+            img = cv2.resize(img, (int(w), int(h)))
             label = cv2.resize(label, (int(w/self.config.scale), int(h/self.config.scale)), interpolation=cv2.INTER_NEAREST)
 
         default_float_dtype = torch.get_default_dtype()
-        image_tensor = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
+        image_tensor = torch.from_numpy(img.transpose((2, 0, 1))).contiguous()
         # backward compatibility
         if isinstance(image_tensor, torch.ByteTensor) or self.config.force_div255:
             image_tensor = image_tensor.to(dtype=default_float_dtype).div(255)
