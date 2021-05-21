@@ -42,7 +42,7 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
         w, h = imgs[0].shape[:2]
         rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
         imgs[0] = cv2.warpAffine(imgs[0], rotation_matrix, (h, w), borderValue=fill_color)
-        for i in range(len(imgs)):
+        for i in range(1, len(imgs)):
             imgs[i] = cv2.warpAffine(imgs[i], rotation_matrix, (h, w), borderValue=self.config.label_bg_color)
         return imgs
 
