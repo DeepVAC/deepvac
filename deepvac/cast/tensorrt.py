@@ -2,14 +2,14 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class TensorrtCast(DeepvacCast):
-    def __init__(self, deepvac_core_config):
-        super(TensorrtCast,self).__init__(deepvac_core_config)
+    def __init__(self, deepvac_config):
+        super(TensorrtCast,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        if not self.config.trt_model_dir:
+        if not self.config.model_dir:
             return False
         
-        if self.config.trt_enable_dynamic_input and self.config.onnx_dynamic_ax is None:
+        if self.config.enable_dynamic_input and self.config.onnx_dynamic_ax is None:
             LOG.logE("If you want to tensorrt support dynamic input, you must set onnx_dynamic_ax.", exit=True)
         
         return True
@@ -22,12 +22,12 @@ class TensorrtCast(DeepvacCast):
             2. unpack Tensorrt*.tar.gz  3. pip install tensorrt-x-cpx-none-linux_x86_64.whl in Tensorrt*(your_tensorrt_path)/python", exit=True)
             return
 
-        output_trt_file = self.config.trt_model_dir
+        output_trt_file = self.config.model_dir
         if cast_output_file:
-            output_trt_file = '{}/trt__{}.trt'.format(self.core_config.output_dir, cast_output_file)
-            self.config.trt_model_dir = output_trt_file
+            output_trt_file = '{}/trt__{}.trt'.format(self.deepvac_core_config.output_dir, cast_output_file)
+            self.config.model_dir = output_trt_file
         
-        LOG.logI("config.trt_model_dir found, save tensorrt model to {}...".format(self.config.trt_model_dir))
+        LOG.logI("config.trt_model_dir found, save tensorrt model to {}...".format(self.config.model_dir))
 
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
@@ -39,9 +39,9 @@ class TensorrtCast(DeepvacCast):
             with open(self.config.onnx_model_dir, 'rb') as model:
                 parser.parse(model.read())
             config = builder.create_builder_config()
-            if self.config.trt_enable_dynamic_input:
+            if self.config.enable_dynamic_input:
                 profile = builder.create_optimization_profile()
-                profile.set_shape(self.config.onnx_input_names[0], self.config.trt_input_min_dims, self.config.trt_input_opt_dims, self.config.trt_input_max_dims)
+                profile.set_shape(self.config.onnx_input_names[0], self.config.input_min_dims, self.config.input_opt_dims, self.config.input_max_dims)
                 config.add_optimization_profile(profile)
             engine = builder.build_engine(network, config)
             with open(output_trt_file, "wb") as f:

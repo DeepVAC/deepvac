@@ -7,14 +7,31 @@ from torch.quantization import get_default_qconfig, quantize_jit
 from torch.quantization import default_dynamic_qconfig, float_qparams_weight_only_qconfig
 from torch.quantization.quantize_fx import prepare_fx, convert_fx, prepare_qat_fx
 import torch.nn as nn
+from ..core.config import AttrDict
 from ..utils import LOG
 
 class DeepvacCast(object):
     def __init__(self, deepvac_config):
-        self.core_config = deepvac_config.core
-        self.config = deepvac_config.cast
+        self.deepvac_cast_config = deepvac_config.cast
+        self.deepvac_core_config = deepvac_config.core
+        self.initConfig()
         self.proceed = False
         self.auditFinalConfig()
+
+    def initConfig(self):
+        if self.name() not in self.deepvac_cast_config.keys():
+            self.deepvac_cast_config[self.name()] = AttrDict()
+        self.config = self.deepvac_cast_config[self.name()]
+
+    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
+        module_name = 'config.cast.{}'.format(self.name())
+        return addUserConfig(module_name, config_name, user_give=user_give, developer_give=developer_give, is_user_mandatory=is_user_mandatory)
+
+    def setAttr(self, k, v):
+        self.config[k] = v
+
+    def getAttr(self,k):
+        return self.config[k]
 
     def auditConfig(self):
         LOG.logW("You should reimplement auditConfig in your subclass {}.".format(self.name()))
@@ -25,16 +42,16 @@ class DeepvacCast(object):
     def auditFinalConfig(self):
         if not self.auditConfig():
             return
-        if self.core_config.net is None:
+        if self.deepvac_core_config.net is None:
             LOG.logE("You must set config.core.net in config.py", exit=True)
 
-        if self.core_config.sample is None:
+        if self.deepvac_core_config.sample is None:
             LOG.logE("You must set config.core.sample, in general, this is done by Deepvac Framework.", exit=True)
         
-        self.net = copy.deepcopy(self.core_config.ema if self.core_config.ema else self.core_config.net)
-        if self.core_config.cast2cpu:
+        self.net = copy.deepcopy(self.deepvac_core_config.ema if self.deepvac_core_config.ema else self.deepvac_core_config.net)
+        if self.deepvac_core_config.cast2cpu:
             self.net.cpu()
-            self.core_config.sample = self.core_config.sample.to('cpu')
+            self.deepvac_core_config.sample = self.deepvac_core_config.sample.to('cpu')
         
         self.proceed = True
         
@@ -52,7 +69,7 @@ class DeepvacCast(object):
             f = tempfile.NamedTemporaryFile(delete=False)
             self.config.onnx_model_dir = f.name
 
-        torch.onnx.export(self.net, self.core_config.sample, self.config.onnx_model_dir, 
+        torch.onnx.export(self.net, self.deepvac_core_config.sample, self.config.onnx_model_dir, 
             input_names=self.config.onnx_input_names, output_names=self.config.onnx_output_names, 
             dynamic_axes=self.config.onnx_dynamic_ax, opset_version=self.config.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.config.onnx_model_dir))
@@ -70,9 +87,9 @@ def calibrate(model, data_loader):
             
 class ScriptModel(object):
     def __init__(self, deepvac_core_config, output_file, backend = 'fbgemm'):
-        self.config = deepvac_core_config
-        self.input_net = copy.deepcopy(self.config.ema if self.config.ema else self.config.net)
-        self.input_net.to(self.config.sample.device)
+        self.deepvac_core_config = deepvac_core_config
+        self.input_net = copy.deepcopy(self.deepvac_core_config.ema if self.deepvac_core_config.ema else self.deepvac_core_config.net)
+        self.input_net.to(self.deepvac_core_config.sample.device)
         self.input_net.eval()
         self.output_file = output_file
         self.backend = backend
@@ -88,7 +105,7 @@ class ScriptModel(object):
         LOG.logE("You must reimplement _jit() in ScriptModel subclass.", exit=True)
 
     def getCalibrateLoader(self):
-        loader = self.config.test_loader if self.config.is_forward_only else self.config.val_loader
+        loader = self.deepvac_core_config.test_loader if self.deepvac_core_config.is_forward_only else self.deepvac_core_config.val_loader
         if loader is None:
             LOG.logE("You enabled config.static_quantize_dir, but didn't provide config.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
         return loader
@@ -114,10 +131,10 @@ class ScriptModel(object):
 
 class SaveModelByTrace(ScriptModel):
     def _freeze_jit(self, model):
-        return torch.jit.freeze(torch.jit.trace(model, self.config.sample).eval() )
+        return torch.jit.freeze(torch.jit.trace(model, self.deepvac_core_config.sample).eval() )
     
     def _jit(self, model):
-        return torch.jit.trace(model, self.config.sample).eval()
+        return torch.jit.trace(model, self.deepvac_core_config.sample).eval()
 
 class SaveModelByScript(ScriptModel):
     def _freeze_jit(self, model):
