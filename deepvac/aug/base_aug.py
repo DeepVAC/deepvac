@@ -45,8 +45,11 @@ class AugBase(object):
         if input_len == 1:
             return self.auditImg(img)
 
-        if not isinstance(img, (list, tuple)):
-            assert False, "input args must be list or tuple in {} if input_len={}".format(self.name(), input_len)
+        if isinstance(img, tuple):
+            img = list(img)
+
+        if not isinstance(img, list):
+            assert False, "input args must be list in {} if input_len={}".format(self.name(), input_len)
             return None
 
         assert len(img) == input_len, "input must has {} args in {}".format(input_len, self.name())

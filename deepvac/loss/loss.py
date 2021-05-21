@@ -27,9 +27,6 @@ class LossBase(nn.Module):
     def auditConfig(self):
         raise Exception("Not implemented!")
 
-    def __call__(self,img):
-        raise Exception("Not implemented!")
-
 class MaskL1Loss(LossBase):
     def __init__(self, deepvac_config):
         super(MaskL1Loss, self).__init__(deepvac_config)
