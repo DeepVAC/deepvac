@@ -18,6 +18,7 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
     def auditConfig(self):
         self.config.max_angle = self.addUserConfig('max_angle', self.config.max_angle, 10)
         self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
+        self.config.label_bg_color = self.addUserConfig('label_bg_color', self.config.label_bg_color, (0, 0, 0))
 
     def __call__(self, imgs):
         imgs = self.auditInput(imgs, input_len=self.config.input_len)
@@ -40,13 +41,9 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
         # ops
         w, h = imgs[0].shape[:2]
         rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
-        for i in range(len(imgs)):
-            img = imgs[i]
-            if img.ndim == 2:
-                img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w))
-            if img.ndim == 3:
-                img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w), borderValue=fill_color)
-            imgs[i] = img_rotation
+        imgs[0] = cv2.warpAffine(imgs[0], rotation_matrix, (h, w), borderValue=fill_color)
+        for i in range(1, len(imgs)):
+            imgs[i] = cv2.warpAffine(imgs[i], rotation_matrix, (h, w), borderValue=self.config.label_bg_color)
         return imgs
 
 class ImageWithMasksRandom4TextCropAug(CvAugBase):
