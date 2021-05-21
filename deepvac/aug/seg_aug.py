@@ -5,9 +5,6 @@ import torch
 from .base_aug import CvAugBase
 
 class ImageWithMasksRandomHorizontalFlipAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
-
     def auditConfig(self):
         self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
 
@@ -18,9 +15,6 @@ class ImageWithMasksRandomHorizontalFlipAug(CvAugBase):
         return imgs
 
 class ImageWithMasksRandomRotateAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
-
     def auditConfig(self):
         self.config.max_angle = self.addUserConfig('max_angle', self.config.max_angle, 10)
         self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
@@ -55,10 +49,7 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
             imgs[i] = img_rotation
         return imgs
 
-class ImageWithMasksRandomCropAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomCropAug, self).__init__(deepvac_config)
-
+class ImageWithMasksRandom4TextCropAug(CvAugBase):
     def auditConfig(self):
         self.config.p = self.addUserConfig('p', self.config.p, 3.0 / 8.0)
         self.config.img_size = self.addUserConfig('img_size', self.config.img_size, 224)
@@ -108,7 +99,7 @@ class ImageWithMasksScaleAug(CvAugBase):
         label = cv2.resize(label, (self.config.w, self.config.h), interpolation=cv2.INTER_NEAREST)
         return [img, label]
 
-class ImageWithMaskCrop(CvAugBase):
+class ImageWithMasksSafeCropAug(CvAugBase):
     def __call__(self, imgs):
        img, label = self.auditInput(imgs, input_len=2)
        h, w = img.shape[:2]
@@ -123,16 +114,14 @@ class ImageWithMaskCrop(CvAugBase):
        label_crop = label[y1:y2, x1:x2]
        return img_crop, label_crop
 
-    @staticmethod
-    def getXY(label):
+    def getXY(self, label):
         coord = label.nonzero()
         ymin, xmin = coord[0].min(), coord[1].min()
         ymax, xmax = coord[0].max(), coord[1].max()
         return xmin, ymin, xmax, ymax
 
-class ImageWithMasksRandomCropResizeAug(CvAugBase):
+class ImageWithMasksCenterCropAug(CvAugBase):
     def auditConfig(self):
-        self.config.size = self.addUserConfig('size', self.config.size, (384,384), True)
         self.config.max_crop_ratio = self.addUserConfig('max_crop_ratio', self.config.max_crop_ratio, 0.1)
 
     def __call__(self, imgs):
@@ -144,8 +133,6 @@ class ImageWithMasksRandomCropResizeAug(CvAugBase):
         img_crop = img[y1:h-y1, x1:w-x1]
         label_crop = label[y1:h-y1, x1:w-x1]
 
-        img_crop = cv2.resize(img_crop, self.config.size)
-        label_crop = cv2.resize(label_crop, self.config.size, interpolation=cv2.INTER_NEAREST)
         return [img_crop, label_crop]
 
 class ImageWithMasksHFlipAug(CvAugBase):
