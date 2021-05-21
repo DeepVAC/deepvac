@@ -7,14 +7,14 @@ class Composer(object):
     def __init__(self,deepvac_config):
         self._graph = OrderedDict()
         self._graph_p = OrderedDict()
-        self.deepvac_composer_config = deepvac_config.composer
+        self.deepvac_aug_config = deepvac_config.aug
         self.initConfig()
         self.auditConfig()
 
     def initConfig(self):
-        if self.name() not in self.deepvac_composer_config.keys():
-            self.deepvac_composer_config[self.name()] = AttrDict()
-        self.config = self.deepvac_composer_config[self.name()]
+        if self.name() not in self.deepvac_aug_config.keys():
+            self.deepvac_aug_config[self.name()] = AttrDict()
+        self.config = self.deepvac_aug_config[self.name()]
 
     def name(self):
         return self.__class__.__name__

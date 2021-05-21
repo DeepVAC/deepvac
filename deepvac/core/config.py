@@ -1,4 +1,6 @@
 import copy
+primitive = (int, float, str, bool, list, dict, tuple, set)
+
 class AttrDict(dict):
     def __getattr__(self, key):
         return self.get(key)
@@ -10,7 +12,12 @@ class AttrDict(dict):
             self[key] = value
 
     def __deepcopy__(self, memo=None):
-        return AttrDict(copy.deepcopy(dict(self), memo=memo))
+        try:
+            ad = AttrDict(copy.deepcopy(dict(self), memo=memo))
+        except Exception as e:
+            print("Warning, issue happened in clone() API. Error: {}".format(str(e)))
+            ad = AttrDict()
+        return ad
 
     def clone(self):
         return copy.deepcopy(self)
@@ -41,13 +48,13 @@ def new():
     config.datasets = AttrDict()
     return config
 
-def fork(deepvac_config, field=['aug','composer','datasets']):
+def fork(deepvac_config, field=['aug','datasets','composer']):
     if not isinstance(field, list):
         field = [field]
     c = new()
     for f in field:
         if f not in deepvac_config.keys():
-            print("ERROR: found unsupport field: {}".format(f))
+            print("ERROR: deepvac fork found unsupport field: {}".format(f))
             return None
         c[f] = deepvac_config[f].clone()
     return c

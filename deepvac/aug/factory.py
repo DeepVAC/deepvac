@@ -10,7 +10,7 @@ from . import base_aug, face_aug, seg_aug, text_aug, yolo_aug
 class SyszuxFactory(object):
     def __init__(self, syntax, deepvac_config):
         self.deepvac_config = deepvac_config
-        self.deepvac_composer_config = deepvac_config.composer
+        self.deepvac_aug_config = deepvac_config.aug
         self.factory_dict = dict()
         self.initConfig()
         self.auditConfig()
@@ -18,9 +18,9 @@ class SyszuxFactory(object):
         self.initProducts()
 
     def initConfig(self):
-        if self.name() not in self.deepvac_composer_config.keys():
-            self.deepvac_composer_config[self.name()] = AttrDict()
-        self.config = self.deepvac_composer_config[self.name()]
+        if self.name() not in self.deepvac_aug_config.keys():
+            self.deepvac_aug_config[self.name()] = AttrDict()
+        self.config = self.deepvac_aug_config[self.name()]
 
     def name(self):
         return self.__class__.__name__

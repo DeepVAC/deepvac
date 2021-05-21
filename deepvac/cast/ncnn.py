@@ -4,11 +4,11 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class NcnnCast(DeepvacCast):
-    def __init__(self, deepvac_core_config):
-        super(NcnnCast,self).__init__(deepvac_core_config)
+    def __init__(self, deepvac_config):
+        super(NcnnCast,self).__init__(deepvac_config)
 
     def auditConfig(self):
-        if not self.config.ncnn_model_dir:
+        if not self.config.model_dir:
             return False
 
         if not self.config.onnx2ncnn:
@@ -17,20 +17,20 @@ class NcnnCast(DeepvacCast):
         return True
 
     def process(self, cast_output_file=None):
-        output_ncnn_file = self.config.ncnn_model_dir
+        output_ncnn_file = self.config.model_dir
         if cast_output_file:
             output_ncnn_file = '{}/ncnn__{}.bin'.format(self.config.output_dir, cast_output_file)
-            self.config.ncnn_model_dir = output_ncnn_file
-        self.config.ncnn_arch_dir = '{}.param'.format(output_ncnn_file)
-        LOG.logI("config.ncnn_model_dir found, save ncnn model to {}...".format(self.config.ncnn_model_dir))
+            self.config.model_dir = output_ncnn_file
+        self.config.arch_dir = '{}.param'.format(output_ncnn_file)
+        LOG.logI("config.cast.NcnnCast.model_dir found, save ncnn model to {}...".format(self.config.model_dir))
 
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
 
-        cmd = self.config.onnx2ncnn + " " + self.config.onnx_model_dir + " " + self.config.ncnn_arch_dir + " " + output_ncnn_file
+        cmd = self.config.onnx2ncnn + " " + self.config.onnx_model_dir + " " + self.config.arch_dir + " " + output_ncnn_file
         pd = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if pd.stderr.read() == b"":
-            LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}.".format(self.config.ncnn_arch_dir, output_ncnn_file))
+            LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}.".format(self.config.arch_dir, output_ncnn_file))
             return
 
         LOG.logE(pd.stderr.read() + b". Error occured when export ncnn model. Deepvac try to simplify the model first.")
@@ -53,4 +53,4 @@ class NcnnCast(DeepvacCast):
         if not os.path.isfile(output_ncnn_file):
             LOG.logE("Error: ncnn model not generated due to internal error!", exit=True)
 
-        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.config.ncnn_arch_dir, output_ncnn_file))
+        LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}".format(self.config.arch_dir, output_ncnn_file))
