@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 from ..utils import LOG, addUserConfig
+from ..core import AttrDict
 
 class LossBase(nn.Module):
     def __init__(self, deepvac_config):

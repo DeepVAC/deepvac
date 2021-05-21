@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from .loss import LossBase
 
 class MultiBoxLoss(LossBase):
-    def __init__(self, num_classes, overlap_thresh, prior_for_matching, bkg_label, neg_mining, neg_pos, neg_overlap, encode_target, device='cpu'):
-        super(MultiBoxLoss, self).__init__()
+    def __init__(self, deepvac_config, num_classes, overlap_thresh, prior_for_matching, bkg_label, neg_mining, neg_pos, neg_overlap, encode_target, device='cpu'):
+        super(MultiBoxLoss, self).__init__(deepvac_config)
         self.num_classes = num_classes
         self.threshold = overlap_thresh
         self.background_label = bkg_label
@@ -16,6 +16,9 @@ class MultiBoxLoss(LossBase):
         self.neg_overlap = neg_overlap
         self.variance = [0.1, 0.2]
         self.device = device
+
+    def auditConfig(self):
+        pass
 
     def _match(self, threshold, truths, priors, variances, labels, landms, loc_t, conf_t, landm_t, idx):
         overlaps = self._jaccard(
