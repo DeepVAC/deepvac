@@ -5,56 +5,62 @@ import torch
 from .base_aug import CvAugBase
 
 class ImageWithMasksRandomHorizontalFlipAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomHorizontalFlipAug, self).__init__(deepvac_config)
-
     def auditConfig(self):
-        pass
+        self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
 
     def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
-        imgs = [img]
-        imgs.extend(label)
+        imgs = self.auditInput(imgs, input_len=self.config.input_len)
         for i in range(len(imgs)):
             imgs[i] = np.flip(imgs[i], axis=1)
-        return [imgs[0],imgs[1:]]
+        return imgs
 
 class ImageWithMasksRandomRotateAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomRotateAug, self).__init__(deepvac_config)
-
     def auditConfig(self):
         self.config.max_angle = self.addUserConfig('max_angle', self.config.max_angle, 10)
+        self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
 
     def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
-        imgs = [img]
-        imgs.extend(label)
+        imgs = self.auditInput(imgs, input_len=self.config.input_len)
+        # angle
         angle = random.random() * 2 * self.config.max_angle - self.config.max_angle
+        # fill color
+        if isinstance(self.config.fill_color, (tuple, list)):
+            fill_color = self.config.fill_color
+            try:
+                fill_color = [min(max(int(fill_color[i]), 0), 255) for i in range(3)]
+            except:
+                raise Exception("fill_color = (int, int, int) while fill_color type = list or tuple")
+        elif isinstance(self.config.fill_color, bool):
+            fill_color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) if self.config.fill_color else (0, 0, 0)
+
+        elif self.config.fill_color is None:
+            fill_color = (0, 0, 0)
+        else:
+            raise TypeError("fill_color type must be (None, bool, tuple, list)")
+        # ops
+        w, h = imgs[0].shape[:2]
+        rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
         for i in range(len(imgs)):
             img = imgs[i]
-            w, h = img.shape[:2]
-            rotation_matrix = cv2.getRotationMatrix2D((h / 2, w / 2), angle, 1)
-            img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w))
+            if img.ndim == 2:
+                img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w))
+            if img.ndim == 3:
+                img_rotation = cv2.warpAffine(img, rotation_matrix, (h, w), borderValue=fill_color)
             imgs[i] = img_rotation
-        return [imgs[0],imgs[1:]]
+        return imgs
 
-class ImageWithMasksRandomCropAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ImageWithMasksRandomCropAug, self).__init__(deepvac_config)
-        self.auditUserConfig("img_size")
-
+class ImageWithMasksRandom4TextCropAug(CvAugBase):
     def auditConfig(self):
         self.config.p = self.addUserConfig('p', self.config.p, 3.0 / 8.0)
+        self.config.img_size = self.addUserConfig('img_size', self.config.img_size, 224)
+        self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
 
     def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
-        h, w, _ = img.shape
+        imgs = self.auditInput(imgs, input_len=self.config.input_len)
+        h, w, _ = imgs[0].shape
 
-        imgs = [img]
-        imgs.extend(label)
         if max(h, w) <= self.config.img_size:
-            return [imgs[0],imgs[1:]]
+            return imgs
 
         img_size = (self.config.img_size,) * 2
         th = min(h, img_size[0])
@@ -80,7 +86,7 @@ class ImageWithMasksRandomCropAug(CvAugBase):
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw, :]
             else:
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw]
-        return [imgs[0],imgs[1:]]
+        return imgs
 
 class ImageWithMasksScaleAug(CvAugBase):
     def auditConfig(self):
@@ -93,9 +99,29 @@ class ImageWithMasksScaleAug(CvAugBase):
         label = cv2.resize(label, (self.config.w, self.config.h), interpolation=cv2.INTER_NEAREST)
         return [img, label]
 
-class ImageWithMasksRandomCropResizeAug(CvAugBase):
+class ImageWithMasksSafeCropAug(CvAugBase):
+    def __call__(self, imgs):
+       img, label = self.auditInput(imgs, input_len=2)
+       h, w = img.shape[:2]
+
+       xmin, ymin, xmax, ymax = self.getXY(label)
+       x1 = random.randint(0, xmin)
+       y1 = random.randint(0, ymin)
+       x2 = random.randint(xmax, w)
+       y2 = random.randint(ymax, h)
+
+       img_crop = img[y1:y2, x1:x2, :]
+       label_crop = label[y1:y2, x1:x2]
+       return img_crop, label_crop
+
+    def getXY(self, label):
+        coord = label.nonzero()
+        ymin, xmin = coord[0].min(), coord[1].min()
+        ymax, xmax = coord[0].max(), coord[1].max()
+        return xmin, ymin, xmax, ymax
+
+class ImageWithMasksCenterCropAug(CvAugBase):
     def auditConfig(self):
-        self.config.size = self.addUserConfig('size', self.config.size, (384,384), True)
         self.config.max_crop_ratio = self.addUserConfig('max_crop_ratio', self.config.max_crop_ratio, 0.1)
 
     def __call__(self, imgs):
@@ -107,8 +133,6 @@ class ImageWithMasksRandomCropResizeAug(CvAugBase):
         img_crop = img[y1:h-y1, x1:w-x1]
         label_crop = label[y1:h-y1, x1:w-x1]
 
-        img_crop = cv2.resize(img_crop, self.config.size)
-        label_crop = cv2.resize(label_crop, self.config.size, interpolation=cv2.INTER_NEAREST)
         return [img_crop, label_crop]
 
 class ImageWithMasksHFlipAug(CvAugBase):
