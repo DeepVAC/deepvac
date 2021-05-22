@@ -74,11 +74,11 @@ train_loader = torch.utils.data.DataLoader(
     batch_size=config.core.batch_size, shuffle=True, num_workers=config.core.num_workers, pin_memory=True)
 ```
 ### composer
-composer中AugFactory的配置项有哪些是这个AugFactory的作者确定的
+composer中AugFactory的配置项是这个AugFactory的作者确定的
 ```python
 #composer的配置需要使用AttrDict()进行初始化
-deepvac_config.composer.GemfieldAugFactory = AttrDict()
-deepvac_config.composer.GemfieldAugFactory.trans1 = transforms.Compose([
+deepvac_config.aug.GemfieldAugFactory = AttrDict()
+deepvac_config.aug.GemfieldAugFactory.trans1 = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
@@ -93,7 +93,6 @@ from deepvac import config as deepvac_config, AttrDict, fork, new, newDict
 deepvac_config2 = new()
 #只克隆需要的部分
 deepvac_config2.aug = deepvac_config.aug.clone()
-deepvac_config2.composer = deepvac_config.composer.clone()
 deepvac_config2.aug.GemfieldAug.gemfield_age = 22
 mycomposer2 = GemfieldComposer(deepvac_config2)
 ```
@@ -186,10 +185,10 @@ config.core.tensorboard_ip = None
 如果要转换PyTorch模型到TorchScript，你需要设置如下的配置：
 ```python
 #通过script的方式将pytorch训练的模型编译为TorchScript模型
-config.cast.script_model_dir = <your_script_model_dir_only4smoketest>
+config.cast.ScriptCast.model_dir = <your_script_model_dir_only4smoketest>
 
 #通过trace的方式将pytorch训练的模型转换为TorchScript模型
-config.cast.trace_model_dir = <your_trace_model_dir_only4smoketest>
+config.cast.TraceCast.model_dir = <your_trace_model_dir_only4smoketest>
 ```
 注意：
 - 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为TorchScript。之后，在每次保存PyTorch模型的时候，会同时保存TorchScript；
@@ -200,13 +199,13 @@ config.cast.trace_model_dir = <your_trace_model_dir_only4smoketest>
 如果要转换PyTorch模型到ONNX，你需要设置如下的配置：
 ```python
 #输出config.onnx_model_dir
-config.cast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+config.cast.OnnxCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
 #默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
-config.cast.onnx_version = 9
-config.cast.onnx_input_names = ["input"]
-config.cast.onnx_output_names = ["output"]
+config.cast.OnnxCast.onnx_version = 9
+config.cast.OnnxCast.onnx_input_names = ["input"]
+config.cast.OnnxCast.onnx_output_names = ["output"]
 #当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
-config.cast.onnx_dynamic_ax = {
+config.cast.OnnxCast.onnx_dynamic_ax = {
             'input': {
                 2: 'image_height',
                 3: 'image_width'
@@ -223,12 +222,23 @@ config.cast.onnx_dynamic_ax = {
 - 在test.py下，<your_onnx_model_dir_only4smoketest> 为ONNX模型输出路径。
 
 ### 输出NCNN模型（适用于train.py和test.py）
-如果要转换PyTorch模型到NCNN，你需要设置如下的配置：
+因为转换NCNN依赖ONNX，所以需要先设置ONNX的配置：
+```python
+#输出config.onnx_model_dir
+config.cast.NcnnCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+#默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
+config.cast.NcnnCast.onnx_version = 9
+config.cast.NcnnCast.onnx_input_names = ["input"]
+config.cast.NcnnCast.onnx_output_names = ["output"]
+#当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
+config.cast.NcnnCast.onnx_dynamic_ax = <参考ONNX章节>
+```
+然后需要设置如下ncnn的配置：
 ```python
 # NCNN的文件路径, ncnn.arch ncnn.bin
-config.cast.ncnn_model_dir = <your_ncnn_model_dir_only4smoketest>
+config.cast.NcnnCast.model_dir = <your_ncnn_model_dir_only4smoketest>
 # onnx2ncnn可执行文件的路径，https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86
-config.cast.onnx2ncnn = <your_onnx2ncnn_executable_file>
+config.cast.NcnnCast.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ```
 注意：
 - 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够成功转换为NCNN。之后，在每次保存PyTorch模型的时候，会同时保存NCNN。
@@ -238,25 +248,25 @@ config.cast.onnx2ncnn = <your_onnx2ncnn_executable_file>
 ### 输出CoreML（适用于train.py和test.py）
 如果要转换PyTorch模型到CoreML，你需要设置如下的配置：
 ```python
-config.cast.coreml_model_dir = <your_coreml_model_dir_only4smoketest>
-#trace_model_dir和script_model_dir二选一，必须打开其中之一
-config.cast.trace_model_dir = trace.pt
-config.cast.script_model_dir = script.pt
+config.cast.CoremlCast.model_dir = <your_coreml_model_dir_only4smoketest>
+#TraceCast.model_dir和ScriptCast.model_dir二选一，必须打开其中之一
+config.cast.TraceCast.model_dir = trace.pt
+config.cast.ScriptCast.model_dir = script.pt
 
 #该配置要么设置为'image'或'tensor',要么不设置，此时相当于'tensor'
-config.cast.coreml_input_type = None
+config.cast.CoremlCast.input_type = None
 
-#以下配置只有当coreml_input_type = 'image'时才需要配置
-config.cast.coreml_scale = 1.0 / (0.226 * 255.0)
-config.cast.coreml_color_layout = 'BGR'
-config.cast.coreml_blue_bias = -0.406 / 0.226
-config.cast.coreml_green_bias = -0.456 / 0.226
-config.cast.coreml_red_bias = -0.485 / 0.226
+#以下配置只有当CoremlCast.input_type = 'image'时才需要配置
+config.cast.CoremlCast.scale = 1.0 / (0.226 * 255.0)
+config.cast.CoremlCast.color_layout = 'BGR'
+config.cast.CoremlCast.blue_bias = -0.406 / 0.226
+config.cast.CoremlCast.green_bias = -0.456 / 0.226
+config.cast.CoremlCast.red_bias = -0.485 / 0.226
 
 #可以不设置
-config.cast.coreml_minimum_deployment_target = coremltools.target.iOS13
+config.cast.CoremlCast.minimum_deployment_target = coremltools.target.iOS13
 #如果类别多，使用代码初始化这个值
-config.cast.coreml_classfier_config = ["cls1","cls2","cls3","cls4","cls5","cls6"]
+config.cast.CoremlCast.classfier_config = ["cls1","cls2","cls3","cls4","cls5","cls6"]
 ```
 注意：
 - 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
@@ -264,15 +274,15 @@ config.cast.coreml_classfier_config = ["cls1","cls2","cls3","cls4","cls5","cls6"
 - 在test.py下，<your_coreml_model_dir_only4smoketest> 为CoreML模型输出路径。
 
 ### 输出TensorRT（适用于train.py和test.py）
-如果要转换PyTorch模型到TensorRT，你需要设置如下的配置：
+因为转换TensorRT依赖ONNX，所以需要先设置ONNX的配置：
 ```python
-config.cast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
-config.cast.trt_model_dir = <your_trt_model_dir_only4smoketest>
-
-# 动态输入下的onnx配置和TensorRT配置
-# 需要配置onnx需要支持的动态输入/动态输出的数据维度, 可以参考上面的 输出ONNX模型
-config.cast.onnx_input_names = ["input"]
-config.cast.onnx_output_names = ["output"]
+#输出config.onnx_model_dir
+config.cast.TensorrtCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+#默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
+config.cast.TensorrtCast.onnx_version = 9
+config.cast.TensorrtCast.onnx_input_names = ["input"]
+config.cast.TensorrtCast.onnx_output_names = ["output"]
+#当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
 config.cast.onnx_dynamic_ax = {
             'input': {
                 0: 'batch_size',
@@ -287,10 +297,14 @@ config.cast.onnx_dynamic_ax = {
                 3: 'output_width'
         }
     }
+```
+然后需要设置如下的配置：
+```python
+config.cast.TensorrtCast.model_dir = <your_trt_model_dir_only4smoketest>
 # 需要配置图片的最小输入尺寸，最大输入尺寸和最优尺寸
-config.cast.trt_input_min_dims = (1, 3, 1, 1)
-config.cast.trt_input_opt_dims = (1, 3, 640, 640)
-config.cast.trt_input_max_dims = (1, 3, 2000, 2000)
+config.cast.TensorrtCast.input_min_dims = (1, 3, 1, 1)
+config.cast.TensorrtCast.input_opt_dims = (1, 3, 640, 640)
+config.cast.TensorrtCast.input_max_dims = (1, 3, 2000, 2000)
 
 ```
 注意：
@@ -318,32 +332,28 @@ config.core.amp = True
 #### 动态量化（适用于train.py和test.py）
 要开启动态量化，你需要设置如下的配置：
 ```python
-config.cast.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+config.cast.TraceCast.model_dir = <your_trace_model_dir_only4smoketest>
+config.cast.TraceCast.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+#或者
+config.cast.ScriptCast.model_dir = <your_script_model_dir_only4smoketest>
+config.cast.ScriptCast.dynamic_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 ```
-注意：开启动态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。
+
 
 #### 静态量化（适用于train.py和test.py）
 要开启静态量化，你需要设置如下配置：
 ```python
-config.cast.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+config.cast.TraceCast.model_dir = <your_trace_model_dir_only4smoketest>
+config.cast.TraceCast.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
+#或者
+config.cast.ScriptCast.model_dir = <your_script_model_dir_only4smoketest>
+config.cast.ScriptCast.static_quantize_dir = <your_quantize_model_output_dir_only4smoketest>
 
 # backend 为可选，默认为fbgemm
-config.cast.quantize_backend = <'fbgemm' | 'qnnpack'>
+config.cast.TraceCast.quantize_backend = <'fbgemm' | 'qnnpack'>
+#或者
+config.cast.ScriptCast.quantize_backend = <'fbgemm' | 'qnnpack'>
 ```
-注意：开启静态量化需要首先开启trace_model_dir或者script_model_dir或者都开启。
 
 #### 量化感知训练(QAT，仅适用于train.py)
-开启QAT后，整个训练任务的self.net就会转变为量化模型。也即所有trace、script、onnx、ncnn、coreml、amp等作用的对象已经变为量化感知模型。
-要开启QAT，你需要设置如下配置：
-```python
-config.cast.qat_dir = <your_quantize_model_output_dir_only4smoketest>
-
-# backend 为可选，默认为fbgemm
-config.cast.quantize_backend = <'fbgemm' | 'qnnpack'>
-```
-
-注意：
 - **由于上游PyTorch相关功能的缺失，该功能还不完善。Deepvac已经删除了此开关，将在之后的版本中择机加回来。**
-- 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试。也就是测试网络是否能够量化成功。之后，在每次保存PyTorch模型的时候，会同时保存量化模型（QAT有点特殊，直接替换了之前的模型）。
-- 在train.py下，<your_quantize_model_output_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
-- 在test.py下（如果支持的话），<your_quantize_model_output_dir_only4smoketest> 为量化模型输出路径。

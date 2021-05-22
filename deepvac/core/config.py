@@ -41,14 +41,13 @@ def new():
     config.core = AttrDict()
     config.feature = AttrDict()
     config.aug = AttrDict()
-    config.composer = AttrDict()
     config.cast = AttrDict()
     config.backbones = AttrDict()
     config.loss = AttrDict()
     config.datasets = AttrDict()
     return config
 
-def fork(deepvac_config, field=['aug','datasets','composer']):
+def fork(deepvac_config, field=['aug','datasets']):
     if not isinstance(field, list):
         field = [field]
     c = new()

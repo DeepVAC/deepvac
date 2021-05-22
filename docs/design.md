@@ -24,7 +24,7 @@
 
 使用DeepvacTrain类体系是很简单的，这里说下如何自定义扩展。比如我现在要封装一个蒸馏训练范式，我可以这么做：
 ```python
-from .deepvac import DeepvacTrain
+from deepvac import DeepvacTrain
 
 #use config.train.teacher to represent teacher net.
 class DeepvacDistill(DeepvacTrain):
@@ -46,10 +46,90 @@ class DeepvacDistill(DeepvacTrain):
 
 再比如，gemfield也在设计一个量化感知训练的范式，但是由于pytorch的fx模块对这块支持还不成熟，只能是在内部实验，甚至还无法放到experimental模块。总之，不管怎么说，DeepvacTrain类体系 + config.py 就代表了各种PyTorch模型训练的范式。
 
+# config-module
+因为config在deepvac库中的核心作用，我们还特别设计了几个API来方便用户对config的使用：
+```python
+from deepvac import config, AttrDict, new, interpret, fork
+```
+
+### config实例
+config是deepvac库初始化后默认内置的AttrDict实例，并且为deepvac的每个模块初始化了一个命名空间，相当于：
+```python
+config = AttrDict()
+config.core = AttrDict()
+config.feature = AttrDict()
+config.aug = AttrDict()
+config.cast = AttrDict()
+config.backbones = AttrDict()
+config.loss = AttrDict()
+config.datasets = AttrDict()
+```
+
+### new
+new() API创建出一个全新的config实例，且为deepvac的每个模块初始化了一个命名空间:
+```python
+myconfig = new()
+```
+相当于：
+```python
+myconfig = AttrDict()
+myconfig.core = AttrDict()
+myconfig.feature = AttrDict()
+myconfig.aug = AttrDict()
+myconfig.cast = AttrDict()
+myconfig.backbones = AttrDict()
+myconfig.loss = AttrDict()
+myconfig.datasets = AttrDict()
+```
+
+### clone
+AttrDict.clone()将一个AttrDict的实例的内容克隆并赋值给另外一个AttrDict，这是深拷贝，内容不共享：
+```python
+myconfig = new()
+myconfig.aug = config.aug.clone()
+```
+使用config.aug的内容初始化myconfig.aug，且内容在两者之间不共享。注意，config.aug中如果某个字段包含不可序列化的内容，则该字段上会使用空的AttrDict来初始化myconfig.aug对应的字段。
+
+### interpret
+创建config实例嵌套字段的快捷方式：
+```python
+x = interpret('x.f1.f2.f3.f4.f5.f6.f7')
+x.f1.f2.f3.f4.f5.f6.f7.name = 'gemfield'
+#相当于
+x = AttrDict()
+x.f1 = AttrDict()
+x.f1.f2 = AttrDict()
+x.f1.f2.f3 = AttrDict()
+x.f1.f2.f3.f4 = AttrDict()
+x.f1.f2.f3.f4.f5 = AttrDict()
+x.f1.f2.f3.f4.f5.f6 = AttrDict()
+x.f1.f2.f3.f4.f5.f6.f7 = AttrDict()
+x.f1.f2.f3.f4.f5.f6.f7.name = 'gemfield'
+```
+
+### fork
+clone() API的快捷使用方式
+```python
+myconfig = fork(config)
+#相当于
+myconfig = new()
+myconfig.aug = config.aug.clone()
+myconfig.datasets = config.datasets.clone()
+```
+还可以传递参数：
+```python
+myconfig = fork(config, ['backbones','loss','core'])
+#相当于
+myconfig = new()
+myconfig.backbones = config.backbones.clone()
+myconfig.loss = config.loss.clone()
+myconfig.core = config.core.clone()
+```
+
 # aug
 deepvac.aug模块为数据增强设计了特有的语法，在两个层面实现了复用：aug 和 composer。比如说，我想复用添加随机斑点的SpeckleAug：
 ```python
-from deepvac.aug.base_aug import SpeckleAug
+from deepvac.aug import SpeckleAug
 ```
 
 这是对底层aug算子的复用。我们还可以直接复用别人写好的composer，并且是以直截了当的方式。比如deepvac.aug提供了一个用于人脸检测数据增强的composer：
@@ -119,8 +199,8 @@ if __name__ == '__main__':
     from torchvision import transforms
     deepvac_config.aug.GemfieldAug = AttrDict()
     deepvac_config.aug.GemfieldAug.gemfield_age = 20
-    deepvac_config.composer.GemfieldAugFactory = AttrDict()
-    deepvac_config.composer.GemfieldAugFactory.trans1 = transforms.Compose([
+    deepvac_config.aug.GemfieldAugFactory = AttrDict()
+    deepvac_config.aug.GemfieldAugFactory.trans1 = transforms.Compose([
           transforms.RandomHorizontalFlip(),
           transforms.ToTensor(),
           transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),

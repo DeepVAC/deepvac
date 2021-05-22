@@ -11,10 +11,10 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 数据集划分为如下四种：
 |  名称      |  说明   | 和训练集分布一致？  |来源 | 准备人员 | 维护在 |
 |------------|---------|---------|---------|---------|---------|
-| 训练集| 基础标注数据中划分80% ~ 90%| 是 |公开数据集/自行标注| 算法人员 | 维护在MLab:/opt/|
-| 验证集| 基础标注数据中划分10% ~ 20%| 是 |公开数据集/自行标注| 算法人员 |维护在MLab:/opt/|
-| 测试集| 用来对模型做初步测试   | 否 |公开数据集/自行标注| 算法人员 |维护在MLab:/opt/|
-| 验收集| 用来对模型做终极测试| 否|业务场景中真实数据的标注，其分布对算法人员不可见| 验收人员| 维护在MLab:/opt/|
+| 训练集| 基础标注数据中划分80% ~ 90%| 是 |公开数据集/自行标注| 算法人员 | 维护在MLab RookPod 存储上|
+| 验证集| 基础标注数据中划分10% ~ 20%| 是 |公开数据集/自行标注| 算法人员 |维护在MLab RookPod 存储上|
+| 测试集| 用来对模型做初步测试   | 否 |公开数据集/自行标注| 算法人员 |维护在MLab RookPod 存储上|
+| 验收集| 用来对模型做终极测试| 否|业务场景中真实数据的标注，其分布对算法人员不可见| 验收人员| 维护在MLab RookPod 存储上|
 
 ## 代码
 包含如下三个方面：
@@ -47,7 +47,7 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 
 并且最终需要满足：
 - 在验收集上的指标必须符合要求；
-- 各种SOTA模型要维护在MLab:/opt/；
+- 各种SOTA模型要维护在MLab RookPod 存储上；
 - 报告要记录在deepvac-product项目页上。报告格式如下： 
 
 dataset: <验收集的名称>  
@@ -61,10 +61,12 @@ date: <测试日期>
 
 #### 部署目标为x86+CUDA Linux的训练
 开启如下开关：
-- config.core.script_model_dir（必须）
-- config.core.trace_model_dir（可选）
-- config.core.static_quantize_dir（必须）
-- config.core.dynamic_quantize_dir（可选）
+- config.cast.ScriptCast.model_dir（必须）
+- config.cast.TraceCast.model_dir（可选）
+- config.cast.ScriptCast.static_quantize_dir（必须）
+- config.cast.ScriptCast.dynamic_quantize_dir（可选）
+- config.cast.TraceCast.static_quantize_dir（必须）
+- config.cast.TraceCast.dynamic_quantize_dir（可选）
 - config.core.ema（可选）
 - config.core.tensorboard_*（可选）
 - config.core.amp（可选）
@@ -74,9 +76,9 @@ date: <测试日期>
 #### 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
 在部署目标为x86+CUDA Linux的训练基础上，开启如下开关：
 - config.core.qat_dir（必须，该功能还未开发完毕）
-- config.core.onnx_model_dir（可选，需要ONNX时开启）
-- config.core.ncnn_model_dir, config.core.onnx2ncnn（可选，需要NCNN时开启）
-- config.core.coreml_model_dir, config.core.coreml_preprocessing_args（可选，需要CoreML时开启）
+- config.cast.OnnxCast.onnx_model_dir（可选，需要ONNX时开启）
+- config.cast.NcnnCast.model_dir, config.cast.NcnnCast.onnx2ncnn（可选，需要NCNN时开启）
+- config.cast.CoremlCast.model_dir（可选，需要CoreML时开启）
 
 ## 部署方式
 所有的AI产品默认进行3种部署测试：
@@ -98,8 +100,8 @@ date: <测试日期>
 |Arm Linux   | App + libdeepvac.so | libdeepvac.so大小 | 否|
 
 测试成功后：
-- Docker镜像维护在ai5.gemfield.org上；
-- 库维护在MLab:/opt/；
+- Docker镜像维护在MLab docker registry上；
+- 库维护在MLab RookPod 存储上；
 
 ## DeepVAC checklist
 请访问：[DeepVAC checklist (检查单)](./deepvac_checklist.md)

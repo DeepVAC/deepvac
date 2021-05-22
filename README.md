@@ -58,9 +58,13 @@ sys.path.insert(0,'/home/gemfield/github/deepvac')
 Deepvac的config模块内置了如下的配置，而且用户一般不需要修改（如果想修改也可以）：
 ```python
 ## ------------------ common ------------------
+#模型输入路径，用户无特殊情况不要修改
 config.core.output_dir = "output"
+#日志存放目录
 config.core.log_dir = "log"
+#每多少次迭代打印一行日志
 config.core.log_every = 10
+#停止对git分支检测结果做出响应
 config.core.disable_git = False
 #使用模型转换器的时候，网络和input是否要to到cpu上
 config.core.cast2cpu = True
@@ -149,7 +153,6 @@ config.core.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.core.optimiz
 
 以及关于配置文件的更详细解释，请阅读[config说明](./docs/config.md).
 
-
 项目根目录下的train.py中用如下方式引用config.py文件:
 
 ```python
@@ -181,7 +184,15 @@ print(self.config.log_dir)
 print(self.config.batch_size)
 ......
 ```
-
+此外，鉴于config的核心作用，deepvac还设计了如下的API来方便对config模块的使用：
+- AttrDict
+- new
+- interpret
+- fork
+```python
+from deepvac import config, AttrDict, new, interpret, fork
+```
+关于这些API的使用方法，请访问[config API 说明](./docs/design.md#config-module).
 ## 6. 编写synthesis/synthesis.py（可选）
 编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
 这一步为可选，如果有需要的话，可以参考Deepvac组织下Synthesis2D项目的实现。
