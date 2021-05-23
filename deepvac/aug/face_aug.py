@@ -1,21 +1,15 @@
 import cv2
 import numpy as np
 import random
-from .base_aug import CvAugBase
+from .base_aug import CvAugBase2
 
 # 随机旋转（针对于人脸关键点任务）
-class RandomRotateFacialKpListAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(RandomRotateFacialKpListAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
+class RandomRotateFacialKpListAug(CvAugBase2):
     # img: include 2 element
     # img[0] -> img
     # img[1] -> keypoint info (scale to 0-1)
-    def __call__(self, img):
-        img,landmarks = self.auditInput(img, input_len=2)
+    def forward(self, img):
+        img,landmarks = img
         angle = random.choice([-13, -12, -11, -10, -9, -8, -7, -6, -5, 0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 11, 12, 13])
         h, w, _ = img.shape
         M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
@@ -30,13 +24,7 @@ class RandomRotateFacialKpListAug(CvAugBase):
         return [dest_img, dest_landmarks]
 
 # 随机水平翻转（针对于人脸关键点任务,关键点索引顺序等需要和deepvac人脸关键点索引顺序一致）
-class RandomFilpFacialKpListAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(RandomFilpFacialKpListAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
+class RandomFilpFacialKpListAug(CvAugBase2):
     def flipLandmark(self, dest_landmark, src_landmark, sequences):
         for sequence in sequences:
             for i in range(sequence[1], sequence[0] - 1, -1):
@@ -52,8 +40,8 @@ class RandomFilpFacialKpListAug(CvAugBase):
     # img: include 2 element
     # img[0] -> img
     # img[1] -> keypoint info(scale to 0-1)
-    def __call__(self, img):
-        img,landmarks = self.auditInput(img, input_len=2)
+    def forward(self, img):
+        img,landmarks = img
         h, w, _ = img.shape
         dest_img = cv2.flip(img, 1)
         flip_landmarks = []
@@ -75,10 +63,7 @@ class RandomFilpFacialKpListAug(CvAugBase):
 
         return [dest_img, dest_landmarks]
 
-class CropFacialWithBoxesAndLmksAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(CropFacialWithBoxesAndLmksAug, self).__init__(deepvac_config)
-
+class CropFacialWithBoxesAndLmksAug(CvAugBase2):
     def auditConfig(self):
         self.config.img_dim = self.addUserConfig('img_dim', self.config.img_dim, 640, True)
 
@@ -89,8 +74,8 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
         area_a = np.prod(a[:, 2:] - a[:, :2], axis=1)
         return area_i / np.maximum(area_a[:, np.newaxis], 1)
 
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -100,7 +85,6 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
         height, width, _ = image.shape
 
         for _ in range(250):
-
             PRE_SCALES = [0.3, 0.45, 0.6, 0.8, 1.0]
             scale = random.choice(PRE_SCALES)
             short_side = min(width, height)
@@ -133,7 +117,6 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
                 continue
 
             image_t = image[roi[1]:roi[3], roi[0]:roi[2]]
-
             boxes_t[:, :2] = np.maximum(boxes_t[:, :2], roi[:2])
             boxes_t[:, :2] -= roi[:2]
             boxes_t[:, 2:] = np.minimum(boxes_t[:, 2:], roi[2:])
@@ -144,7 +127,6 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
             landms_t[:, :, :2] = np.maximum(landms_t[:, :, :2], np.array([0, 0]))
             landms_t[:, :, :2] = np.minimum(landms_t[:, :, :2], roi[2:] - roi[:2])
             landms_t = landms_t.reshape([-1, 10])
-
 
             # make sure that the cropped image contains at least one face > 16 pixel at training image scale
             b_w_t = (boxes_t[:, 2] - boxes_t[:, 0] + 1) / w * self.config.img_dim
@@ -161,106 +143,62 @@ class CropFacialWithBoxesAndLmksAug(CvAugBase):
         return image, [boxes, landms, labels]
 
 
-class DistortFacialAugBase(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(DistortFacialAugBase, self).__init__(deepvac_config)
-
+class DistortFacialAugBase(CvAugBase2):
     def _convert(self, image, alpha=1, beta=0):
         tmp = image.astype(float) * alpha + beta
         tmp[tmp < 0] = 0
         tmp[tmp > 255] = 255
         image[:] = tmp
 
-    def auditConfig(self):
-        pass
-
 class BrightDistortFacialAug(DistortFacialAugBase):
-    def __init__(self, deepvac_config):
-        super(BrightDistortFacialAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-
         self._convert(image, beta=random.uniform(-32, 32))
-
         return image, label
 
 class ContrastDistortFacialAug(DistortFacialAugBase):
-    def __init__(self, deepvac_config):
-        super(ContrastDistortFacialAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-
         self._convert(image, alpha=random.uniform(0.5, 1.5))
-
         return image, label
 
 class SaturationDistortFacialAug(DistortFacialAugBase):
-    def __init__(self, deepvac_config):
-        super(SaturationDistortFacialAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         self._convert(image[:, :, 1], alpha=random.uniform(0.5, 1.5))
         image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
-
         return image, label
 
 class HueDistortFacialAug(DistortFacialAugBase):
-    def __init__(self, deepvac_config):
-        super(HueDistortFacialAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
         assert isinstance(label[2], np.ndarray) and label[2].ndim == 1, "label[2](labels) must be numpy.ndarray, and shape should be (n, )"
-
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         tmp = image[:, :, 0].astype(int) + random.randint(-18, 18)
         tmp %= 180
         image[:, :, 0] = tmp
         image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
-
         return image, label
 
-class MirrorFacialAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(MirrorFacialAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+class MirrorFacialAug(CvAugBase2):
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -286,15 +224,12 @@ class MirrorFacialAug(CvAugBase):
 
         return image, [boxes, landms, labels]
 
-class Pad2SquareFacialAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(Pad2SquareFacialAug, self).__init__(deepvac_config)
-
+class Pad2SquareFacialAug(CvAugBase2):
     def auditConfig(self):
         self.config.rgb_means = self.addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"
@@ -309,16 +244,13 @@ class Pad2SquareFacialAug(CvAugBase):
         image_t[0:0 + height, 0:0 + width] = image
         return image, label
 
-class ResizeSubtractMeanFacialAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(ResizeSubtractMeanFacialAug, self).__init__(deepvac_config)
-
+class ResizeSubtractMeanFacialAug(CvAugBase2):
     def auditConfig(self):
         self.config.img_dim = self.addUserConfig('img_dim', self.config.img_dim, 640, True)
         self.config.rgb_means = self.addUserConfig('rgb_means', self.config.rgb_means, (104, 117, 123))
 
-    def __call__(self, image):
-        image, label = self.auditInput(image, input_len=2)
+    def forward(self, img):
+        image, label = img
         assert isinstance(label, list) and len(label) == 3, "label must be list, and length should be 3"
         assert isinstance(label[0], np.ndarray) and label[0].ndim == 2, "label[0](boxes) must be numpy.ndarray, and shape should be (n, 4)"
         assert isinstance(label[1], np.ndarray) and label[1].ndim == 2, "label[1](landms) must be numpy.ndarray, and shape should be (n, 10)"

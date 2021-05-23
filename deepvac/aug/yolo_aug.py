@@ -2,20 +2,17 @@ import math
 import cv2
 import numpy as np
 import random
-from .base_aug import CvAugBase
+from .base_aug import CvAugBase2
 
 ### yolov5 dataset aug
-class HSVAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(HSVAug, self).__init__(deepvac_config)
-
+class HSVAug(CvAugBase2):
     def auditConfig(self):
         self.config.hgain = self.addUserConfig('hgain', self.config.hgain, 0.015)
         self.config.sgain = self.addUserConfig('sgain', self.config.sgain, 0.7)
         self.config.vgain = self.addUserConfig('vgain', self.config.vgain, 0.4)
 
-    def __call__(self, img):
-        img, label = self.auditInput(img, input_len=2)
+    def forward(self, img):
+        img, label = img
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
         dtype = img.dtype
@@ -29,47 +26,32 @@ class HSVAug(CvAugBase):
         cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)
         return img, label
 
-class YoloHFlipAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(YoloHFlipAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, img):
-        img, label = self.auditInput(img, input_len=2)
+class YoloHFlipAug(CvAugBase2):
+    def forward(self, img):
+        img, label = img
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.fliplr(img)
         if label.size:
             label[:, 1] = 1 - label[:, 1]
         return img, label
 
-class YoloVFlipAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(YoloVFlipAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, img):
-        img, label = self.auditInput(img, input_len=2)
+class YoloVFlipAug(CvAugBase2):
+    def forward(self, img):
+        img, label = img
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         img = np.flipud(img)
         if label.size:
             label[:, 2] = 1 - label[:, 2]
         return img, label
 
-class YoloPerspectiveAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(YoloPerspectiveAug, self).__init__(deepvac_config)
-        self.border = deepvac_config.border
-
+class YoloPerspectiveAug(CvAugBase2):
     def auditConfig(self):
         self.config.scale = self.addUserConfig('scale', self.config.scale, 0.5)
         self.config.shear = self.addUserConfig('shear', self.config.shear, 0.0)
         self.config.degrees = self.addUserConfig('degrees', self.config.degrees, 0.0)
         self.config.translate = self.addUserConfig('translate', self.config.translate, 0.1)
         self.config.perspective = self.addUserConfig('perspective', self.config.perspective, 0.0)
+        self.config.border = self.addUserConfig('border', self.config.border, -9999, True)
 
     def _box_candidates(self, box1, box2, wh_thr=2, ar_thr=20, area_thr=0.1):
         w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
@@ -77,11 +59,11 @@ class YoloPerspectiveAug(CvAugBase):
         ar = np.maximum(w2 / (h2 + 1e-16), h2 / (w2 + 1e-16))
         return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr) & (ar < ar_thr)
 
-    def __call__(self, img):
-        img, label = self.auditInput(img, input_len=2)
+    def forward(self, img):
+        img, label = img
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
 
-        border = self.border
+        border = self.config.border
         h, w, c = img.shape
 
         width = int(w + border[1] * 2)
@@ -173,19 +155,13 @@ class YoloPerspectiveAug(CvAugBase):
         return img, label
 
 
-class YoloNormalizeAug(CvAugBase):
-    def __init__(self, deepvac_config):
-        super(YoloNormalizeAug, self).__init__(deepvac_config)
-
-    def auditConfig(self):
-        pass
-
-    def __call__(self, img):
+class YoloNormalizeAug(CvAugBase2):
+    def forward(self, img):
         '''
             1. [cls, x1, y1, x2, y2] -> [cls, cx, cy, w, h]
             2. cx, w normalized by img width, cy, h normalized by img height
         '''
-        img, label = self.auditInput(img, input_len=2)
+        img, label = img
         assert isinstance(label, np.ndarray) and label.ndim == 2, "label must be numpy.ndarray, and shape should be (n, 5)"
         if not label.size:
             return img, label

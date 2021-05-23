@@ -165,7 +165,7 @@ class GemfieldAug(CvAugBase):
     def auditConfig(self):
         self.config.gemfield_age = addUserConfig('gemfield_age', self.config.gemfield_age, 18)
 
-    def __call__(self, img):
+    def forward(self, img):
         LOG.logI("gemfield age {} and shape: {}".format(self.config.gemfield_age, img.shape))
 ```
 其次实现自己的factory（我把它命名为GemfieldFactory），把自己的aug放到factory里面。在aug/aug.py中，需要继承AugFactory，然后重新实现initProducts方法：

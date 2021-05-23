@@ -2,27 +2,21 @@ import cv2
 import numpy as np
 import random
 import torch
-from .base_aug import CvAugBase
+from .base_aug import CvAugBase2
 
-class ImageWithMasksRandomHorizontalFlipAug(CvAugBase):
-    def auditConfig(self):
-        self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
-
-    def __call__(self, imgs):
-        imgs = self.auditInput(imgs, input_len=self.config.input_len)
+class ImageWithMasksRandomHorizontalFlipAug(CvAugBase2):
+    def forward(self, imgs):
         for i in range(len(imgs)):
             imgs[i] = np.flip(imgs[i], axis=1)
         return imgs
 
-class ImageWithMasksRandomRotateAug(CvAugBase):
+class ImageWithMasksRandomRotateAug(CvAugBase2):
     def auditConfig(self):
         self.config.max_angle = self.addUserConfig('max_angle', self.config.max_angle, 10)
         self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
         self.config.label_bg_color = self.addUserConfig('label_bg_color', self.config.label_bg_color, (0, 0, 0))
 
-    def __call__(self, imgs):
-        imgs = self.auditInput(imgs, input_len=self.config.input_len)
-        # angle
+    def forward(self, imgs):
         angle = random.random() * 2 * self.config.max_angle - self.config.max_angle
         # fill color
         if isinstance(self.config.fill_color, (tuple, list)):
@@ -46,16 +40,14 @@ class ImageWithMasksRandomRotateAug(CvAugBase):
             imgs[i] = cv2.warpAffine(imgs[i], rotation_matrix, (h, w), borderValue=self.config.label_bg_color)
         return imgs
 
-class ImageWithMasksRandom4TextCropAug(CvAugBase):
+class ImageWithMasksRandom4TextCropAug(CvAugBase2):
     def auditConfig(self):
         self.config.p = self.addUserConfig('p', self.config.p, 3.0 / 8.0)
         self.config.img_size = self.addUserConfig('img_size', self.config.img_size, 224)
         self.config.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
 
-    def __call__(self, imgs):
-        imgs = self.auditInput(imgs, input_len=self.config.input_len)
+    def forward(self, imgs):
         h, w, _ = imgs[0].shape
-
         if max(h, w) <= self.config.img_size:
             return imgs
 
@@ -85,20 +77,20 @@ class ImageWithMasksRandom4TextCropAug(CvAugBase):
                 imgs[idx] = imgs[idx][i:i + th, j:j + tw]
         return imgs
 
-class ImageWithMasksScaleAug(CvAugBase):
+class ImageWithMasksScaleAug(CvAugBase2):
     def auditConfig(self):
         self.config.w = self.addUserConfig('w', self.config.w, 384, True)
         self.config.h = self.addUserConfig('h', self.config.h, 384, True)
 
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+    def forward(self, imgs):
+        img, label = imgs
         img = cv2.resize(img, (self.config.w, self.config.h))
         label = cv2.resize(label, (self.config.w, self.config.h), interpolation=cv2.INTER_NEAREST)
         return [img, label]
 
-class ImageWithMasksSafeCropAug(CvAugBase):
-    def __call__(self, imgs):
-       img, label = self.auditInput(imgs, input_len=2)
+class ImageWithMasksSafeCropAug(CvAugBase2):
+    def forward(self, imgs):
+       img, label = imgs
        h, w = img.shape[:2]
 
        xmin, ymin, xmax, ymax = self.getXY(label)
@@ -117,12 +109,12 @@ class ImageWithMasksSafeCropAug(CvAugBase):
         ymax, xmax = coord[0].max(), coord[1].max()
         return xmin, ymin, xmax, ymax
 
-class ImageWithMasksCenterCropAug(CvAugBase):
+class ImageWithMasksCenterCropAug(CvAugBase2):
     def auditConfig(self):
         self.config.max_crop_ratio = self.addUserConfig('max_crop_ratio', self.config.max_crop_ratio, 0.1)
 
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+    def forward(self, imgs):
+        img, label = imgs
         h, w = img.shape[:2]
         x1 = random.randint(0, int(w*self.config.max_crop_ratio)) # 25% to 10%
         y1 = random.randint(0, int(h*self.config.max_crop_ratio))
@@ -132,27 +124,27 @@ class ImageWithMasksCenterCropAug(CvAugBase):
 
         return [img_crop, label_crop]
 
-class ImageWithMasksHFlipAug(CvAugBase):
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+class ImageWithMasksHFlipAug(CvAugBase2):
+    def forward(self, imgs):
+        img, label = imgs
         img = cv2.flip(img, 1) # horizontal flip
         label = cv2.flip(label, 1) # horizontal flip
         return [img, label]
 
-class ImageWithMasksVFlipAug(CvAugBase):
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+class ImageWithMasksVFlipAug(CvAugBase2):
+    def forward(self, imgs):
+        img, label = imgs
         img = cv2.flip(img, 0) # veritcal flip
         label = cv2.flip(label, 0)  # veritcal flip
         return [img, label]
 
-class ImageWithMasksNormalizeAug(CvAugBase):
+class ImageWithMasksNormalizeAug(CvAugBase2):
     def auditConfig(self):
         self.config.mean = self.addUserConfig('mean', self.config.mean,  [137.98341,142.35637,150.78705], True)
         self.config.std = self.addUserConfig('std', self.config.std, [62.98702,63.34315,62.743645], True)
 
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+    def forward(self, imgs):
+        img, label = imgs
         img = img.astype(np.float32)
         for i in range(3):
             img[:,:,i] -= self.config.mean[i]
@@ -160,13 +152,13 @@ class ImageWithMasksNormalizeAug(CvAugBase):
             img[:,:, i] /= self.config.std[i]
         return [img, label]
 
-class ImageWithMasksToTensorAug(CvAugBase):
+class ImageWithMasksToTensorAug(CvAugBase2):
     def auditConfig(self):
         self.config.scale = self.addUserConfig('scale', self.config.scale, 1)
         self.config.force_div255 = self.addUserConfig('force_div255', self.config.force_div255, True)
 
-    def __call__(self, imgs):
-        img, label = self.auditInput(imgs, input_len=2)
+    def forward(self, imgs):
+        img, label = imgs
 
         if self.config.scale != 1:
             h, w = label.shape[:2]
