@@ -65,7 +65,6 @@ class AugBase(object):
             img = list(img)
 
         if isinstance(img, list):
-            assert len(img) == self.input_len, "input list/tuple must has {} items for Aug class {}".format(self.input_len, self.name())
             img[0] = self.auditImg(img[0])
             return img
 
