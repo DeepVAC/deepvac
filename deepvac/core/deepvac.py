@@ -402,7 +402,8 @@ class DeepvacTrain(Deepvac):
     def initTrainLoader(self):
         if self.config.train_loader is None:
             LOG.logE("You must set config.core.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass {}.".format(self.name()), exit=True)
-        LOG.logI("You set config.core.train_loader to {} in config.py".format(self.config.train_loader)) 
+        LOG.logI("You set config.core.train_loader to {} in config.py".format(self.config.train_loader))
+        self.config.loader = self.config.train_loader
 
     def initValLoader(self):
         if self.config.val_loader is None:
@@ -554,6 +555,8 @@ class DeepvacTrain(Deepvac):
         self.config.net.train()
         self.initStepAndSaveNumber()
         self.initTickTock()
+        #for multi loader user case
+        self.config.loader = self.config.train_loader
         self.preEpoch()
         self._preEpoch()
         self.doIterTick()
