@@ -18,7 +18,7 @@ try:
 except ImportError:
     LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
-from ..utils import syszux_once, LOG, assertAndGetGitBranch, getPrintTime, AverageMeter
+from ..utils import syszux_once, LOG, assertAndGetGitBranch, getPrintTime, AverageMeter, anyFieldsInConfig
 from ..cast import export3rd
 
 #deepvac implemented based on PyTorch Framework
@@ -108,15 +108,38 @@ class Deepvac(object):
 
     def castStateDict(self, config):
         LOG.logI("model_reinterpret_cast set to True in config.py, Try to reinterpret cast the model")
+
+        if self.config.model_path_omit_keys:
+            LOG.logI("You have set config.core.model_path_omit_keys: {}".format(self.config.model_path_omit_keys))
+            for k in self.config.model_path_omit_keys:
+                LOG.logI("remove key {} from config.core.model_path {}".format(k, self.config.model_path))
+                config.state_dict.pop(k, None)
+
         state_dict = collections.OrderedDict()
         keys = list(config.state_dict.keys())
-        for idx, name in enumerate(config.net.state_dict()):
-            if config.net.state_dict()[name].size() == config.state_dict[keys[idx]].size():
-                LOG.logI("cast pretrained model [{}] => config.core.net [{}]".format(keys[idx], name))
-                state_dict[name] = config.state_dict[keys[idx]]
+        model_path_keys_len = len(keys)
+        if len(config.net.state_dict() ) > model_path_keys_len:
+            LOG.logW("config.core.net has more parameters than config.core.model_path({}), may has cast issues.".format(self.config.model_path))
+
+        real_idx = 0
+        for _, name in enumerate(config.net.state_dict()):
+            if real_idx >= model_path_keys_len:
+                LOG.logI("There alreay has no corresponding parameter in {} for {}".format(self.config.model_path, name))
                 continue
-            LOG.logE("cannot cast pretrained model [{}] => config.net [{}] due to parameter shape mismatch!".format(keys[idx], name))
+
+            if anyFieldsInConfig(name, self.config.net_omit_keys, self.config.net_omit_keys_strict):
+                LOG.logI('found key to omit in config.core.net: {}, continue...'.format(name))
+                continue
+  
+            if config.net.state_dict()[name].size() == config.state_dict[keys[real_idx]].size():
+                LOG.logI("cast pretrained model [{}] => config.core.net [{}]".format(keys[real_idx], name))
+                state_dict[name] = config.state_dict[keys[real_idx]]
+                real_idx += 1
+                continue
+
+            LOG.logE("cannot cast pretrained model [{}] => config.net [{}] due to parameter shape mismatch!".format(keys[real_idx], name))
             if config.cast_state_dict_strict is False:
+                real_idx += 1
                 continue
             LOG.logE("If you know above risk, set cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
             

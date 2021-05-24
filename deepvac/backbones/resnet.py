@@ -270,6 +270,7 @@ class ResNet50Test(Deepvac):
 
 def auditConfig():
     config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    config.cast.ScriptCast = AttrDict()
     config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
 
     config.core.disable_git = True
@@ -279,7 +280,7 @@ def auditConfig():
     config.core.log_every = 100
     config.core.num_workers = 4
 
-    config.core.net = ResNet50() # ResNet50() / resnet50()
+    config.core.net = ResNet50()
 
     config.core.optimizer = optim.SGD(
         config.core.net.parameters(),
@@ -289,6 +290,7 @@ def auditConfig():
         nesterov=False
     )
     config.core.scheduler = optim.lr_scheduler.MultiStepLR(config.core.optimizer, [50, 70, 90], 0.1)
+    config.core.criterion=torch.nn.CrossEntropyLoss()
     
     config.core.shuffle = True
     config.core.batch_size = 1
@@ -325,6 +327,7 @@ if __name__ == "__main__":
         
         config.core.val_dataset = FileLineDataset(config, fileline_path=sys.argv[5], sample_path_prefix=sys.argv[3])
         config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, batch_size=1, pin_memory=False)
+        config.core.test_loader = ''
         train = ResNet50Train(config)
         train()
 
@@ -333,18 +336,23 @@ if __name__ == "__main__":
             LOG.logE("Usage: python -m deepvac.backbones.resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
 
         config.core.model_path = sys.argv[2]
-        config.cast.ScriptCast.model_dir = ""
+        config.cast.ScriptCast.model_dir = "./script.pt"
         config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
         config.core.test_dataset = ResnetClsTestDataset(config, sample_path=sys.argv[3])
         config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
         test = ResNet50Test(config)
         input_tensor = torch.rand(1,3,640,640)
-        test(input_tensor)
+        test()
 
     if op == 'benchmark':
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.backbones.resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
 
+        config.core.model_reinterpret_cast = False
+        config.core.cast_state_dict_strict = False
+        # config.core.net_omit_keys = ['num_batches_tracked']
+        # config.core.net_omit_keys_strict = False
+        # config.core.network_audit_disabled=False
         config.core.model_path = sys.argv[2]
         config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         img_path = sys.argv[3]
