@@ -267,6 +267,7 @@ class ResNet50Test(Deepvac):
             max_res = torch.max(softmaxs, dim=1)
             max_probability, max_index = max_res
             LOG.logI("path: {}, max_probability:{}, max_index:{}".format(path[0], max_probability.item(), max_index.item()))
+        self.config.sample = input_tensor
 
 def auditConfig():
     config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -280,7 +281,7 @@ def auditConfig():
     config.core.log_every = 100
     config.core.num_workers = 4
 
-    config.core.net = ResNet50()
+    config.core.net = resnet50(pretrained=True)
 
     config.core.optimizer = optim.SGD(
         config.core.net.parameters(),
@@ -334,7 +335,7 @@ if __name__ == "__main__":
     if op == 'test':
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.backbones.resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
-
+        #config.core.network_audit_disabled=True
         config.core.model_path = sys.argv[2]
         config.cast.ScriptCast.model_dir = "./script.pt"
         config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
@@ -348,11 +349,10 @@ if __name__ == "__main__":
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.backbones.resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
 
-        config.core.model_reinterpret_cast = False
-        config.core.cast_state_dict_strict = False
+        # config.core.model_reinterpret_cast = False
+        # config.core.cast_state_dict_strict = False
         # config.core.net_omit_keys = ['num_batches_tracked']
         # config.core.net_omit_keys_strict = False
-        # config.core.network_audit_disabled=False
         config.core.model_path = sys.argv[2]
         config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         img_path = sys.argv[3]

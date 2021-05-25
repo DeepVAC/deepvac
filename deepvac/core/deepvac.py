@@ -261,7 +261,10 @@ class Deepvac(object):
         LOG.logI("You did not provide input with config.core.sample...")
         
         LOG.logI("testFly() is your last chance, you must have already reimplemented testFly() in subclass {}, right?".format(self.name()))
-        return self.testFly()
+        x = self.testFly()
+        if self.config.sample is None:
+            LOG.logE("You must set self.config.sample in testFly() reimplementation in your subclass {}".format(self.name()), exit=True)
+        return x
 
     def __call__(self, input_tensor=None):
         self.auditConfig()
