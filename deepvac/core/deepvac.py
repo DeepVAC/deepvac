@@ -299,9 +299,9 @@ class deepvac_val_mode(object):
 
 #base class for train pipeline    
 class DeepvacTrain(Deepvac):
-    def __init__(self, deepvac_core_config):
-        deepvac_core_config.is_forward_only=False
-        super(DeepvacTrain, self).__init__(deepvac_core_config)
+    def __init__(self, deepvac_config):
+        deepvac_config.core.is_forward_only=False
+        super(DeepvacTrain, self).__init__(deepvac_config)
         self.initTrainContext()
 
     def auditConfig(self):
@@ -622,8 +622,8 @@ class DeepvacTrain(Deepvac):
         self.process()
 
 class DeepvacDDP(DeepvacTrain):
-    def __init__(self, deepvac_core_config):
-        super(DeepvacDDP,self).__init__(deepvac_core_config)
+    def __init__(self, deepvac_config):
+        super(DeepvacDDP,self).__init__(deepvac_config)
         assert self.config.train_sampler is not None, "You should define config.core.train_sampler in config.py when training with DDP mode."
 
     def initDevice(self):

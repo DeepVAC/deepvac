@@ -122,6 +122,18 @@ class PilAugBase(AugBase):
 
         LOG.logE("PilAugBase subclass {} expect PIL.Image as input, make sure you read img with PIL.".format(self.name()), exit=True)
 
+class TensorAugBase(AugBase):
+    #only make sure tuple to list
+    def auditInput(self, img):
+        if isinstance(img, tuple):
+            img = list(img)
+        return img
+
+class TensorAugBase2(TensorAugBase):
+    def __init__(self, deepvac_config):
+        super(TensorAugBase2, self).__init__(deepvac_config)
+        self.input_len = self.addUserConfig('input_len', self.config.input_len, 2)
+
 class Cv2PilAug(CvAugBase):
     def forward(self, img):
         return self.cv2pillow(img)
