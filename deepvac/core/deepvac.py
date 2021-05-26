@@ -322,6 +322,7 @@ class DeepvacTrain(Deepvac):
     def initTrainContext(self):
         self.config.epoch = 0
         self.config.iter = 0
+        self.config.is_train = True
         self.config.scaler = GradScaler()
         self.config.loader_time = AverageMeter()
         self.config.train_time = AverageMeter()
