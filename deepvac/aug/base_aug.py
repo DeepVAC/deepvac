@@ -104,7 +104,7 @@ class CvAugBase(AugBase):
             assert img.ndim == 3, "image must has 3 channels rather than {}.".format(img.ndim)
             return img
 
-        LOG.logE("CvAugBase subclass {} expect numpy ndarray as input, make sure you read img with cv2.".format(self.name()), exit=True)
+        LOG.logE("CvAugBase subclass {} expect numpy ndarray as input, make sure you read img with cv2 :{}".format(self.name(), type(img)), exit=True)
 
 class CvAugBase2(CvAugBase):
     def __init__(self, deepvac_config):
@@ -120,7 +120,7 @@ class PilAugBase(AugBase):
         if self.isPil(img):
             return img
 
-        LOG.logE("PilAugBase subclass {} expect PIL.Image as input, make sure you read img with PIL.".format(self.name()), exit=True)
+        LOG.logE("PilAugBase subclass {} expect PIL.Image as input, make sure you read img with PIL :{}".format(self.name(), type(img)), exit=True)
 
 class TensorAugBase(AugBase):
     #only make sure tuple to list
