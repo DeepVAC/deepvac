@@ -10,6 +10,8 @@
 ```python
 #单卡训练和测试所使用的device，多卡请开启Deepvac的DDP功能
 config.core.device = "cuda"
+#禁用训练中的验证环节
+config.core.no_val = False
 #是否禁用git branch约束
 config.core.disable_git = False
 #模型输出和加载所使用的路径，非必要不要改动

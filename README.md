@@ -60,6 +60,8 @@ Deepvac的config模块内置了如下的配置，而且用户一般不需要修�
 ## ------------------ common ------------------
 #模型输入路径，用户无特殊情况不要修改
 config.core.output_dir = "output"
+#禁用训练中的验证环节
+config.core.no_val = False
 #日志存放目录
 config.core.log_dir = "log"
 #每多少次迭代打印一行日志
