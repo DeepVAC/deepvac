@@ -535,6 +535,7 @@ class DeepvacTrain(Deepvac):
 
     def doSave(self, current_time):
         #context for export 3rd
+        LOG.logI("preparing save model with timefix: {}".format(current_time))
         with torch.no_grad(), deepvac_val_mode(self.config):
             file_partial_name = '{}__acc_{}__epoch_{}__step_{}__lr_{}'.format(current_time, self.config.acc, self.config.epoch, self.config.step, self.config.optimizer.param_groups[0]['lr'])
             state_file = '{}/model__{}.pth'.format(self.config.output_dir, file_partial_name)
@@ -543,6 +544,8 @@ class DeepvacTrain(Deepvac):
             net = self.config.ema_net if self.config.ema else self.config.net
             torch.save(net.state_dict(), state_file)
             #save checkpoint
+            LOG.logI("saving model: {}".format(state_file))
+            LOG.logI("saving checkpoint: {}".format(checkpoint_file))
             torch.save({
                 'optimizer': self.config.optimizer.state_dict(),
                 'epoch': self.config.epoch,
@@ -617,6 +620,8 @@ class DeepvacTrain(Deepvac):
             self.doIterTick()
         #epoch end
         self.postEpoch()
+        #must before schedule
+        self.doSave(getPrintTime())
         self.doSchedule()
         self.doTimekeeping()
 
