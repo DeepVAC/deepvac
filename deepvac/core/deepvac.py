@@ -533,7 +533,8 @@ class DeepvacTrain(Deepvac):
         self.addScalar('{}/TrainTime(secs/batch)'.format(self.config.phase), self.config.train_time.val, self.config.iter)
         LOG.logI('{}: [{}][{}/{}] [Loss:{}  Lr:{}]'.format(self.config.phase, self.config.epoch, self.config.step + 1, len(self.config.loader),self.config.loss.item(),self.config.optimizer.param_groups[0]['lr']))
 
-    def doSave(self, current_time):
+    def doSave(self):
+        current_time = getPrintTime()
         #context for export 3rd
         LOG.logI("preparing save model with timefix: {}".format(current_time))
         with torch.no_grad(), deepvac_val_mode(self.config):
@@ -616,12 +617,12 @@ class DeepvacTrain(Deepvac):
             self.doTrainTock()
             if self.config.step in self.config.save_list:
                 self.val()
-                self.doSave(getPrintTime())
+                self.doSave()
             self.doIterTick()
         #epoch end
         self.postEpoch()
         #must before schedule
-        self.doSave(getPrintTime())
+        self.doSave()
         self.doSchedule()
         self.doTimekeeping()
 
@@ -708,10 +709,10 @@ class DeepvacDDP(DeepvacTrain):
     def _preEpoch(self):
         self.config.train_sampler.set_epoch(self.config.epoch)
 
-    def doSave(self, time):
+    def doSave(self):
         if self.config.args.rank != 0:
             return
-        super(DeepvacDDP, self).doSave(time)
+        super(DeepvacDDP, self).doSave()
 
     def addScalar(self, tag, value, step):
         if self.config.args.rank != 0:
