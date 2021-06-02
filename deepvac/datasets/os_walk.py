@@ -4,7 +4,7 @@ from .base_dataset import DatasetBase
 
 class OsWalkBaseDataset(DatasetBase):
     def __init__(self, deepvac_config, sample_path):
-        super(OsWalkDataset, self).__init__(deepvac_config)
+        super(OsWalkBaseDataset, self).__init__(deepvac_config)
         self.files = []
         for subdir, dirs, fns in os.walk(sample_path):
             for fn in fns:
