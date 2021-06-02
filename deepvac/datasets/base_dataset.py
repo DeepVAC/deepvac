@@ -13,11 +13,24 @@ class DatasetBase(Dataset):
         if self.name() not in self.deepvac_datasets_config.keys():
             self.deepvac_datasets_config[self.name()] = AttrDict()
         self.config = self.deepvac_datasets_config[self.name()]
-        self.transform = self.config.transform
-        self.composer = self.config.composer
 
     def auditConfig(self):
         pass
+
+    def compose(self, img):
+        if isinstance(self.config.transform, (list,tuple)):
+            for t in self.config.transform:
+                img = t(img)
+        elif self.config.transform is not None:
+            img = self.config.transform(img)
+
+        if isinstance(self.config.composer, (list,tuple)):
+            for c in self.config.composer:
+                img = c(img)
+        elif self.config.composer is not None:
+            img = self.config.composer(img)
+
+        return img
 
     def name(self):
         return self.__class__.__name__

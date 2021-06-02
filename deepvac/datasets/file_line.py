@@ -32,11 +32,7 @@ class FileLineDataset(DatasetBase):
         path, target = self.samples[index]
         abs_path = os.path.join(self.sample_path_prefix, path)
         sample = self._buildSampleFromPath(abs_path)
-
-        if self.config.transform is not None:
-            sample = self.config.transform(sample)
-        if self.config.composer is not None:
-            sample = self.config.composer(sample)
+        sample = self.compose(sample)
         return sample, target
 
     def _buildSampleFromPath(self, abs_path):
@@ -67,9 +63,5 @@ class FileLineCvSegDataset(FileLineCvStrDataset):
         sample = self._buildSampleFromPath(os.path.join(self.sample_path_prefix, image_path.strip()))
         label = self._buildLabelFromPath(os.path.join(self.sample_path_prefix, label_path.strip()))
 
-        if self.config.transform is not None:
-            sample, label = self.config.transform([sample, label])
-        if self.config.composer is not None:
-            sample, label = self.config.composer([sample, label])
-
+        sample, label = self.compose([sample, label])
         return sample, label

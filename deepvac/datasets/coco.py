@@ -20,13 +20,7 @@ class CocoCVDataset(DatasetBase):
 
     def __getitem__(self, index):
         sample, label = self._getSample(index)
-        # augment for numpy
-        if self.config.composer is not None:
-            sample = self.config.composer(sample)
-        # pytorch offical transform for PIL Image or numpy
-        if self.config.transform is not None:
-            # rewrite method: '_buildSample' first
-            sample = self.config.transform(sample)
+        sample = self.compose(sample)
         # post process
         img, label = self._buildSample(sample, label)
         return img, label

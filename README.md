@@ -245,8 +245,7 @@ class FileLineCvStrDataset(FileLineDataset):
     def _buildSampleFromPath(self, abs_path):
         #we just set default loader with Pillow Image
         sample = cv2.imread(abs_path)
-        if self.transform is not None:
-            sample = self.transform(sample)
+        sample = self.compose(sample)
         return sample
 ```
 哦，FileLineCvStrDataset也已经是deepvac.datasets中提供的类了。
