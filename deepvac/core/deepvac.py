@@ -565,6 +565,9 @@ class DeepvacTrain(Deepvac):
 
     def initStepAndSaveNumber(self):
         loader_len = len(self.config.loader)
+        LOG.logI("TRAIN DataLoader has length {}".format(loader_len))
+        if loader_len == 0:
+            LOG.logE("dataloader has length 0, make sure you have set correct DataLoader(and Dataset)", exit=True)
         save_every = loader_len//self.config.save_num
         save_list = list(range(0, loader_len + 1, save_every ))
         self.config.save_list = save_list[1:-1]
