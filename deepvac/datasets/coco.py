@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import cv2
+
+from ..utils import LOG
 from .base_dataset import DatasetBase
 
 class CocoCVDataset(DatasetBase):
@@ -53,3 +55,48 @@ class CocoCVDataset(DatasetBase):
         boxes = np.array([i["bbox"] for i in anns], dtype=np.float)
         masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
         return category_ids, boxes, masks
+
+
+class CocoCVSegDataset(DatasetBase):
+    def __init__(self, deepvac_config, sample_path_prefix, target_path, cat2idx):
+        super(CocoCVSegDataset, self).__init__(deepvac_config)
+        try:
+            from pycocotools.coco import COCO
+        except:
+            raise Exception("pycocotools module not found, you should try 'pip3 install pycocotools' first!")
+        self.sample_path_prefix = sample_path_prefix
+        self.coco = COCO(target_path)
+        self.ids = list(sorted(self.coco.imgs.keys()))
+        self.cats = list(sorted(self.coco.cats.keys()))
+        self.cat2idx = cat2idx
+        LOG.logI("Notice: 0 will be treated as background in {}!!!".format(self.name()))
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, index):
+        id = self.ids[index]
+        sample, mask, cls_masks, file_path = self._getSample(id)
+        sample, mask, cls_masks, file_path = self.compose((sample, mask, cls_masks, os.path.join(self.sample_path_prefix, file_path)))
+        return sample, mask, file_path
+
+    def _getSample(self, id: int):
+        # img
+        file_path = self.coco.loadImgs(id)[0]["file_name"]
+        img = cv2.imread(os.path.join(self.sample_path_prefix, file_path), 1)
+        assert img is not None, "Image {} not found!".format(file_path)
+        # anno
+        anns = self.coco.loadAnns(self.coco.getAnnIds(id))
+        cls_masks = {}
+        h, w = img.shape[:2]
+        mask = np.zeros((h, w))
+        bg_mask = None
+        for idx, ann in enumerate(anns):
+            # current category as 1, BG and others as 0.
+            cls_mask = self.coco.annToMask(ann)
+            cls_idx = self.cat2idx[ann["category_id"]]
+            cls_masks[cls_idx] = cls_mask
+            mask[cls_mask==1] = cls_idx
+
+        # return target you want
+        return img, mask, cls_masks, file_path

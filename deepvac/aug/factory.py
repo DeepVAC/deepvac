@@ -5,7 +5,7 @@ import cv2
 from torchvision import transforms as trans
 from ..utils import LOG
 from ..core import AttrDict
-from . import base_aug, face_aug, seg_aug, text_aug, yolo_aug
+from . import base_aug, face_aug, seg_aug, text_aug, yolo_aug, seg_audit
 
 class SyszuxFactory(object):
     def __init__(self, syntax, deepvac_config):
@@ -146,3 +146,9 @@ class AugFactory(SyszuxFactory):
         self.addProducts(seg_aug, module_name='seg_aug', end_suffix='Aug')
         self.addProducts(text_aug, module_name='text_aug', end_suffix='Aug')
         self.addProducts(yolo_aug, module_name='yolo_aug', end_suffix='Aug')
+
+
+class ImageWithMaskAuditFactory(AugFactory):
+    def initProducts(self):
+        super(ImageWithMaskAuditFactory, self).initProducts()
+        self.addProducts(seg_audit, module_name='seg_audit', end_suffix='Audit')
