@@ -65,3 +65,17 @@ class FileLineCvSegDataset(FileLineCvStrDataset):
 
         sample, label = self.compose([sample, label])
         return sample, label
+
+class FileLineCvSegAuditDataset(FileLineCvSegDataset):
+    def __getitem__(self, index):
+        image_path, label_path = self.samples[index]
+        image_path = os.path.join(self.sample_path_prefix, image_path.strip() )
+        label_path = os.path.join(self.sample_path_prefix, label_path.strip() )
+        sample = self._buildSampleFromPath(image_path)
+        label = self._buildLabelFromPath(label_path)
+
+        cls_masks = {}
+        for cls_idx in np.unique(label):
+            cls_masks[cls_idx] = label == cls_idx
+        sample, label, cls_masks, label_path = self.compose([sample, label, cls_masks, label_path])
+        return sample, label, cls_masks, label_path

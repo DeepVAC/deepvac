@@ -81,7 +81,7 @@ class CocoCVSegDataset(DatasetBase):
         id = self.ids[index]
         sample, mask, cls_masks, file_path = self._getSample(id)
         sample, mask, cls_masks, file_path = self.compose((sample, mask, cls_masks, os.path.join(self.sample_path_prefix, file_path)))
-        return sample, mask, file_path
+        return sample, mask, cls_masks, file_path
 
     def updatePath(self, id, file_path):
         full_file_path = self.coco.loadImgs(id)[0]["path"]

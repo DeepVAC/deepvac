@@ -128,15 +128,19 @@ class ImageWithMaskTargetSizeAudit(CvAugSegAuditBase4):
 class ImageWithMaskVisionAudit(CvAugSegAuditBase4):
     def auditConfig(self):
         self.save_dir = self.addUserConfig('vision_dir', self.config.vision_dir, "vision_dir")
+        self.mask_dir = self.addUserConfig('mask_dir', self.config.mask_dir, "mask_dir")
         os.makedirs(self.save_dir, exist_ok=True)
+        os.makedirs(self.mask_dir, exist_ok=True)
 
     def forward(self, imgs):
         img, label, _, fn = imgs
         self.write(img, label, fn)
 
-        label_path = os.path.dirname(fn)+'_label'
+        sub_path = self.getBaseName(os.path.dirname(fn))
+        new_label_path = os.path.join(self.mask_dir, sub_path)
+        os.makedirs(new_label_path, exist_ok=True)
         basename = self.getBaseName(fn)
-        cv2.imwrite(os.path.join(label_path, os.path.splitext(basename)[0]+'.png'), label)
+        cv2.imwrite(os.path.join(new_label_path, os.path.splitext(basename)[0]+'.png'), label)
         return imgs
 
 
