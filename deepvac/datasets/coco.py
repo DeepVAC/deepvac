@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import cv2
-
 from ..utils import LOG
 from .base_dataset import DatasetBase
 
@@ -71,6 +70,10 @@ class CocoCVSegDataset(DatasetBase):
         self.cat2idx = cat2idx
         LOG.logI("Notice: 0 will be treated as background in {}!!!".format(self.name()))
 
+    def auditConfig(self):
+        self.auto_detect_subdir_with_basenum = self.addUserConfig('auto_detect_subdir_with_basenum', self.config.auto_detect_subdir_with_basenum, 0)
+        LOG.logI("You set auto_detect_subdir_with_basenum to {}".format(self.auto_detect_subdir_with_basenum))
+
     def __len__(self):
         return len(self.ids)
 
@@ -80,11 +83,30 @@ class CocoCVSegDataset(DatasetBase):
         sample, mask, cls_masks, file_path = self.compose((sample, mask, cls_masks, os.path.join(self.sample_path_prefix, file_path)))
         return sample, mask, file_path
 
+    def updatePath(self, id, file_path):
+        full_file_path = self.coco.loadImgs(id)[0]["path"]
+        path_list = full_file_path.split('/')
+        path_list_num = len(path_list)
+
+        if path_list_num == self.auto_detect_subdir_with_basenum:
+            withsub_file_path = file_path
+        elif path_list_num == self.auto_detect_subdir_with_basenum + 1:
+            withsub_file_path = path_list[-2] + '/' + file_path
+            file_path = path_list[-2] + '_' + file_path
+        else:
+            LOG.logE("path list has {} fields, which should be {} or {}".format(path_list_num, self.auto_detect_subdir_with_basenum, self.auto_detect_subdir_with_basenum+1), exit=True)
+
+        return withsub_file_path, file_path
+
     def _getSample(self, id: int):
         # img
         file_path = self.coco.loadImgs(id)[0]["file_name"]
-        img = cv2.imread(os.path.join(self.sample_path_prefix, file_path), 1)
-        assert img is not None, "Image {} not found!".format(file_path)
+        withsub_file_path = file_path
+        if self.auto_detect_subdir_with_basenum > 0:
+            withsub_file_path, file_path = self.updatePath(id, file_path)
+
+        img = cv2.imread(os.path.join(self.sample_path_prefix, withsub_file_path), 1)
+        assert img is not None, "Image {} not found in {} !".format(withsub_file_path, self.sample_path_prefix)
         # anno
         anns = self.coco.loadAnns(self.coco.getAnnIds(id))
         cls_masks = {}

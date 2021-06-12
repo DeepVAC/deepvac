@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset
-from ..utils import LOG
+from ..utils import LOG, addUserConfig
 from ..core import AttrDict
 
 class DatasetBase(Dataset):
@@ -16,6 +16,10 @@ class DatasetBase(Dataset):
 
     def auditConfig(self):
         pass
+
+    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
+        module_name = 'config.datasets.{}'.format(self.name())
+        return addUserConfig(module_name, config_name, user_give=user_give, developer_give=developer_give, is_user_mandatory=is_user_mandatory)
 
     def compose(self, img):
         if isinstance(self.config.transform, (list,tuple)):
