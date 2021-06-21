@@ -684,6 +684,7 @@ class DeepvacDDP(DeepvacTrain):
     def initDevice(self):
         super(DeepvacDDP, self).initDevice()
         parser = argparse.ArgumentParser(description='DeepvacDDP')
+        parser.add_argument('vars', nargs='*')
         parser.add_argument("--gpu", default=-1, type=int, help="gpu")
         parser.add_argument('--rank', default=-1, type=int, help='node rank for distributed training')
         self.config.args = parser.parse_args()

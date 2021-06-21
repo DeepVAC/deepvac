@@ -9,8 +9,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms as trans
 from torchvision.models import resnet50
-from ..core.config import AttrDict, new
-from ..core.deepvac import Deepvac, DeepvacTrain
+from ..core import AttrDict, new, Deepvac, DeepvacTrain
 from ..datasets.os_walk import OsWalkDataset
 from ..datasets.file_line import FileLineDataset
 from ..utils import LOG
@@ -271,8 +270,11 @@ class ResNet50Test(Deepvac):
 
 def auditTestConfig():
     config.core.ResNet50Test.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     config.cast.ScriptCast = AttrDict()
     config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
+    config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
+    config.cast.ScriptCast.dynamic_quantize_dir = "./dynamic_quantize.pt"
 
     config.core.ResNet50Test.disable_git = True
 
@@ -287,14 +289,20 @@ def auditTestConfig():
 
 def auditTrainConfig():
     config.core.ResNet50Train.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     config.cast.ScriptCast = AttrDict()
     config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
+    # config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
+    # config.cast.ScriptCast.dynamic_quantize_dir = "./dynamic_quantize.pt"
+
+    config.core.ResNet50Train.dist_url = "tcp://localhost:27030"
+    config.core.ResNet50Train.world_size = 2
 
     config.core.ResNet50Train.disable_git = True
     #train stuff
     config.core.ResNet50Train.epoch_num = 100
     config.core.ResNet50Train.save_num = 1
-    config.core.ResNet50Train.log_every = 10
+    config.core.ResNet50Train.log_every = 100
     config.core.ResNet50Train.num_workers = 4
 
     config.core.ResNet50Train.net = resnet50(pretrained=True)
@@ -314,19 +322,18 @@ def auditTrainConfig():
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
         LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
-    
     op = sys.argv[1]
     if op not in ('train','test','benchmark'):
         LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
 
     if op == 'train':
-        if(len(sys.argv) != 6):
+        if(len(sys.argv) < 6):
             LOG.logE("Usage: python -m deepvac.backbones.resnet train <pretrained_model.pth> <train_val_data_dir_prefix> <train.txt> <val.txt>", exit=True)
-
+        
         config = new('ResNet50Train')
         auditTrainConfig()
-        
         config.core.ResNet50Train.model_path = sys.argv[2]
+        # config.core.ResNet50Train.checkpoint_suffix = '2021-06-21-17-24__acc_0__epoch_24__step_89__lr_0.001.pth'
         config.datasets.FileLineDataset = AttrDict()
         config.datasets.FileLineDataset.transform = trans.Compose([
             trans.ToTensor(),
