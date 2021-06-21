@@ -18,28 +18,39 @@ try:
 except ImportError:
     LOG.logE("Deepvac has dependency on tensorboard, please install tensorboard first, e.g. [pip3 install tensorboard]", exit=True)
 
-from ..utils import syszux_once, LOG, assertAndGetGitBranch, getPrintTime, AverageMeter, anyFieldsInConfig
+from ..utils import syszux_once, LOG, assertAndGetGitBranch, getPrintTime, AverageMeter, anyFieldsInConfig, addUserConfig
 from ..cast import export3rd
+from .config import AttrDict
 
 #deepvac implemented based on PyTorch Framework
 class Deepvac(object):
-    def __init__(self, deepvac_config):
+    def __init__(self, deepvac_config, is_forward_only=True):
         self.deepvac_config = deepvac_config
-        self.config = self.deepvac_config.core
-        if self.config.is_forward_only is None:
-            self.config.is_forward_only = True
+        self.core_config = deepvac_config.core
+        self.initConfig()
+        self.config.is_forward_only = is_forward_only
+        print('debug: ', self.core_config.disable_git)
         self.config.branch = assertAndGetGitBranch(self.config.disable_git)
         self.init()
+
+    def initConfig(self):
+        if self.name() not in self.core_config.keys():
+            self.core_config[self.name()] = AttrDict()
+        self.config = self.core_config[self.name()]
+
+    def addUserConfig(self, config_name, user_give=None, developer_give=None, is_user_mandatory=False):
+        module_name = 'config.core.{}'.format(self.name())
+        return addUserConfig(module_name, config_name, user_give=user_give, developer_give=developer_give, is_user_mandatory=is_user_mandatory)
 
     def name(self):
         return self.__class__.__name__
 
     def auditConfig(self):
         if not self.config.model_path and not self.config.jit_model_path:
-            LOG.logE("both config.core.model_path and config.core.jit_model_path are not set, cannot do predict.", exit=True)
+            LOG.logE("both config.core.{}.model_path and config.core.{}.jit_model_path are not set, cannot do predict.".format(self.name(), self.name()), exit=True)
         #audit for ema
         if self.config.is_forward_only and self.config.ema:
-            LOG.logE("Error: You must disable config.core.ema in test only mode.", exit=True)
+            LOG.logE("Error: You must disable config.core.{}.ema in test only mode.".format(self.name()), exit=True)
 
     def _parametersInfo(self):
         param_info_list = [p.numel() for p in self.config.net.parameters() ]
@@ -52,25 +63,25 @@ class Deepvac(object):
 
     def initNetWithCode(self):
         if self.config.net is None:
-            LOG.logE("You must implement and set config.core.net to a torch.nn.Module instance in config.py.", exit=True)
+            LOG.logE("You must implement and set config.core.{}.net to a torch.nn.Module instance in config.py.".format(self.name()), exit=True)
         if not isinstance(self.config.net, nn.Module):
-            LOG.logE("You must set config.core.net to a torch.nn.Module instance in config.py.", exit=True)
+            LOG.logE("You must set config.core.{}.net to a torch.nn.Module instance in config.py.".format(self.name()), exit=True)
 
-    def auditStateDict(self, config):
+    def auditStateDict(self, myconfig):
         state_dict = None
-        if not config.model_path:
-            LOG.logI("model_path not specified in config.py, network parametes will not be initialized from trained/pretrained model.")
+        if not myconfig.model_path:
+            LOG.logI("config.core.{}.model_path not specified in config.py, network parametes will not be initialized from trained/pretrained model.".format(self.name()))
             return state_dict
 
-        if config.jit_model_path and config.is_forward_only:
-            LOG.logI("jit_model_path set in forward-only mode in config.py, network parametes will be initialized from jit model rather than trained/pretrained model.")
+        if myconfig.jit_model_path and self.config.is_forward_only:
+            LOG.logI("config.core{}..jit_model_path set in forward-only mode in config.py, network parametes will be initialized from jit model rather than trained/pretrained model.".format(self.name()))
             return state_dict
 
-        if config.jit_model_path:
-            LOG.logW("jit_model_path set in training mode in config.py, omit...")
+        if myconfig.jit_model_path:
+            LOG.logW("config.core{}.jit_model_path set in training mode in config.py, omit...".format(self.name()))
 
-        LOG.logI('Loading State Dict from {}'.format(config.model_path))
-        state_dict = torch.load(config.model_path, map_location=self.config.device)
+        LOG.logI('Loading State Dict from {}'.format(myconfig.model_path))
+        state_dict = torch.load(myconfig.model_path, map_location=myconfig.device)
         #remove prefix begin
         prefix = 'module.'
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
@@ -82,7 +93,7 @@ class Deepvac(object):
 
         #audit on model file
         state_dict_keys = set(state_dict.keys())
-        code_net_keys = set(config.net.state_dict().keys())
+        code_net_keys = set(myconfig.net.state_dict().keys())
         used_keys = code_net_keys & state_dict_keys
         unused_keys = state_dict_keys - code_net_keys
         missing_keys = code_net_keys - state_dict_keys
@@ -90,58 +101,58 @@ class Deepvac(object):
         LOG.logI('Unused keys before model_reinterpret_cast:{} | {}'.format(len(unused_keys), unused_keys))
         LOG.logI('Used keys before model_reinterpret_cast:{}'.format(len(used_keys)))
 
-        if config.model_reinterpret_cast:
-            LOG.logI("You enabled model_reinterpret_cast in config.py, omit net parameter audit.")
+        if myconfig.model_reinterpret_cast:
+            LOG.logI("You enabled config.core.{}.model_reinterpret_cast in config.py, omit net parameter audit.".format(self.name()))
             return state_dict
 
         if len(used_keys) == 0:
-            LOG.logE('Error: load NONE from pretrained model: {}'.format(config.model_path), exit=True)
+            LOG.logE('Error: load NONE from pretrained model: {}'.format(myconfig.model_path), exit=True)
 
         if len(missing_keys) > 0:
             LOG.logW("There have missing network parameters, double check if you are using a mismatched trained model.")
-            if not config.network_audit_disabled:
-                LOG.logE("If you know this risk, set network_audit_disabled=True in config.py to omit this error.", exit=True)
+            if not myconfig.network_audit_disabled:
+                LOG.logE("If you know this risk, set config.core.{}.network_audit_disabled=True in config.py to omit this error.".format(self.name()), exit=True)
         return state_dict
 
     def initStateDict(self):
         self.config.state_dict = self.auditStateDict(self.config)
 
-    def castStateDict(self, config):
-        LOG.logI("model_reinterpret_cast set to True in config.py, Try to reinterpret cast the model")
+    def castStateDict(self, old_state_dict, myconfig):
+        LOG.logI("config.core.{}.model_reinterpret_cast set to True in config.py, Try to reinterpret cast the model".format(self.name()))
 
         if self.config.model_path_omit_keys:
-            LOG.logI("You have set config.core.model_path_omit_keys: {}".format(self.config.model_path_omit_keys))
+            LOG.logI("You have set config.core.{}.model_path_omit_keys: {}".format(self.name(), self.config.model_path_omit_keys))
             for k in self.config.model_path_omit_keys:
-                LOG.logI("remove key {} from config.core.model_path {}".format(k, self.config.model_path))
-                config.state_dict.pop(k, None)
+                LOG.logI("remove key {} from config.core.{}.model_path {}".format(k, self.name(), myconfig.model_path))
+                old_state_dict.pop(k, None)
 
         state_dict = collections.OrderedDict()
-        keys = list(config.state_dict.keys())
+        keys = list(old_state_dict.keys())
         model_path_keys_len = len(keys)
-        if len(config.net.state_dict() ) > model_path_keys_len:
-            LOG.logW("config.core.net has more parameters than config.core.model_path({}), may has cast issues.".format(self.config.model_path))
+        if len(myconfig.net.state_dict() ) > model_path_keys_len:
+            LOG.logW("config.core.{}.net has more parameters than config.core.{}.model_path({}), may has cast issues.".format(self.name(), self.name(), myconfig.model_path))
 
         real_idx = 0
-        for _, name in enumerate(config.net.state_dict()):
+        for _, name in enumerate(myconfig.net.state_dict()):
             if real_idx >= model_path_keys_len:
-                LOG.logI("There alreay has no corresponding parameter in {} for {}".format(self.config.model_path, name))
+                LOG.logI("There alreay has no corresponding parameter in {} for {}".format(myconfig.model_path, name))
                 continue
 
             if anyFieldsInConfig(name, self.config.net_omit_keys, self.config.net_omit_keys_strict):
-                LOG.logI('found key to omit in config.core.net: {}, continue...'.format(name))
+                LOG.logI('found key to omit in config.core.{}.net: {}, continue...'.format(self.name(),name))
                 continue
   
-            if config.net.state_dict()[name].size() == config.state_dict[keys[real_idx]].size():
-                LOG.logI("cast pretrained model [{}] => config.core.net [{}]".format(keys[real_idx], name))
-                state_dict[name] = config.state_dict[keys[real_idx]]
+            if myconfig.net.state_dict()[name].size() == old_state_dict[keys[real_idx]].size():
+                LOG.logI("cast pretrained model [{}] => config.core.{}.net [{}]".format(keys[real_idx], self.name(), name))
+                state_dict[name] = old_state_dict[keys[real_idx]]
                 real_idx += 1
                 continue
 
             LOG.logE("cannot cast pretrained model [{}] => config.net [{}] due to parameter shape mismatch!".format(keys[real_idx], name))
-            if config.cast_state_dict_strict is False:
+            if myconfig.cast_state_dict_strict is False:
                 real_idx += 1
                 continue
-            LOG.logE("If you know above risk, set cast_state_dict_strict=False in config.py to omit this audit.", exit=True)
+            LOG.logE("If you know above risk, set config.core.{}.cast_state_dict_strict=False in config.py to omit this audit.".format(self.name()), exit=True)
             
         LOG.logI("Reinterpret cast the model succeeded.")
         return state_dict
@@ -153,13 +164,13 @@ class Deepvac(object):
             return
         
         if self.config.model_reinterpret_cast:
-            self.config.state_dict = self.castStateDict(self.config)
+            self.config.state_dict = self.castStateDict(self.config.state_dict, self.config)
             
         self.config.net.load_state_dict(self.config.state_dict, strict=False)
 
     def loadJitModel(self):
         if not self.config.jit_model_path:
-            LOG.logI("config.jit_model_path not specified, omit the loadJitModel")
+            LOG.logI("config.core.{}.jit_model_path not specified, omit the loadJitModel".format(self.name()))
             return
 
         if not self.config.is_forward_only:
@@ -171,10 +182,10 @@ class Deepvac(object):
     def initTestLoader(self):
         #only init test_loader in base class
         if self.config.test_loader is None and self.config.is_forward_only:
-            LOG.logE("You must set config.core.test_loader in config.py", exit=True)
+            LOG.logE("You must set config.core.{}.test_loader in config.py".format(self.name()), exit=True)
         
         if self.config.test_loader is not None:
-            LOG.logI("You set config.core.test_loader to {} in config.py".format(self.config.test_loader)) 
+            LOG.logI("You set config.core.{}.test_loader to {} in config.py".format(self.name(), self.config.test_loader)) 
 
     def initEMA(self):
         if self.config.ema is not True:
@@ -209,7 +220,7 @@ class Deepvac(object):
         self.initTestLoader()
 
     def export3rd(self, output_file=None):
-        export3rd(self.deepvac_config, output_file)
+        export3rd(self.config, self.deepvac_config.cast, output_file)
 
     #For Deepvac user to reimplement
     def preIter(self):
@@ -233,7 +244,7 @@ class Deepvac(object):
             self.config.sample = self.config.data
         
         if not isinstance(self.config.sample, torch.Tensor):
-            LOG.logE("You must reimplement _preIter() in subclass {} since got config.core.sample type: {}.".format(self.name(), type(self.config.sample)))
+            LOG.logE("You must reimplement _preIter() in subclass {} since got config.core.{}.sample type: {}.".format(self.name(), self.name(), type(self.config.sample)))
             LOG.logE("1st element in dataloader item must be torch.Tensor, i.e. your dataloader item should be [torch.Tensor, otherType,...].", exit=True)
 
         self.doFeedData2Device()
@@ -254,7 +265,7 @@ class Deepvac(object):
         self.config.output = self.config.net(self.config.sample)
 
     def test(self):
-        LOG.logI("config.core.test_load has been set, do test() with config.core.test_loader")
+        LOG.logI("config.core.{}.test_loader has been set, do test() with config.core.{}.test_loader".format(self.name(), self.name()))
         for self.config.test_step, self.config.data in enumerate(self.config.test_loader):
             self._preIter()
             self.preIter()
@@ -272,7 +283,7 @@ class Deepvac(object):
     def testFly(self):
         if self.config.test_loader:
             return self.test()
-        LOG.logE("You have to reimplement testFly() in subclass {} if you didn't set any valid input, e.g. config.core.test_loader.".format(self.name()), exit=True)
+        LOG.logE("You have to reimplement testFly() in subclass {} if you didn't set any valid input, e.g. config.core.{}.test_loader.".format(self.name(), self.name()), exit=True)
 
     def process(self, input_tensor):
         self.config.phase = 'TEST'
@@ -284,9 +295,9 @@ class Deepvac(object):
         LOG.logI("You did not provide input_tensor at Deepvac(input_tensor)...")
 
         if self.config.sample is not None:
-            LOG.logI('You provided input with config.core.sample, do net inference with config.core.example.')
+            LOG.logI('You provided input with config.core.{}.sample, do net inference with config.core.{}.example.'.format(self.name(), self.name()))
             return self.testSample()
-        LOG.logI("You did not provide input with config.core.sample...")
+        LOG.logI("You did not provide input with config.core.{}.sample...".format(self.name()))
         
         LOG.logI("testFly() is your last chance, you must have already reimplemented testFly() in subclass {}, right?".format(self.name()))
         x = self.testFly()
@@ -327,17 +338,16 @@ class deepvac_val_mode(object):
 
 #base class for train pipeline    
 class DeepvacTrain(Deepvac):
-    def __init__(self, deepvac_config):
-        deepvac_config.core.is_forward_only=False
-        super(DeepvacTrain, self).__init__(deepvac_config)
+    def __init__(self, deepvac_config, is_forward_only=False):
+        super(DeepvacTrain, self).__init__(deepvac_config, is_forward_only)
         self.initTrainContext()
 
     def auditConfig(self):
         #basic train config audit
         if self.config.train_dataset is None:
-            LOG.logE("You must set config.core.train_dataset in config.py",exit=True)
+            LOG.logE("You must set config.core.{}.train_dataset in config.py".format(self.name()),exit=True)
         if self.config.val_dataset is None and not self.config.no_val:
-            LOG.logE("You must set config.core.val_dataset in config.py",exit=True)
+            LOG.logE("You must set config.core.{}.val_dataset in config.py".format(self.name()),exit=True)
 
         #audit for amp
         if self.config.amp and self.config.device.type != 'cuda':
@@ -351,6 +361,7 @@ class DeepvacTrain(Deepvac):
         self.config.epoch = 0
         self.config.iter = 0
         self.config.is_train = True
+        self.config.phase = 'TRAIN'
         self.config.scaler = GradScaler()
         self.config.loader_time = AverageMeter()
         self.config.train_time = AverageMeter()
@@ -418,32 +429,32 @@ class DeepvacTrain(Deepvac):
 
     def initCriterion(self):
         if self.config.criterion is None:
-            LOG.logE("You should set config.core.criterion in config.py, e.g. config.core.criterion=torch.nn.CrossEntropyLoss()",exit=True)
-        LOG.logI("You set config.core.criterion to {}".format(self.config.criterion))
+            LOG.logE("You should set config.core.{}.criterion in config.py, e.g. config.core.{}.criterion=torch.nn.CrossEntropyLoss()".format(self.name(), self.name()),exit=True)
+        LOG.logI("You set config.core.{}.criterion to {}".format(self.name(), self.config.criterion))
 
     def initScheduler(self):
         if self.config.scheduler is None:
-            LOG.logE("You must set config.core.scheduler in config.py.", exit=True)
-        LOG.logI("You set config.core.scheduler to {}".format(self.config.scheduler))
+            LOG.logE("You must set config.core.{}.scheduler in config.py.".format(self.name()), exit=True)
+        LOG.logI("You set config.core.{}.scheduler to {}".format(self.name(),self.config.scheduler))
         
     def initOptimizer(self):
         if self.config.optimizer is None:
-            LOG.logE("You must set config.core.optimizer in config.py.",exit=True)
-        LOG.logI("You set config.core.optimizer to {} in config.py".format(self.config.optimizer))
+            LOG.logE("You must set config.core.{}.optimizer in config.py.".format(self.name()),exit=True)
+        LOG.logI("You set config.core.{}.optimizer to {} in config.py".format(self.name(),self.config.optimizer))
 
     def initTrainLoader(self):
         if self.config.train_loader is None:
-            LOG.logE("You must set config.core.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass {}.".format(self.name()), exit=True)
-        LOG.logI("You set config.core.train_loader to {} in config.py".format(self.config.train_loader))
+            LOG.logE("You must set config.core.{}.train_loader in config.py, or reimplement initTrainLoader() API in your DeepvacTrain subclass {}.".format(self.name(),self.name()), exit=True)
+        LOG.logI("You set config.core.{}.train_loader to {} in config.py".format(self.name(),self.config.train_loader))
         self.config.loader = self.config.train_loader
 
     def initValLoader(self):
         if self.config.no_val:
-            LOG.logI("You specified config.core.no_val={}, omit VAL phase.".format(self.config.no_val))
+            LOG.logI("You specified config.core.{}.no_val={}, omit VAL phase.".format(self.name(),self.config.no_val))
             return
         if self.config.val_loader is None:
-            LOG.logE("You must set config.core.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass {}.".format(self.name()), exit=True)
-        LOG.logI("You set config.core.val_loader to {} in config.py".format(self.config.val_loader))
+            LOG.logE("You must set config.core.{}.val_loader in config.py, or reimplement initValLoader() API in your DeepvacTrain subclass {}.".format(self.name(), self.name()), exit=True)
+        LOG.logI("You set config.core.{}.val_loader to {} in config.py".format(self.name(),self.config.val_loader))
 
     def initEmaUpdates(self):
         if self.config.ema is not True:
@@ -669,7 +680,7 @@ class DeepvacTrain(Deepvac):
 class DeepvacDDP(DeepvacTrain):
     def __init__(self, deepvac_config):
         super(DeepvacDDP,self).__init__(deepvac_config)
-        assert self.config.train_sampler is not None, "You should define config.core.train_sampler in config.py when training with DDP mode."
+        assert self.config.train_sampler is not None, "You should define config.core.{}.train_sampler in config.py when training with DDP mode.".format(self.name())
 
     def initDevice(self):
         super(DeepvacDDP, self).initDevice()

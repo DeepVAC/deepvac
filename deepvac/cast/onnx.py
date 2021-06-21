@@ -2,9 +2,6 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class OnnxCast(DeepvacCast):
-    def __init__(self, deepvac_config):
-        super(OnnxCast,self).__init__(deepvac_config)
-
     def auditConfig(self):
         if not self.config.onnx_model_dir:
             return False

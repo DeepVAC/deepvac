@@ -2,9 +2,6 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class CoremlCast(DeepvacCast):
-    def __init__(self, deepvac_config):
-        super(CoremlCast,self).__init__(deepvac_config)
-
     def auditConfig(self):
         if not self.config.model_dir:
             return False
@@ -43,7 +40,7 @@ class CoremlCast(DeepvacCast):
 
         output_coreml_file = self.config.model_dir
         if cast_output_file:
-            output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.deepvac_core_config.output_dir, cast_output_file)
+            output_coreml_file = '{}/coreml__{}.mlmodel'.format(self.trainer_config.output_dir, cast_output_file)
             self.config.model_dir = output_coreml_file
 
         LOG.logI("config.cast.CoremlCast.model_dir found, save coreml model to {}...".format(self.config.model_dir))
@@ -53,12 +50,12 @@ class CoremlCast(DeepvacCast):
         #input mode
         if self.config.input_type == 'image':
             input = coremltools.ImageType(name="input",
-                        shape=tuple(self.deepvac_core_config.sample.shape),
+                        shape=tuple(self.trainer_config.sample.shape),
                         scale=self.config.scale,
                         color_layout = self.config.color_layout,
                         bias = [self.config.blue_bias, self.config.green_bias, self.config.red_bias])
         else:
-            input = coremltools.TensorType(name='input', shape=tuple(self.deepvac_core_config.sample.shape))
+            input = coremltools.TensorType(name='input', shape=tuple(self.trainer_config.sample.shape))
         #convert
         coreml_model = coremltools.convert(model=model, inputs=[input], 
              classfier_config=self.config.classfier_config, minimum_deployment_target=self.config.minimum_deployment_target)

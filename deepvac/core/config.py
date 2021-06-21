@@ -36,7 +36,7 @@ def interpret(name):
 def newDict():
     return AttrDict()
 
-def new():
+def new(trainer=None):
     config = AttrDict()
     config.core = AttrDict()
     config.feature = AttrDict()
@@ -45,6 +45,41 @@ def new():
     config.backbones = AttrDict()
     config.loss = AttrDict()
     config.datasets = AttrDict()
+    if trainer is None:
+        return config
+    
+    config.core[trainer] = AttrDict()
+    ## ------------------ common ------------------
+    config.core[trainer].device = "cuda"
+    config.core[trainer].output_dir = "output"
+    config.core[trainer].log_dir = "log"
+    config.core[trainer].log_every = 10
+    config.core[trainer].disable_git = False
+    config.core[trainer].cast2cpu = True
+    config.core[trainer].model_reinterpret_cast=False
+    config.core[trainer].cast_state_dict_strict=True
+    config.core[trainer].model_path_omit_keys=[]
+    config.core[trainer].net_omit_keys_strict=[]
+
+    ## --------[trainer].--------- ddp --------------------
+    config.core[trainer].dist_url = "tcp://localhost:27030"
+    config.core[trainer].world_size = 2
+    config.core[trainer].shuffle = False
+
+    ## --------[trainer].----------- loader ------------------
+    config.core[trainer].num_workers = 3
+    config.core[trainer].nominal_batch_factor = 1
+
+    ## --------[trainer].---------- train ------------------
+    config.core[trainer].train_batch_size = 128
+    config.core[trainer].epoch_num = 30
+    #model save[trainer].number duriong an epoch
+    config.core[trainer].save_num = 5
+    config.core[trainer].checkpoint_suffix = ''
+
+    ## --------[trainer].--------- val ------------------
+    config.core[trainer].val_batch_size = None
+
     return config
 
 def fork(deepvac_config, field=['aug','datasets']):
@@ -57,46 +92,4 @@ def fork(deepvac_config, field=['aug','datasets']):
             return None
         c[f] = deepvac_config[f].clone()
     return c
-
-config = new()
-
-## ------------------ common ------------------
-config.core.device = "cuda"
-config.core.output_dir = "output"
-config.core.log_dir = "log"
-config.core.log_every = 10
-config.core.disable_git = False
-config.core.cast2cpu = True
-config.core.model_reinterpret_cast=False
-config.core.cast_state_dict_strict=True
-
-## ------------------ ddp --------------------
-config.core.dist_url = "tcp://localhost:27030"
-config.core.world_size = 2
-
-## ------------------ optimizer  ------------------
-config.core.lr = 0.01
-config.core.lr_step = None
-config.core.lr_factor = 0.2703
-config.core.momentum = 0.9
-config.core.nesterov = False
-config.core.weight_decay = None
-
-## -------------------- loader ------------------
-config.core.num_workers = 3
-config.core.nominal_batch_factor = 1
-
-## ------------------- train ------------------
-config.core.train_batch_size = 128
-config.core.epoch_num = 30
-#model save number duriong an epoch
-config.core.save_num = 5
-config.core.milestones = [2,4,6,8,10]
-config.core.checkpoint_suffix = ''
-#
-config.core.acc = 0
-config.core.phase = 'TRAIN'
-
-## ------------------ val ------------------
-config.core.val_batch_size = None
 

@@ -11,9 +11,9 @@ from ..core.config import AttrDict
 from ..utils import LOG
 
 class DeepvacCast(object):
-    def __init__(self, deepvac_config):
-        self.deepvac_cast_config = deepvac_config.cast
-        self.deepvac_core_config = deepvac_config.core
+    def __init__(self, trainer_config, cast_config):
+        self.trainer_config = trainer_config
+        self.deepvac_cast_config = cast_config
         self.initConfig()
         self.proceed = False
         self.auditFinalConfig()
@@ -42,16 +42,16 @@ class DeepvacCast(object):
     def auditFinalConfig(self):
         if not self.auditConfig():
             return
-        if self.deepvac_core_config.net is None:
+        if self.trainer_config.net is None:
             LOG.logE("You must set config.core.net in config.py", exit=True)
 
-        if self.deepvac_core_config.sample is None:
+        if self.trainer_config.sample is None:
             LOG.logE("You must set config.core.sample, in general, this is done by Deepvac Framework.", exit=True)
         
-        self.net = copy.deepcopy(self.deepvac_core_config.ema if self.deepvac_core_config.ema else self.deepvac_core_config.net)
-        if self.deepvac_core_config.cast2cpu:
+        self.net = copy.deepcopy(self.trainer_config.ema if self.trainer_config.ema else self.trainer_config.net)
+        if self.trainer_config.cast2cpu:
             self.net.cpu()
-            self.deepvac_core_config.sample = self.deepvac_core_config.sample.to('cpu')
+            self.trainer_config.sample = self.trainer_config.sample.to('cpu')
         
         self.proceed = True
         
@@ -69,7 +69,7 @@ class DeepvacCast(object):
             f = tempfile.NamedTemporaryFile(delete=False)
             self.config.onnx_model_dir = f.name
 
-        torch.onnx.export(self.net, self.deepvac_core_config.sample, self.config.onnx_model_dir, 
+        torch.onnx.export(self.net, self.trainer_config.sample, self.config.onnx_model_dir, 
             input_names=self.config.onnx_input_names, output_names=self.config.onnx_output_names, 
             dynamic_axes=self.config.onnx_dynamic_ax, opset_version=self.config.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.config.onnx_model_dir))
@@ -87,9 +87,9 @@ def calibrate(model, data_loader):
             
 class ScriptModel(object):
     def __init__(self, deepvac_core_config, output_file, backend = 'fbgemm'):
-        self.deepvac_core_config = deepvac_core_config
-        self.input_net = copy.deepcopy(self.deepvac_core_config.ema if self.deepvac_core_config.ema else self.deepvac_core_config.net)
-        self.input_net.to(self.deepvac_core_config.sample.device)
+        self.trainer_config = deepvac_core_config
+        self.input_net = copy.deepcopy(self.trainer_config.ema if self.trainer_config.ema else self.trainer_config.net)
+        self.input_net.to(self.trainer_config.sample.device)
         self.input_net.eval()
         self.output_file = output_file
         self.backend = backend
@@ -105,7 +105,7 @@ class ScriptModel(object):
         LOG.logE("You must reimplement _jit() in ScriptModel subclass.", exit=True)
 
     def getCalibrateLoader(self):
-        loader = self.deepvac_core_config.test_loader if self.deepvac_core_config.is_forward_only else self.deepvac_core_config.val_loader
+        loader = self.trainer_config.test_loader if self.trainer_config.is_forward_only else self.trainer_config.val_loader
         if loader is None:
             LOG.logE("You enabled config.static_quantize_dir, but didn't provide config.test_loader in forward-only mode, or self.val_loader in train mode.", exit=True)
         return loader
@@ -131,10 +131,10 @@ class ScriptModel(object):
 
 class SaveModelByTrace(ScriptModel):
     def _freeze_jit(self, model):
-        return torch.jit.freeze(torch.jit.trace(model, self.deepvac_core_config.sample).eval() )
+        return torch.jit.freeze(torch.jit.trace(model, self.trainer_config.sample).eval() )
     
     def _jit(self, model):
-        return torch.jit.trace(model, self.deepvac_core_config.sample).eval()
+        return torch.jit.trace(model, self.trainer_config.sample).eval()
 
 class SaveModelByScript(ScriptModel):
     def _freeze_jit(self, model):
