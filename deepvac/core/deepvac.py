@@ -29,7 +29,6 @@ class Deepvac(object):
         self.core_config = deepvac_config.core
         self.initConfig()
         self.config.is_forward_only = is_forward_only
-        print('debug: ', self.core_config.disable_git)
         self.config.branch = assertAndGetGitBranch(self.config.disable_git)
         self.init()
 

@@ -8,8 +8,3 @@ from .se_layer import *
 from .spp_layer import *
 from .ssh_layer import *
 from .weights_init import *
-
-from .mobilenet import *
-from .regnet import *
-from .repvgg import *
-from .resnet import *

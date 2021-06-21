@@ -49,7 +49,7 @@ def new(trainer=None):
         return config
     
     config.core[trainer] = AttrDict()
-    ## ------------------ common ------------------
+    ## ------------- common ------------------
     config.core[trainer].device = "cuda"
     config.core[trainer].output_dir = "output"
     config.core[trainer].log_dir = "log"
@@ -61,24 +61,25 @@ def new(trainer=None):
     config.core[trainer].model_path_omit_keys=[]
     config.core[trainer].net_omit_keys_strict=[]
 
-    ## --------[trainer].--------- ddp --------------------
+    ## ----------------- ddp --------------------
     config.core[trainer].dist_url = "tcp://localhost:27030"
     config.core[trainer].world_size = 2
     config.core[trainer].shuffle = False
 
-    ## --------[trainer].----------- loader ------------------
+    ## ------------------- loader ------------------
     config.core[trainer].num_workers = 3
     config.core[trainer].nominal_batch_factor = 1
 
-    ## --------[trainer].---------- train ------------------
+    ## ------------------ train ------------------
     config.core[trainer].train_batch_size = 128
     config.core[trainer].epoch_num = 30
     #model save[trainer].number duriong an epoch
     config.core[trainer].save_num = 5
     config.core[trainer].checkpoint_suffix = ''
 
-    ## --------[trainer].--------- val ------------------
+    ## ----------------- val ------------------
     config.core[trainer].val_batch_size = None
+    config.core[trainer].acc = 0
 
     return config
 
@@ -92,4 +93,3 @@ def fork(deepvac_config, field=['aug','datasets']):
             return None
         c[f] = deepvac_config[f].clone()
     return c
-

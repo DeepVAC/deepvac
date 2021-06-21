@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms as trans
 from torchvision.models import resnet50
-from ..core.config import config, AttrDict, fork
+from ..core.config import AttrDict, new
 from ..core.deepvac import Deepvac, DeepvacTrain
 from ..datasets.os_walk import OsWalkDataset
 from ..datasets.file_line import FileLineDataset
@@ -269,32 +269,14 @@ class ResNet50Test(Deepvac):
             LOG.logI("path: {}, max_probability:{}, max_index:{}".format(path[0], max_probability.item(), max_index.item()))
         self.config.sample = input_tensor
 
-def auditConfig():
-    config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def auditTestConfig():
+    config.core.ResNet50Test.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     config.cast.ScriptCast = AttrDict()
     config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
 
-    config.core.disable_git = True
-    #train stuff
-    config.core.epoch_num = 100
-    config.core.save_num = 1
-    config.core.log_every = 100
-    config.core.num_workers = 4
+    config.core.ResNet50Test.disable_git = True
 
-    config.core.net = resnet50(pretrained=True)
-
-    config.core.optimizer = optim.SGD(
-        config.core.net.parameters(),
-        lr=1e-3,
-        momentum=0.9,
-        weight_decay=5e-4,
-        nesterov=False
-    )
-    config.core.scheduler = optim.lr_scheduler.MultiStepLR(config.core.optimizer, [50, 70, 90], 0.1)
-    config.core.criterion=torch.nn.CrossEntropyLoss()
-    
-    config.core.shuffle = True
-    config.core.batch_size = 1
+    config.core.ResNet50Test.net = resnet50(pretrained=True)
 
     config.datasets.ResnetClsTestDataset = AttrDict()
     config.datasets.ResnetClsTestDataset.transform = trans.Compose([
@@ -302,7 +284,33 @@ def auditConfig():
         trans.ToTensor(),
         trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
-#Note, existed issue, will be fixed next week.
+
+def auditTrainConfig():
+    config.core.ResNet50Train.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    config.cast.ScriptCast = AttrDict()
+    config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
+
+    config.core.ResNet50Train.disable_git = True
+    #train stuff
+    config.core.ResNet50Train.epoch_num = 100
+    config.core.ResNet50Train.save_num = 1
+    config.core.ResNet50Train.log_every = 10
+    config.core.ResNet50Train.num_workers = 4
+
+    config.core.ResNet50Train.net = resnet50(pretrained=True)
+
+    config.core.ResNet50Train.optimizer = optim.SGD(
+        config.core.ResNet50Train.net.parameters(),
+        lr=1e-3,
+        momentum=0.9,
+        weight_decay=5e-4,
+        nesterov=False
+    )
+    config.core.ResNet50Train.scheduler = optim.lr_scheduler.MultiStepLR(config.core.ResNet50Train.optimizer, [50, 70, 90], 0.1)
+    config.core.ResNet50Train.criterion=torch.nn.CrossEntropyLoss()
+
+    config.core.ResNet50Train.batch_size = 1
+
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
         LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
@@ -310,37 +318,42 @@ if __name__ == "__main__":
     op = sys.argv[1]
     if op not in ('train','test','benchmark'):
         LOG.logE("Usage: python -m deepvac.backbones.resnet <train|test|benchmark> <pretrained_model.pth> <your_input>", exit=True)
-    #
-    auditConfig()
 
     if op == 'train':
         if(len(sys.argv) != 6):
             LOG.logE("Usage: python -m deepvac.backbones.resnet train <pretrained_model.pth> <train_val_data_dir_prefix> <train.txt> <val.txt>", exit=True)
 
-        config.core.model_path = sys.argv[2]
+        config = new('ResNet50Train')
+        auditTrainConfig()
+        
+        config.core.ResNet50Train.model_path = sys.argv[2]
         config.datasets.FileLineDataset = AttrDict()
         config.datasets.FileLineDataset.transform = trans.Compose([
             trans.ToTensor(),
             trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
-        config.core.train_dataset = FileLineDataset(config, fileline_path=sys.argv[4], sample_path_prefix=sys.argv[3])
-        config.core.train_loader = torch.utils.data.DataLoader(config.core.train_dataset, batch_size=config.core.batch_size, pin_memory=False)
+        config.core.ResNet50Train.train_dataset = FileLineDataset(config, fileline_path=sys.argv[4], sample_path_prefix=sys.argv[3])
+        config.core.ResNet50Train.train_loader = torch.utils.data.DataLoader(config.core.ResNet50Train.train_dataset, batch_size=config.core.ResNet50Train.batch_size, pin_memory=False)
         
-        config.core.val_dataset = FileLineDataset(config, fileline_path=sys.argv[5], sample_path_prefix=sys.argv[3])
-        config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, batch_size=1, pin_memory=False)
-        config.core.test_loader = ''
+        config.core.ResNet50Train.val_dataset = FileLineDataset(config, fileline_path=sys.argv[5], sample_path_prefix=sys.argv[3])
+        config.core.ResNet50Train.val_loader = torch.utils.data.DataLoader(config.core.ResNet50Train.val_dataset, batch_size=1, pin_memory=False)
+        config.core.ResNet50Train.test_loader = ''
         train = ResNet50Train(config)
         train()
 
     if op == 'test':
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.backbones.resnet test <pretrained_model.pth> <your_test_img_input_dir>", exit=True)
-        #config.core.network_audit_disabled=True
-        config.core.model_path = sys.argv[2]
+        
+        config = new('ResNet50Test')
+        auditTestConfig()
+        
+        # config.core.ResNet50Test.network_audit_disabled=True
+        config.core.ResNet50Test.model_path = sys.argv[2]
         config.cast.ScriptCast.model_dir = "./script.pt"
         config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
-        config.core.test_dataset = ResnetClsTestDataset(config, sample_path=sys.argv[3])
-        config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
+        config.core.ResNet50Test.test_dataset = ResnetClsTestDataset(config, sample_path=sys.argv[3])
+        config.core.ResNet50Test.test_loader = torch.utils.data.DataLoader(config.core.ResNet50Test.test_dataset, batch_size=1, pin_memory=False)
         test = ResNet50Test(config)
         input_tensor = torch.rand(1,3,640,640)
         test()
@@ -349,19 +362,22 @@ if __name__ == "__main__":
         if(len(sys.argv) != 4):
             LOG.logE("Usage: python -m deepvac.backbones.resnet benchmark <pretrained_model.pth> <your_input_img.jpg>", exit=True)
 
-        # config.core.model_reinterpret_cast = False
-        # config.core.cast_state_dict_strict = False
-        # config.core.net_omit_keys = ['num_batches_tracked']
-        # config.core.net_omit_keys_strict = False
-        config.core.model_path = sys.argv[2]
-        config.core.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        img_path = sys.argv[3]
-        config.core.test_loader = ''
+        config = new('ResNet50Test')
+        auditTestConfig()
 
-        t224x224 = torch.rand((100, 1, 3, 224, 224), dtype = torch.float).to(config.core.device)
-        t640x640 = torch.rand((100, 1, 3, 640, 640), dtype = torch.float).to(config.core.device)
-        t1280x720 = torch.rand((50, 1, 3, 720, 1280), dtype = torch.float).to(config.core.device)
-        t1280x1280 = torch.rand((50, 1, 3, 1280, 1280), dtype = torch.float).to(config.core.device)
+        # config.core.ResNet50Test.device = 'cuda'
+        config.core.ResNet50Test.model_reinterpret_cast = True
+        config.core.ResNet50Test.cast_state_dict_strict = False
+        config.core.ResNet50Test.net_omit_keys = ['num_batches_tracked']
+        config.core.ResNet50Test.net_omit_keys_strict = False
+        config.core.ResNet50Test.model_path = sys.argv[2]
+        img_path = sys.argv[3]
+        config.core.ResNet50Test.test_loader = ''
+
+        t224x224 = torch.rand((100, 1, 3, 224, 224), dtype = torch.float).to(config.core.ResNet50Test.device)
+        t640x640 = torch.rand((100, 1, 3, 640, 640), dtype = torch.float).to(config.core.ResNet50Test.device)
+        t1280x720 = torch.rand((50, 1, 3, 720, 1280), dtype = torch.float).to(config.core.ResNet50Test.device)
+        t1280x1280 = torch.rand((50, 1, 3, 1280, 1280), dtype = torch.float).to(config.core.ResNet50Test.device)
 
         test = ResNet50Test(config)
         test.benchmark(t224x224, img_path)
