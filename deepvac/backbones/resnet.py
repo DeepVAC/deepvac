@@ -291,7 +291,7 @@ def auditTrainConfig():
     config.core.ResNet50Train.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     config.cast.ScriptCast = AttrDict()
-    config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
+    # config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
     # config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
     # config.cast.ScriptCast.dynamic_quantize_dir = "./dynamic_quantize.pt"
 
@@ -305,6 +305,11 @@ def auditTrainConfig():
     config.core.ResNet50Train.log_every = 100
     config.core.ResNet50Train.num_workers = 4
 
+    # config.core.ResNet50Train.tensorboard_port = "6007"
+    # config.core.ResNet50Train.tensorboard_ip = None
+
+    # config.core.ResNet50Train.amp = True
+
     config.core.ResNet50Train.net = resnet50(pretrained=True)
 
     config.core.ResNet50Train.optimizer = optim.SGD(
@@ -317,7 +322,7 @@ def auditTrainConfig():
     config.core.ResNet50Train.scheduler = optim.lr_scheduler.MultiStepLR(config.core.ResNet50Train.optimizer, [50, 70, 90], 0.1)
     config.core.ResNet50Train.criterion=torch.nn.CrossEntropyLoss()
 
-    config.core.ResNet50Train.batch_size = 1
+    config.core.ResNet50Train.batch_size = 16
 
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
@@ -337,6 +342,7 @@ if __name__ == "__main__":
         config.datasets.FileLineDataset = AttrDict()
         config.datasets.FileLineDataset.transform = trans.Compose([
             trans.ToTensor(),
+            trans.Resize([224, 224]),
             trans.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
         config.core.ResNet50Train.train_dataset = FileLineDataset(config, fileline_path=sys.argv[4], sample_path_prefix=sys.argv[3])

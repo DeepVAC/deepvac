@@ -706,7 +706,7 @@ class DeepvacDDP(DeepvacTrain):
             self.config.train_dataset,
             batch_size=self.config.batch_size,
             num_workers=self.config.num_workers,
-            shuffle=self.config.shuffle,
+            shuffle=False,
             sampler=self.config.train_sampler,
             collate_fn=self.config.collate_fn
         )
