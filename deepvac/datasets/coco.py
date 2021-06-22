@@ -5,7 +5,7 @@ from ..utils import LOG
 from .base_dataset import DatasetBase
 
 class CocoCVDataset(DatasetBase):
-    def __init__(self, deepvac_config, sample_path, target_path):
+    def __init__(self, deepvac_config, sample_path, target_path, cat2idx=None):
         super(CocoCVDataset, self).__init__(deepvac_config)
         try:
             from pycocotools.coco import COCO
@@ -15,6 +15,7 @@ class CocoCVDataset(DatasetBase):
         self.coco = COCO(target_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
         self.cats = list(sorted(self.coco.cats.keys()))
+        self.cat2idx = cat2idx
 
     def __len__(self):
         return len(self.ids)
@@ -50,9 +51,18 @@ class CocoCVDataset(DatasetBase):
     def loadAnns(self, index):
         ann_ids = self.coco.getAnnIds(imgIds=self.ids[index])
         anns = self.coco.loadAnns(ann_ids)
-        category_ids = np.array([self.cats.index(i["category_id"]) for i in anns], dtype=np.float)
+        # use coco target idx or define your self target idx
+        if self.cat2idx is None:
+            category_ids = np.array([self.cats.index(int(i["category_id"])) for i in anns], dtype=np.float)
+        else:
+            category_ids = np.array([self.cat2idx[i["category_id"]] for i in anns], dtype=np.float)
+
         boxes = np.array([i["bbox"] for i in anns], dtype=np.float)
-        masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
+
+        if "segmentation" in anns[0].keys():
+            masks = np.array([self.coco.annToMask(i) for i in anns], dtype=np.float)
+        else:
+            masks = None
         return category_ids, boxes, masks
 
 
