@@ -19,7 +19,7 @@ class Conv2dBNWithName(nn.Sequential):
             ('conv', nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, groups=groups, bias=bias)),
             ('bn', nn.BatchNorm2d(out_planes))
         ]))
-        
+
 class Conv2dBNReLU(nn.Sequential):
     def __init__(self, in_planes, out_planes, kernel_size=3, stride=1, padding=None, groups=1, bias=False):
         if padding is None:
@@ -114,3 +114,4 @@ class Conv2dDilatedBN(nn.Sequential):
             nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, dilation=dilation, groups=groups, bias=bias),
             nn.BatchNorm2d(out_planes)
     )
+

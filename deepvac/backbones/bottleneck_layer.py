@@ -1,30 +1,30 @@
 import torch
 import torch.nn as nn
-from .conv_layer import Conv2dBNReLU
+from .conv_layer import *
 
 class BottleneckStd(nn.Module):
     # Standard bottleneck
-    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, eps=1e-5, momentum=0.1, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
+    def __init__(self, in_planes, out_planes, groups=1, shortcut=True, expansion=0.5):  # ch_in, ch_out, shortcut, groups, expansion
         super(BottleneckStd, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
-        self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, eps, momentum, groups=groups)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1,)
+        self.conv2 = Conv2dBNHardswish(hidden_planes, out_planes, 3, 1, groups=groups)
         self.add = shortcut and in_planes == out_planes
 
     def forward(self, x):
         return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
 
 class BottleneckCSP(nn.Module):
-    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, eps=1e-5, momentum=0.1, groups=1, expansion=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, in_planes, out_planes, bottle_std_num=1, shortcut=True, groups=1, expansion=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(BottleneckCSP, self).__init__()
         hidden_planes = int(out_planes * expansion)  # hidden channels
-        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1, eps, momentum)
+        self.conv1 = Conv2dBNHardswish(in_planes, hidden_planes, 1, 1,)
         self.conv2 = nn.Conv2d(in_planes, hidden_planes, 1, 1, bias=False)
         self.conv3 = nn.Conv2d(hidden_planes, hidden_planes, 1, 1, bias=False)
-        self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1, eps, momentum)
-        self.bn = nn.BatchNorm2d(2 * hidden_planes, eps=eps, momentum=momentum)  # applied to cat(conv2, conv3)
+        self.conv4 = Conv2dBNHardswish(2 * hidden_planes, out_planes, 1, 1,)
+        self.bn = nn.BatchNorm2d(2 * hidden_planes)  # applied to cat(conv2, conv3)
         self.act = nn.LeakyReLU(0.1, inplace=True)
-        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, eps=eps, momentum=momentum, expansion=1.0) for _ in range(bottle_std_num)])
+        self.std_bottleneck_list = nn.Sequential(*[BottleneckStd(hidden_planes, hidden_planes, groups=groups, shortcut=shortcut, expansion=1.0) for _ in range(bottle_std_num)])
 
     def forward(self, x):
         y1 = self.conv3(self.std_bottleneck_list(self.conv1(x)))
@@ -81,3 +81,4 @@ class BottleneckIR(nn.Module):
         shortcut = self.shortcut_layer(x)
         res = self.res_layer(x)
         return res + shortcut
+
