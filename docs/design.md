@@ -1,6 +1,6 @@
 # 概要设计
-总的来说，deepvac 1.x及之前（当前为预览版本，版本号为0.5.x）要保持如下原则：
-- 极其轻量：当前的0.5.x预览版本只有66个python源码文件，代码量7000行左右；即使在下半年的1.0版本发布的时候，也会控制在100个python源码文件，10000行代码以内；
+总的来说，deepvac 1.x及之前要保持如下原则：
+- 极其轻量：当前的0.5.x预览版本（开始写该文档时）只有66个python源码文件，代码量7000行左右；即使在下半年的1.0版本发布的时候，也会控制不超过100个python源码文件，代码行数10000行以内；
 - 纯python实现，且只依赖cv领域内常见的包；
 - 只封装PyTorch深度学习框架；
 - 追踪PyTorch最新release上的有普遍价值或者高价值的功能。
@@ -22,7 +22,7 @@
 
 比如常见的PyTorch训练范式有标准训练、DDP训练、混合精度训练、开启EMA等，这些已经封装到了deepvac库的core模块中了。config就是项目中常用的配置文件config.py，deepvac把尽可能多的逻辑抽象到配置层面，从而让config.py成为deepvac库中的一等公民。抽象到配置层面后，deepvac各模块之间就更容易解耦了。而且config被设计成了平面模式，更符合常人的直觉。
 
-使用DeepvacTrain类体系是很简单的，这里说下如何自定义扩展。比如我现在要封装一个蒸馏训练范式，我可以这么做：
+使用DeepvacTrain类体系是很简单的，这里说下如何自定义扩展。比如我现在要扩展封装出一个蒸馏训练范式，我可以这么做：
 ```python
 from deepvac import DeepvacTrain
 
@@ -32,13 +32,13 @@ class DeepvacDistill(DeepvacTrain):
         #for student
         super(DeepvacDistill, self).auditConfig()
         #for teacher
-        #do audit for some extra flags on config.train.teacher
+        #do audit for some extra flags on teacher
 
     def initNetWithCode(self):
         #for student
         super(DeepvacDistill, self).initNetWithCode()
         #for teacher
-        #init self.config.teacher.net
+        #init teacher net
 ......
 ```
 
@@ -49,11 +49,23 @@ class DeepvacDistill(DeepvacTrain):
 # config-module
 因为config在deepvac库中的核心作用，我们还特别设计了几个API来方便用户对config的使用：
 ```python
-from deepvac import config, AttrDict, new, interpret, fork
+from deepvac import AttrDict, new, interpret, fork
 ```
 
 ### config实例
-config是deepvac库初始化后默认内置的AttrDict实例，并且为deepvac的每个模块初始化了一个命名空间，相当于：
+在config.py的开始，我们需要使用new API来创建config实例:
+```python
+config = new('my_train_class')
+```
+
+### new
+new() API创建出一个全新的config实例，:
+```python
+config = new()
+#或者
+config = new('my_train_class')
+```
+new()相当于：
 ```python
 config = AttrDict()
 config.core = AttrDict()
@@ -64,22 +76,42 @@ config.backbones = AttrDict()
 config.loss = AttrDict()
 config.datasets = AttrDict()
 ```
-
-### new
-new() API创建出一个全新的config实例，且为deepvac的每个模块初始化了一个命名空间:
+new('my_train_class')相当于：
 ```python
-myconfig = new()
-```
-相当于：
-```python
-myconfig = AttrDict()
-myconfig.core = AttrDict()
-myconfig.feature = AttrDict()
-myconfig.aug = AttrDict()
-myconfig.cast = AttrDict()
-myconfig.backbones = AttrDict()
-myconfig.loss = AttrDict()
-myconfig.datasets = AttrDict()
+config = AttrDict()
+config.core = AttrDict()
+config.feature = AttrDict()
+config.aug = AttrDict()
+config.cast = AttrDict()
+config.backbones = AttrDict()
+config.loss = AttrDict()
+config.datasets = AttrDict()
+config.core.<my_train_class> = AttrDict()
+config.core.<my_train_class>.device = "cuda"
+config.core.<my_train_class>.output_dir = "output"
+config.core.<my_train_class>.log_dir = "log"
+config.core.<my_train_class>.log_every = 10
+config.core.<my_train_class>.disable_git = False
+config.core.<my_train_class>.cast2cpu = True
+config.core.<my_train_class>.model_reinterpret_cast=False
+config.core.<my_train_class>.cast_state_dict_strict=True
+config.core.<my_train_class>.model_path_omit_keys=[]
+config.core.<my_train_class>.net_omit_keys_strict=[]
+## ----------------- ddp --------------------
+config.core.<my_train_class>.dist_url = "tcp://localhost:27030"
+config.core.<my_train_class>.world_size = 2
+config.core.<my_train_class>.shuffle = False
+## ------------------- loader ------------------
+config.core.<my_train_class>.num_workers = 3
+config.core.<my_train_class>.nominal_batch_factor = 1
+## ------------------ train ------------------
+config.core.<my_train_class>.train_batch_size = 128
+config.core.<my_train_class>.epoch_num = 30
+config.core.<my_train_class>.save_num = 5
+config.core.<my_train_class>.checkpoint_suffix = ''
+## ----------------- val ------------------
+config.core.<my_train_class>.val_batch_size = None
+config.core.<my_train_class>.acc = 0
 ```
 
 ### clone
@@ -111,6 +143,8 @@ x.f1.f2.f3.f4.f5.f6.f7.name = 'gemfield'
 clone() API的快捷使用方式
 ```python
 myconfig = fork(config)
+#由于默认参数['aug','datasets']，相当于
+myconfig = fork(config, ['aug','datasets'])
 #相当于
 myconfig = new()
 myconfig.aug = config.aug.clone()
@@ -226,17 +260,39 @@ deepvac.backbones模块中封装对项目有用的backbone和模块。deepvac的
 
 # cast
 deepvac.cast模块中实现了PyTorch模型到如下推理框架的模型的转换：
-- LibTorch使用的TorchScript，及量化版TorchScript模型；
+- TorchScript;
+- 量化版TorchScript模型；
+- ONNX;
 - TensorRT；
-- onnx；
-- iOS使用的CoreML；
-- Android、Arm Linux使用的ncnn。
+- NCNN;
+- TNN;
+- MNN;
+- CoreML；
 
-deepvac 1.0版本发布的时候还将支持TNN和MNN转换器。得益于config.py的抽象，deepvac的模型转换器可以做到代码层面的解耦，实现非常漂亮。同样的，用户使用这些转换器的方式也异常简单：只需要在config.py中打开一个或几个开关即可。
+得益于config.py的抽象，deepvac的模型转换器可以做到代码层面的解耦，实现非常漂亮。同样的，用户使用这些转换器的方式也异常简单：只需要在config.py中打开一个或几个开关即可。
 
 # datasets
+对torch.utils.data.Dataset类的扩展实现，扩展并实现各种自定义数据集的装载。用户使用deepvac.datasets模块的时候，应该先看看deepvac.datasets模块是否满足需求。如果否，那么用户需要自己继承其中的某个类去扩展实现。
 
-对torch.utils.data.Dataset类的扩展实现，扩展并实现各种自定义数据集的装载。torchvision的datasets目录下已经实现了各种各样的dataset，用户可以先去那里看看是否满足需求。如果否，再看看deepvac.datasets模块是否满足需求。如果否，那么用户需要自己去实现了，这个时候，继承deepvac.datasets模块中的某个类可能是个好办法。
+deepvac.datasets模块还有一个compose机制，就是在data从datasets中返回之前，我们会先检查用户是否在config中配置了：
+- config.datasets.<my_dataset_class>.composer
+- config.datasets.<my_dataset_class>.transform  
+
+其值可以是：
+- transforms.composer实例;
+- deepvac的composer实例(比如上述的GemfieldComposer);
+- 由多个transforms.composer实例组成的list;
+- 由多个deepvac composer实例组成的list;
+
+如果配置了其中一个，则data会先经过composer/transform的增强/变换再传到用户层面，比如：
+```python
+config.datasets.FileLineDataset.composer = trans.Compose([
+        trans.Resize([192, 48]),
+        trans.ToTensor(),
+        trans.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))
+    ])
+```
+如果config.datasets.<my_dataset_class>.composer和config.datasets.<my_dataset_class>.transform都被用户配置，则优先级是先config.datasets.<my_dataset_class>.transform再config.datasets.<my_dataset_class>.composer。
 
 # loss
 

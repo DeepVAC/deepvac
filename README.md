@@ -42,103 +42,28 @@ import sys
 #replace with your local deepvac directory
 sys.path.insert(0,'/home/gemfield/github/deepvac')
 ```
+或者设置PYTHONPATH环境变量：
+```bash
+export PYTHONPATH=/home/gemfield/github/deepvac
+```
 
 ## 4. 创建自己的PyTorch项目
 - 初始化自己项目的git仓库；
 - 在仓库中创建第一个研究分支，比如分支名为 LTS_b1_aug9_movie_video_plate_130w；
-- 切换到上述的LTS_b1分支中，开始coding；
+- 切换到上述的LTS_b1分支中，开始工作；
 
 ## 5. 编写配置文件
-配置文件的文件名均为 config.py，位于你项目的根目录。在代码开始处添加```from deepvac import config```；
-所有用户的配置都存放在这个文件里。config模块提供了2个预定义的作用域：config.core和config.aug。使用方法如下：
-- 所有和trainer相关（包括train、val、test）的配置都定义在config.core中；
-- 所有和deepvac.aug中增强模块相关的配置都定义在config.aug中；
+配置文件的文件名均为 config.py，位于你项目的根目录。在代码开始处添加```from deepvac import new, AttrDict```；
+所有用户的配置都存放在这个文件里。config模块提供了6个预定义的作用域：config.core,config.aug,config.cast,config.datasets,config.backbones,config.loss。使用方法如下：
+- 所有和trainer相关（包括train、val、test）的配置都定义在config.core.<my_train_class>中；
+- 所有和deepvac.aug中增强模块相关的配置都定义在config.aug.<my_aug_class>中；
+- 所有和模型转换相关的配置都定义在config.cast.<the_caster_class>中；
+- 所有和Datasets相关的配置都定义在config.datasets.<my_dataset_class>中；
+- 所有和loss相关的配置都定义在config.loss.<my_loss_class>中；
 - 用户可以开辟自己的作用域，比如config.my_stuff = AttrDict()，然后config.my_stuff.name = 'gemfield'；
+- 用户可以使用new()来初始化config实例，使用clone()来深拷贝config配置项。
 
-Deepvac的config模块内置了如下的配置，而且用户一般不需要修改（如果想修改也可以）：
-```python
-## ------------------ common ------------------
-#模型输入路径，用户无特殊情况不要修改
-config.core.output_dir = "output"
-#禁用训练中的验证环节
-config.core.no_val = False
-#日志存放目录
-config.core.log_dir = "log"
-#每多少次迭代打印一行日志
-config.core.log_every = 10
-#停止对git分支检测结果做出响应
-config.core.disable_git = False
-#使用模型转换器的时候，网络和input是否要to到cpu上
-config.core.cast2cpu = True
-#加载预训练模型的时候，如果参数名不一致，是否进行强制转换
-config.core.model_reinterpret_cast=False
-#强制转换的时候，是否严格要求参数的shape一致
-config.core.cast_state_dict_strict=True
-
-## -------------------- loader ------------------
-config.core.num_workers = 3
-```
-
-Deepvac的config模块内置了如下的配置，但是用户一般需要修改（如果用到的话）：
-```python
-## ------------------ common ------------------
-config.core.device = "cuda:0"
-
-## ------------------ ddp --------------------
-config.core.dist_url = "tcp://localhost:27030"
-config.core.world_size = 2
-
-## ------------------ optimizer  ------------------
-#多少个batch更新一次权重
-config.core.nominal_batch_factor = 1
-
-## ------------------- train ------------------
-config.core.train_batch_size = 128
-config.core.epoch_num = 30
-#一个Epoch保存几次模型
-config.core.save_num = 5
-#要加载的预训练模型
-config.core.checkpoint_suffix = ''
-config.core.train_batch_size = 128
-
-## ------------------ val ------------------
-config.core.val_batch_size = 32
-```
-
-Deepvac的config模块没有预定义，但是用户必须要定义的配置：
-```python
-## -------------------- loader ------------------
-#dataloader的collate_fn参数
-config.core.collate_fn = None
-#MyTrainDataset为Dataset的子类
-config.core.train_dataset = MyTrainDataset(config)
-config.core.train_loader = torch.utils.data.DataLoader(
-    config.core.train_dataset,
-    batch_size=config.core.batch_size,
-    num_workers=config.core.num_workers,
-    shuffle= True,
-    collate_fn=config.core.collate_fn
-)
-#MyValDataset为Dataset的子类
-config.core.val_dataset = MyValDataset(config)
-config.core.val_loader = torch.utils.data.DataLoader(config.core.val_dataset, batch_size=1, pin_memory=False)
-
-#MyTestDataset为Dataset的子类
-config.core.test_dataset = MyTestDataset(config)
-config.core.test_loader = torch.utils.data.DataLoader(config.core.test_dataset, batch_size=1, pin_memory=False)
-
-## ------------------- train ------------------
-#网络定义
-config.core.net = MyNet()
-#损失函数
-config.core.criterion = MyCriterion()
-
-## ------------------ optimizer  ------------------
-config.core.optimizer = optim.SGD(config.core.net.parameters(),lr=0.01,momentum=0.9,weight_decay=None,nesterov=False)
-config.core.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.core.optimizer, [2,4,6,8,10], 0.27030)
-```
-
-以上只是基础配置，更多配置：
+更多配置：
 - 预训练模型加载；
 - checkpoint加载；
 - tensorboard使用；
@@ -147,11 +72,11 @@ config.core.scheduler = torch.optim.lr_scheduler.MultiStepLR(config.core.optimiz
 - 转换NCNN；
 - 转换CoreML；
 - 转换TensorRT；
-- 转换TNN（即将）；
-- 转换MNN（即将）；
+- 转换TNN；
+- 转换MNN；
 - 开启量化；
 - 开启EMA；
-- 开启自动混合精度训练；
+- 开启自动混合精度训练(AMP)；
 
 以及关于配置文件的更详细解释，请阅读[config说明](./docs/config.md).
 
@@ -191,12 +116,13 @@ print(self.config.batch_size)
 - new
 - interpret
 - fork
+- clone
 ```python
-from deepvac import config, AttrDict, new, interpret, fork
+from deepvac import AttrDict, new, interpret, fork
 ```
 关于这些API的使用方法，请访问[config API 说明](./docs/design.md#config-module).
 ## 6. 编写synthesis/synthesis.py（可选）
-编写该文件，用于产生数据集和data/train.txt，data/val.txt。 
+编写该文件，用于产生本项目的数据集，用于对本项目的数据集进行自动化检查和清洗。
 这一步为可选，如果有需要的话，可以参考Deepvac组织下Synthesis2D项目的实现。
 
 ## 7. 编写aug/aug.py（可选）
@@ -216,8 +142,8 @@ from deepvac.aug import RetinaAugComposer
 
 要扩展自己的composer也是很简单的，比如我可以自定义一个composer（我把它命名为GemfieldComposer），这个composer可以使用/复用以下增强逻辑：
 - torchvision transform定义的compose；
-- deepvac内置的aug；
-- 我自己写的aug。
+- deepvac内置的aug算子；
+- 我自己写的aug算子。
 
 更详细的步骤请访问：[deepvac.aug模块使用](./docs/design.md#aug)
 
@@ -273,7 +199,7 @@ class MyTrain(DeepvacTrain):
 | doBackward | 网络反向传播过程，DeepvacTrain会调用self.config.loss.backward()进行BP| 用户可以重新定义（如果需要的话）|
 | doOptimize | 网络权重更新的过程，DeepvacTrain会调用self.config.optimizer.step() | 用户可以重新定义（如果需要的话） |
 | doSchedule | 更新学习率的过程，DeepvacTrain会调用self.config.scheduler.step() | 用户可以重新定义（如果需要的话） |
-| * doValAcc | 在val模式下计算模型的acc，DeepvacTrain啥也不做 | 用户一般要重新定义 |
+| * doValAcc | 在val模式下计算模型的acc，DeepvacTrain啥也不做 | 用户一般要重新定义，写tensorboard的时候依赖于此 |
 
 典型的写法如下：
 ```python
@@ -310,13 +236,13 @@ train()
 | postIter| 每个batch迭代之后的用户操作，Deepvac啥也不做 | 用户可以重新定义（如果需要的话） |
 | doFeedData2Device | Deepvac把来自dataloader的sample和target(标签)移动到device设备上  | 用户可以重新定义（如果需要的话） |
 | doForward | Deepvac会进行网络推理，推理结果赋值给self.config.output成员 |用户可以重新定义（如果需要的话）  |
-| testFly | 用户完全自定义的test逻辑，需要通过report.add(gt, pred)添加测试结果，生成报告 | 看下面的测试逻辑 |
+| doTest | 用户完全自定义的test逻辑，可以通过report.add(gt, pred)添加测试结果，生成报告 | 看下面的测试逻辑 |
 
 典型的写法如下：
 ```python
 class MyTest(Deepvac):
     ...
-    def testFly(self):
+    def doTest(self):
         ...
 
 test = MyTest(deepvac_config)
@@ -326,22 +252,18 @@ test()
 
 当执行test()的时候，DeepVAC框架会按照如下的优先级进行测试：
 - 如果用户传递了参数，比如test(input_tensor)，则将针对该input_tensor进行doFeedData2Device + doForward，然后测试结束；
-- 如果用户配置了config.core.sample，则将针对config.core.sample进行doFeedData2Device + doForward，然后测试结束；
-- 如果用户重写了testFly()函数，则将执行testFly()，然后测试结束；
-- 如果用户配置了config.test_loader，则将迭代该loader，每个sample进行doFeedData2Device + doForward，然后测试结束；
+- 如果用户重写了doTest()函数，则将执行doTest()，然后测试结束；
+- 如果用户配置了config.my_test.test_loader，则将迭代该loader，对每个sample进行doFeedData2Device + doForward，然后测试结束；
 - 以上都不符合，报错退出。
 
-# 已知问题
-- 由上游PyTorch引入的问题：[问题列表](https://github.com/DeepVAC/deepvac/issues/72); 
-- 暂无。
 
 # DeepVAC的社区产品
 | 产品名称 | 简介  |当前版本 | 获取方式/部署形式 |
 | ---- | ---- | ---- |---- |
-|[DeepVAC](https://github.com/deepvac/deepvac)|独树一帜的PyTorch模型训练工程规范  | 0.5.0 | pip install deepvac |
+|[DeepVAC](https://github.com/deepvac/deepvac)|独树一帜的PyTorch工程规范  | 0.6.0 | pip install deepvac |
 |[libdeepvac](https://github.com/deepvac/libdeepvac) | 独树一帜的PyTorch模型部署框架 | 1.9.0 | SDK，下载 & 解压|
-|[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| 迄今为止最先进的容器化PyTorch模型训练环境 | 1.1 | docker run / k8s|
+|[MLab HomePod](https://github.com/DeepVAC/MLab#mlab-homepod)| 迄今为止最先进的容器化PyTorch模型训练环境 | 2.0 | docker run / k8s|
 |MLab RookPod| 迄今为止最先进的成本10万人民币以下的存储解决方案 | NA | 硬件规范 + k8s yaml|
-|MLab HPC| 适配MLab HomePod的硬件 | NA | 硬件规范|
-|DeepVAC版PyTorch | 为MLab HomePod定制的PyTorch包 |1.9.0 | conda install -c gemfield pytorch |
+|[pyRBAC](https://github.com/DeepVAC/pyRBAC) | 基于Keycloak的RBAC python实现 |  NA | pip install(敬请期待) |
+|DeepVAC版PyTorch | 为MLab HomePod pro版本定制的PyTorch包 |1.9.0 | conda install -c gemfield pytorch |
 |[DeepVAC版LibTorch](https://github.com/deepvac/libdeepvac)| 为libdeepvac定制的LibTorch库 | 1.9.0 | 压缩包，下载 & 解压|

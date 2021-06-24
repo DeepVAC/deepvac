@@ -24,9 +24,8 @@ DeepVAC标准是由MLab团队设立，用来定义和约束AI模型的训练、�
 - 测试代码基于Deepvac类；
 - 日志基于LOG模块；
 - 配置基于config模块;
-- 数据合成基于Synthesis项目;
-- 数据增强基于deepvac.aug;
-- 数据动态增强基于deepvac.aug模块的Composer类体系;
+- 数据合成基于本项目的synthesis目录，或者通用的Synthesis项目;
+- 数据增强基于deepvac.aug模块及该模块中的Composer类体系;
 - 自定义dataloader基于deepvac.datasets;
 - 模型性能报告基于Report模块;
 - 模型定义基于deepvac.backbones;
@@ -67,15 +66,13 @@ date: <测试日期>
 - config.cast.ScriptCast.dynamic_quantize_dir（可选）
 - config.cast.TraceCast.static_quantize_dir（必须）
 - config.cast.TraceCast.dynamic_quantize_dir（可选）
-- config.core.ema（可选）
-- config.core.tensorboard_*（可选）
-- config.core.amp（可选）
-- config.core.dist_url（可选）
-
+- config.core.<my_train_class>.ema（可选）
+- config.core.<my_train_class>.tensorboard_*（可选）
+- config.core.<my_train_class>.amp（可选）
+- config.core.<my_train_class>.dist_url（可选）
 
 #### 部署目标为x86 Linux、Arm Linux、ARM Android/iOS的训练
 在部署目标为x86+CUDA Linux的训练基础上，开启如下开关：
-- config.core.qat_dir（必须，该功能还未开发完毕）
 - config.cast.OnnxCast.onnx_model_dir（可选，需要ONNX时开启）
 - config.cast.NcnnCast.model_dir, config.cast.NcnnCast.onnx2ncnn（可选，需要NCNN时开启）
 - config.cast.CoremlCast.model_dir（可选，需要CoreML时开启）

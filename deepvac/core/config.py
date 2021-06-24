@@ -73,7 +73,7 @@ def new(trainer=None):
     ## ------------------ train ------------------
     config.core[trainer].train_batch_size = 128
     config.core[trainer].epoch_num = 30
-    #model save[trainer].number duriong an epoch
+    #model save number during an epoch
     config.core[trainer].save_num = 5
     config.core[trainer].checkpoint_suffix = ''
 

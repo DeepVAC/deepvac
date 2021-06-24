@@ -6,7 +6,7 @@ deepvac库对云上炼丹师提供以下模块：
 |Deepvac |from deepvac import Deepvac |测试代码的基类|
 |DeepvacTrain |from deepvac import DeepvacTrain |训练、验证代码的基类|
 |LOG                 | from deepvac import LOG     |日志模块|
-|config            | from deepvac import config, AttrDict, new, fork, interpret    |配置模块 |
+|config            | from deepvac import AttrDict, new, fork, interpret    |配置模块 |
 |*Aug          | from deepvac.aug import *       | 各种数据增强的类实现|
 |{,*Aug}Composer      | from deepvac.aug import *   |动态数据增强的抽象封装|
 |*Dataset       | from deepvac.datasets import *  | Dataset的扩展实现，torch.utils.data.Dataset的子类们，用于个性化各种dataloader|
