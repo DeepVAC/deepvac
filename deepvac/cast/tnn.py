@@ -33,7 +33,7 @@ class TnnCast(DeepvacCast):
             self.onnxSimplify(input_shapes=input_shapes_, perform_optimization=False)
         
         output_dir = os.path.dirname(self.config.model_dir)
-        command = "python3 -c \"import onnx2tnn;onnx2tnn.convert(\\\"{}\\\",\\\"{}\\\",\\\"v1.0\\\",\\\"{}\\\",0,{},\\\"\\\")\"". \
+        command = "python3 -c \"import onnx2tnn;onnx2tnn.convert('{}','{}','v1.0','{}',0,{},'')\"". \
                 format(self.config.onnx_model_dir, output_dir, time.strftime("%Y%m%d %H:%M:%S", time.localtime()), str(1 if self.config.optimize else 0))
         rc, out_text, err_text = self.runCmd(command)
     
