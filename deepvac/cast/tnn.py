@@ -3,7 +3,7 @@ import time
 from ..utils import LOG
 from .base import DeepvacCast
 
-class TNNCast(DeepvacCast):
+class TnnCast(DeepvacCast):
     def auditConfig(self):
         if not self.config.model_dir:
             return False
@@ -25,7 +25,7 @@ class TNNCast(DeepvacCast):
             self.config.model_dir = output_tnn_file
         self.config.arch_dir = '{}.tnnproto'.format(output_tnn_file)
         
-        LOG.logI("config.cast.TNNCast.model_dir found, save tnn model to {}...".format(self.config.model_dir))
+        LOG.logI("config.cast.TnnCast.model_dir found, save tnn model to {}...".format(self.config.model_dir))
 
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
@@ -43,4 +43,4 @@ class TNNCast(DeepvacCast):
         prefix = os.path.splitext(os.path.basename(self.config.onnx_model_dir))[0]
         os.rename(os.path.join(output_dir, prefix+".tnnmodel"), self.config.model_dir)
         os.rename(os.path.join(output_dir, prefix+".tnnproto"), self.config.arch_dir)
-        LOG.logI("Pytorch model convert to TNN model succeed, save tnn model file in {}, save tnn proto file in {}".format(self.config.model_dir, self.config.arch_dir))
+        LOG.logI("Pytorch model convert to Tnn model succeed, save tnn model file in {}, save tnn proto file in {}".format(self.config.model_dir, self.config.arch_dir))
