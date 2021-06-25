@@ -1,11 +1,18 @@
 import setuptools
 import sys
-from deepvac import __version__
+
 def readme():
     with open('README.md') as f:
         return f.read()
 
-version=__version__
+def version():
+    with open('deepvac/version.py') as f:
+        version_cmd = f.read()
+        loc = {}
+        exec(version_cmd.strip(),globals(), loc)
+        return loc['__version__']
+
+version=version()
 print("You are building deepvac with version: {}".format(version))
 setuptools.setup(name='deepvac',
     version=version,
