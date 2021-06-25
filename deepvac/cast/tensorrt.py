@@ -2,6 +2,13 @@ from ..utils import LOG
 from .base import DeepvacCast
 
 class TensorrtCast(DeepvacCast):
+    try:
+        import tensorrt as trt
+    except:
+        LOG.logE("You must install tensorrt package if you want to convert pytorch to onnx. 1. Download Tensorrt7.2.3(for CUDA11.0) from https://developer.nvidia.com/tensorrt \
+        2. unpack Tensorrt*.tar.gz  3. pip install tensorrt-x-cpx-none-linux_x86_64.whl in Tensorrt*(your_tensorrt_path)/python", exit=True)
+    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+
     def auditConfig(self):
         if not self.config.model_dir:
             return False
@@ -10,14 +17,9 @@ class TensorrtCast(DeepvacCast):
             LOG.logE("If you want to tensorrt support dynamic input, you must set onnx_dynamic_ax.", exit=True)
         
         return True
-
+    
     def process(self, cast_output_file=None):
-        try:
-            import tensorrt as trt
-        except:
-            LOG.logE("You must install tensorrt package if you want to convert pytorch to onnx. 1. Download Tensorrt7.2.3(for CUDA11.0) from https://developer.nvidia.com/tensorrt \
-            2. unpack Tensorrt*.tar.gz  3. pip install tensorrt-x-cpx-none-linux_x86_64.whl in Tensorrt*(your_tensorrt_path)/python", exit=True)
-            return
+        import tensorrt as trt
 
         output_trt_file = self.config.model_dir
         if cast_output_file:
@@ -29,10 +31,7 @@ class TensorrtCast(DeepvacCast):
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
 
-        trt_logger = trt.Logger(trt.Logger.WARNING)
-        with trt.Builder(trt_logger) as builder, builder.create_network(1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, trt_logger) as parser:
-            builder.max_workspace_size = 4 << 30
-            builder.max_batch_size = 1
+        with trt.Builder(TensorrtCast.TRT_LOGGER) as builder, builder.create_network(1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TensorrtCast.TRT_LOGGER) as parser:
             with open(self.config.onnx_model_dir, 'rb') as model:
                 parser.parse(model.read())
             config = builder.create_builder_config()

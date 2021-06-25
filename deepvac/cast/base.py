@@ -66,13 +66,32 @@ class DeepvacCast(object):
             self.config.onnx_output_names = ["output"]
 
         if not self.config.onnx_model_dir:
-            f = tempfile.NamedTemporaryFile(delete=False)
+            f = tempfile.NamedTemporaryFile(suffix=".onnx", delete=False)
             self.config.onnx_model_dir = f.name
 
         torch.onnx.export(self.net, self.trainer_config.sample, self.config.onnx_model_dir, 
             input_names=self.config.onnx_input_names, output_names=self.config.onnx_output_names, 
             dynamic_axes=self.config.onnx_dynamic_ax, opset_version=self.config.onnx_version, export_params=True)
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.config.onnx_model_dir))
+    
+    def onnxSimplify(self, check_n=0, perform_optimization=True, skip_fuse_bn=False, input_shapes=None,
+                    skipped_optimizers=None, skip_shape_inference=False, input_data=None):
+        try:
+            import onnx
+            from onnxsim import simplify
+        except:
+            LOG.logE("You must install onnx and onnxsim package first if you want to convert pytorch to ncnn or tnn.", exit=True)
+        model_op, check_ok = simplify(self.config.onnx_model_dir, check_n=check_n, perform_optimization=perform_optimization, skip_fuse_bn=skip_fuse_bn,  skip_shape_inference=skip_shape_inference)
+        onnx.save(model_op, self.config.onnx_model_dir)
+        if not check_ok:
+            LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right.")
+        else:
+            LOG.logI("Simplify model succeed")
+
+    def runCmd(self, cmd):
+        sub = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        output, err = sub.communicate()
+        return sub.poll(), output.decode("utf-8"), err.decode("utf-8")
 
     def __call__(self, cast_output_file=None):
         if not self.proceed:

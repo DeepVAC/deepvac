@@ -319,6 +319,53 @@ config.cast.TensorrtCast.input_max_dims = (1, 3, 2000, 2000)
 - 在train.py下，<your_trt_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
 - 在test.py下，<your_trt_model_dir_only4smoketest> 为TensorRT模型输出路径。
 
+### 输出MNN（适用于train.py和test.py）
+因为转换MNN依赖ONNX，所以需要先设置ONNX的配置：
+```python
+# 输出config.onnx_model_dir
+config.cast.MNNCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+# 默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
+config.cast.MNNCast.onnx_version = 9
+config.cast.MNNCast.onnx_input_names = ["input"]
+config.cast.MNNCast.onnx_output_names = ["output"]
+
+```
+然后需要设置如下的配置：
+```python
+# onnx2mnn可执行文件的路径，https://www.yuque.com/mnn/cn/cvrt_linux_mac
+config.cast.MNNCast.onnx2mnn = <your_onnx2mnn_executable_file>
+config.cast.MNNCast.model_dir = <your_mnn_model_dir_only4smoketest>
+# 固定输入形状，保存静态模型
+config.cast.MNNCast.saveStaticModel = True
+```
+注意：
+- MNN模型的转换依赖于onnx，因此需要首先将模型转换为onnx。
+- 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为MNN。之后，在每次保存PyTorch模型的时候，会同时保存MNN。
+- 在train.py下，<your_mnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在test.py下，<your_mnn_model_dir_only4smoketest> 为MNN模型输出路径。
+
+### 输出TNN（适用于train.py和test.py）
+因为转换TNN依赖ONNX，所以需要先设置ONNX的配置：
+```python
+# 输出config.onnx_model_dir
+config.cast.TNNCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
+# 默认onnx版本，默认是9。当模型使用了上采样等操作时，建议将它设置为11或以上
+config.cast.TNNCast.onnx_version = 9
+config.cast.TNNCast.onnx_input_names = ["input"]
+config.cast.TNNCast.onnx_output_names = ["output"]
+```
+然后需要设置如下的配置：
+```python
+config.cast.TNNCast.model_dir = <your_tnn_model_dir_only4smoketest>
+# 开启模型优化，有可能会提高移动端模型推理速度
+config.cast.TNNCast.optimize = True
+
+```
+注意：
+- TNN模型的转换依赖于onnx，因此需要首先将模型转换为onnx。
+- 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为TNN。之后，在每次保存PyTorch模型的时候，会同时保存TNN。
+- 在train.py下，<your_mnn_model_dir_only4smoketest> 仅用于冒烟测试，真正的存储目录为PyTorch模型所在的目录，无需用户额外指定。
+- 在test.py下，<your_mnn_model_dir_only4smoketest> 为TNN模型输出路径。
 
 ### 启用自动混合精度训练（仅适用于train.py）
 如果要开启自动混合精度训练（AMP），你只需要设置如下配置即可：
