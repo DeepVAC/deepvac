@@ -1,10 +1,12 @@
 import setuptools
 import sys
+from deepvac import __version__
 def readme():
     with open('README.md') as f:
         return f.read()
 
-version="0.5.7"
+version=__version__
+print("You are building deepvac with version: {}".format(version))
 setuptools.setup(name='deepvac',
     version=version,
     description='PyTorch python project standard',

@@ -87,7 +87,7 @@ class MobileNetV3Large(MobileNetV3):
             [5,   6, 160, True, True, 1]
         ]
 
-class MobileNetV3Ocr(MobileNetV3):
+class MobileNetV3OCR(MobileNetV3):
     def auditConfig(self):
         self.last_output_channel = 1024
         self.cfgs = [
