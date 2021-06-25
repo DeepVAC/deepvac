@@ -55,3 +55,10 @@ class DeepvacDistill(DeepvacTrain):
         super(DeepvacDistill, self).doBackward()
         if self.config.teacher.use_backword is True:
             self.config.teacher.loss.backward()
+
+    def doOptimize(self):
+        super(DeepvacDistill, self).doOptimize()
+        if self.config.iter % self.config.nominal_batch_factor != 0:
+            return
+        self.config.teacher.optimizer.step()
+        self.config.teacher.optimizer.zero_grad()

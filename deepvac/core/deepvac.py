@@ -279,10 +279,10 @@ class Deepvac(object):
         LOG.logI('{}: [input shape: {}]'.format(self.config.phase, self.config.sample.shape))
         return self.config.output
 
-    def testFly(self):
+    def doTest(self):
         if self.config.test_loader:
             return self.test()
-        LOG.logE("You have to reimplement testFly() in subclass {} if you didn't set any valid input, e.g. config.core.{}.test_loader.".format(self.name(), self.name()), exit=True)
+        LOG.logE("You have to reimplement doTest() in subclass {} if you didn't set any valid input, e.g. config.core.{}.test_loader.".format(self.name(), self.name()), exit=True)
 
     def process(self, input_tensor):
         self.config.phase = 'TEST'
@@ -292,16 +292,10 @@ class Deepvac(object):
             self.config.sample = input_tensor
             return self.testSample()
         LOG.logI("You did not provide input_tensor at Deepvac(input_tensor)...")
-
-        if self.config.sample is not None:
-            LOG.logI('You provided input with config.core.{}.sample, do net inference with config.core.{}.example.'.format(self.name(), self.name()))
-            return self.testSample()
-        LOG.logI("You did not provide input with config.core.{}.sample...".format(self.name()))
-        
-        LOG.logI("testFly() is your last chance, you must have already reimplemented testFly() in subclass {}, right?".format(self.name()))
-        x = self.testFly()
+        LOG.logI("doTest() is your last chance, you must have already reimplemented doTest() in subclass {}, right?".format(self.name()))
+        x = self.doTest()
         if self.config.sample is None:
-            LOG.logE("You must set self.config.sample in testFly() reimplementation in your subclass {}".format(self.name()), exit=True)
+            LOG.logE("You must set self.config.sample in doTest() in your subclass {}, or cast model will fail.".format(self.name()), exit=True)
         return x
 
     def __call__(self, input_tensor=None):

@@ -290,13 +290,13 @@ def auditTestConfig():
 def auditTrainConfig():
     config.core.ResNet50Train.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    config.cast.ScriptCast = AttrDict()
+    # config.cast.ScriptCast = AttrDict()
     # config.cast.ScriptCast.model_dir = "./gemfield_script.pt"
     # config.cast.ScriptCast.static_quantize_dir = "./static_quantize.pt"
     # config.cast.ScriptCast.dynamic_quantize_dir = "./dynamic_quantize.pt"
 
-    config.core.ResNet50Train.dist_url = "tcp://localhost:27030"
-    config.core.ResNet50Train.world_size = 2
+    # config.core.ResNet50Train.dist_url = "tcp://localhost:27030"
+    # config.core.ResNet50Train.world_size = 2
 
     config.core.ResNet50Train.disable_git = True
     #train stuff
