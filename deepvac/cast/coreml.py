@@ -62,7 +62,6 @@ class CoremlCast(DeepvacCast):
 
         # Set feature descriptions (these show up as comments in XCode)
         coreml_model.input_description["input"] = "Deepvac Model Input"
-        coreml_model.output_description["classLabel"] = "Most likely image category"
 
         # Set model author name
         coreml_model.author = '"DeepVAC'
