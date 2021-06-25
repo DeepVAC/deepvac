@@ -22,7 +22,7 @@ class MnnCast(DeepvacCast):
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
 
-        cmd = self.config.onnx2mnn + " -f ONNX --modelFile " + self.config.onnx_model_dir + " --MNNModel " + output_mnn_file
+        cmd = "{} -f ONNX --modelFile {} --MNNModel {}".format(self.config.onnx2mnn, self.config.onnx_model_dir, output_mnn_file)
         if self.config.save_static_model:
             cmd += " --saveStaticModel true"
         else:

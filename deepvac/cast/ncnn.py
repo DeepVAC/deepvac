@@ -24,7 +24,7 @@ class NcnnCast(DeepvacCast):
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
 
-        cmd = self.config.onnx2ncnn + " " + self.config.onnx_model_dir + " " + self.config.arch_dir + " " + output_ncnn_file
+        cmd = "{} {} {} {}".format(self.config.onnx2ncnn, self.config.onnx_model_dir, self.config.arch_dir, output_ncnn_file)
         rc, out_text, err_text = self.runCmd(cmd)
         if err_text == "":
             LOG.logI("Pytorch model convert to NCNN model succeed, save ncnn param file in {}, save ncnn bin file in {}.".format(self.config.arch_dir, output_ncnn_file))
