@@ -8,7 +8,7 @@ from torch.quantization import default_dynamic_qconfig, float_qparams_weight_onl
 from torch.quantization.quantize_fx import prepare_fx, convert_fx, prepare_qat_fx
 import torch.nn as nn
 from ..core.config import AttrDict
-from ..utils import LOG
+from ..utils import LOG, addUserConfig
 
 class DeepvacCast(object):
     def __init__(self, trainer_config, cast_config):

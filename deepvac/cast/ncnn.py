@@ -1,5 +1,5 @@
 import os
-from ..utils import LOG, addUserConfig
+from ..utils import LOG
 from .base import DeepvacCast
 
 class NcnnCast(DeepvacCast):
@@ -9,16 +9,19 @@ class NcnnCast(DeepvacCast):
         
         if self.config.onnx2ncnn:
             return True
-        
-        LOG.logW("You didn't set onnx2ncnn executable program path in config file. So we try to set a dafault path for onnx2ncnn")
-        
+
         onnx2ncnn = "/bin/onnx2ncnn"
+        LOG.logW("You didn't set config.cast.NcnnCast.onnx2ncnn executable program path in config file. So we try to use {} as the dafault configuration for config.cast.NcnnCast.onnx2ncnn. ".format(onnx2ncnn))
+        
         exist = os.path.exists(onnx2ncnn)
         if not exist:
-            LOG.logE("The default path of onnx2ncnn is invalid. We think you are not in HomePod Env(https://github.com/DeepVAC/MLab). If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
+            LOG.logE("The default configuration of config.cast.NcnnCast.onnx2ncnn is invalid. We think you are not in HomePod Env(https://github.com/DeepVAC/MLab). \
+                    If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
             return False
+        else:
+            LOG.logI("The default configuration of onnx2ncnn set success. ")
 
-        self.config.onnx2ncnn = addUserConfig("NcnnCast", "onnx2ncnn", developer_give=onnx2ncnn)
+        self.config.onnx2ncnn = self.addUserConfig("onnx2ncnn", developer_give=onnx2ncnn)
 
         return True
 

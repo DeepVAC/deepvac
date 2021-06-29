@@ -1,5 +1,5 @@
 import os
-from ..utils import LOG, addUserConfig
+from ..utils import LOG
 from .base import DeepvacCast
 
 class MnnCast(DeepvacCast):
@@ -10,15 +10,18 @@ class MnnCast(DeepvacCast):
         if self.config.onnx2mnn:
             return True
         
-        LOG.logW("You didn't set onnx2mnn executable program path in config file. So we try to set a dafault path for onnx2mnn")
-        
         onnx2mnn = "/bin/MNNConvert"
+        LOG.logW("You didn't set onnx2mnn executable program path in config file. So we try to use {} as the dafault configuration for config.cast.MnnCast.onnx2mnn. ".format(onnx2mnn))
+        
         exist = os.path.exists(onnx2mnn)
         if not exist:
-            LOG.logE("The default path of onnx2mnn is invalid. We think you are not in HomePod Env(https://github.com/DeepVAC/MLab). If you want to compile onnx2mnn tools, reference https://www.yuque.com/mnn/cn/cvrt_linux_mac ", exit=True)
+            LOG.logE("The default configuration of onnx2mnn is invalid. We think you are not in HomePod Env(https://github.com/DeepVAC/MLab). \
+                    If you want to compile onnx2mnn tools, reference https://www.yuque.com/mnn/cn/cvrt_linux_mac ", exit=True)
             return False
+        else:
+            LOG.logI("The default configuration of onnx2mnn set success. ")
 
-        self.config.onnx2mnn = addUserConfig("MnnCast", "onnx2mnn", developer_give=onnx2mnn)
+        self.config.onnx2mnn = self.addUserConfig("onnx2mnn", developer_give=onnx2mnn)
         
         return True
 
