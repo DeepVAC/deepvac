@@ -1,3 +1,4 @@
+import os
 from ..utils import LOG
 from .base import DeepvacCast
 
@@ -6,9 +7,13 @@ class MnnCast(DeepvacCast):
         if not self.config.model_dir:
             return False
 
-        if not self.config.onnx2mnn:
-            LOG.logE("You must set the onnx2mnn executable program path in config file. If you want to compile onnx2mnn tools, reference https://www.yuque.com/mnn/cn/cvrt_linux_mac  ", exit=True)
+        self.config.onnx2mnn = self.addUserConfig("onnx2mnn", self.config.onnx2mnn, "/bin/MNNConvert")
+        exist = os.path.exists(self.config.onnx2mnn)
+        if not exist:
+            LOG.logE("The config.cast.MnnCast.onnx2mnn is invalid. We try to use default setting of config.cast.MnnCast.onnx2mnn is failed too. \
+                    If you want to compile onnx2mnn tools, reference https://www.yuque.com/mnn/cn/cvrt_linux_mac ", exit=True)
             return False
+
         return True
 
     def process(self, cast_output_file=None):

@@ -6,10 +6,14 @@ class NcnnCast(DeepvacCast):
     def auditConfig(self):
         if not self.config.model_dir:
             return False
-
-        if not self.config.onnx2ncnn:
-            LOG.logE("You must set the onnx2ncnn executable program path in config file. If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
+        
+        self.config.onnx2ncnn = self.addUserConfig("onnx2ncnn", self.config.onnx2ncnn, "/bin/onnx2ncnn")
+        exist = os.path.exists(self.config.onnx2ncnn)
+        if not exist:
+            LOG.logE("The config.cast.NcnnCast.onnx2ncnn is invalid. We try to use default setting of config.cast.NcnnCast.onnx2ncnn is failed too. \
+                    If you want to compile onnx2ncnn tools, reference https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux-x86 ", exit=True)
             return False
+        
         return True
 
     def process(self, cast_output_file=None):
