@@ -133,9 +133,9 @@ class CocoCVSegDataset(DatasetBase):
         # return target you want
         return img, mask, cls_masks, file_path
 
-class CocoCVOcrDataset(DatasetBase):
+class CocoCVContoursDataset(DatasetBase):
     def __init__(self, deepvac_config, sample_path_prefix, target_path):
-        super(CocoCVOcrDataset, self).__init__(deepvac_config)
+        super(CocoCVContoursDataset, self).__init__(deepvac_config)
         try:
             from pycocotools.coco import COCO
         except:
