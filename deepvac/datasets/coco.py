@@ -155,9 +155,9 @@ class CocoCVContoursDataset(DatasetBase):
 
     def __getitem__(self, index):
         id = self.ids[index]
-        sample, bbox_info, file_path = self._getSample(id)
-        sample, bbox_info, file_path = self.compose((sample, bbox_info, os.path.join(self.sample_path_prefix, file_path)))
-        return sample, bbox_info, file_path
+        sample, bbox_info, file_path, show_img = self._getSample(id)
+        sample, bbox_info, file_path, show_img = self.compose((sample, bbox_info, os.path.join(self.sample_path_prefix, file_path), show_img))
+        return sample, bbox_info, file_path, show_img
 
     def updatePath(self, id, file_path):
         full_file_path = self.coco.loadImgs(id)[0]["path"]
@@ -176,20 +176,23 @@ class CocoCVContoursDataset(DatasetBase):
 
     def _bbox_generator(self, img, anns_list):
         bbox_info = []
+        show_img = img.copy()
         for idx, single in enumerate(anns_list):
             s = ''
             if single['isbbox']:
                 x, y, w, h = single['bbox']
                 x, y, w, h = int(x), int(y), int(w), int(h)
+                cv2.rectangle(show_img, (x, y), (x + w, y + h), (0, 0, 255), 2)
                 s = '{},{},{},{},{},{},{},{},ok'.format(x, y, x+w, y, x+w, y+h, x, y+h)
             else:
                 seg = single['segmentation']
                 pts = np.array(seg[0]).reshape((-1,2)).astype(np.int32)
+                cv2.polylines(show_img, [pts], True, (0,0,255), 2)
                 for pt in pts.reshape((-1)):
                     s += '{},'.format(pt)
                 s += 'ok'
             bbox_info.append(s)
-        return bbox_info
+        return bbox_info, show_img
 
     def _getSample(self, id: int):
         # img
@@ -203,7 +206,7 @@ class CocoCVContoursDataset(DatasetBase):
         # anno
         anns = self.coco.loadAnns(self.coco.getAnnIds(id))
 
-        bbox_info = self._bbox_generator(img, anns)
+        bbox_info, show_img = self._bbox_generator(img, anns)
 
         # return target you want
-        return img, bbox_info, file_path 
+        return img, bbox_info, file_path, show_img
