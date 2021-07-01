@@ -11,10 +11,7 @@ class TensorrtCast(DeepvacCast):
     def auditConfig(self):
         if not self.config.model_dir:
             return False
-        
-        if self.config.enable_dynamic_input and self.config.onnx_dynamic_ax is None:
-            LOG.logE("If you want to tensorrt support dynamic input, you must set onnx_dynamic_ax.", exit=True)
-        
+    
         return True
     
     def process(self, cast_output_file=None):
@@ -39,7 +36,7 @@ class TensorrtCast(DeepvacCast):
             with open(self.config.onnx_model_dir, 'rb') as model:
                 parser.parse(model.read())
             config = builder.create_builder_config()
-            if self.config.enable_dynamic_input:
+            if self.config.onnx_dynamic_ax:
                 profile = builder.create_optimization_profile()
                 profile.set_shape(self.config.onnx_input_names[0], self.config.input_min_dims, self.config.input_opt_dims, self.config.input_max_dims)
                 config.add_optimization_profile(profile)

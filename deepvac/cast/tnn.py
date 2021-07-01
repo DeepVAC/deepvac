@@ -30,7 +30,7 @@ class TnnCast(DeepvacCast):
         #to onnx, also set self.config.onnx_model_dir, self.config.onnx_input_names and self.config.onnx_output_names
         self.exportOnnx()
         if self.config.optimize:
-            self.onnxSimplify(input_shapes=input_shapes_, perform_optimization=False)
+            self.onnxSimplify(input_shapes={self.config.onnx_input_names[0]: self.trainer_config.sample.shape} if self.config.onnx_dynamic_ax else None, perform_optimization=False, dynamic_input_shape=True if self.config.onnx_dynamic_ax else False)
         
         output_dir = os.path.dirname(self.config.model_dir)
         command = "python3 -c \"import onnx2tnn;onnx2tnn.convert('{}','{}','v1.0','{}',0,{},'')\"". \

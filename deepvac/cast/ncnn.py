@@ -18,7 +18,7 @@ class NcnnCast(DeepvacCast):
 
     def process(self, cast_output_file=None):
         output_ncnn_file = self.config.model_dir
-
+        
         if cast_output_file:
             output_ncnn_file = '{}/ncnn__{}.bin'.format(self.trainer_config.output_dir, cast_output_file)
             self.config.model_dir = output_ncnn_file
@@ -41,13 +41,14 @@ class NcnnCast(DeepvacCast):
             from onnxsim import simplify
         except:
             LOG.logE("You must install onnx and onnxsim package first if you want to convert pytorch to ncnn.", exit=True)
+        
+        dynamic_input_shape = False
+        input_shapes = None
+        if self.config.onnx_dynamic_ax:
+            dynamic_input_shape = True
+            input_shapes = {self.config.onnx_input_names[0]: self.trainer_config.sample.shape}
 
-        model_op, check_ok = simplify(self.config.onnx_model_dir, check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False)
-        onnx.save(model_op, self.config.onnx_model_dir)
-        if not check_ok:
-            LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right.")
-        else:
-            LOG.logI("Simplify model succeed")
+        self.onnxSimplify(check_n=3, perform_optimization=True, skip_fuse_bn=True,  skip_shape_inference=False, dynamic_input_shape=dynamic_input_shape, input_shapes=input_shapes)
         
         rc, out_text, err_text = self.runCmd(cmd)
         if err_text != "":
