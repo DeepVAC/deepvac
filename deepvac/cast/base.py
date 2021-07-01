@@ -75,13 +75,19 @@ class DeepvacCast(object):
         LOG.logI("Pytorch model convert to ONNX model succeed, save model in {}".format(self.config.onnx_model_dir))
     
     def onnxSimplify(self, check_n=0, perform_optimization=True, skip_fuse_bn=False, input_shapes=None,
-                    skipped_optimizers=None, skip_shape_inference=False, input_data=None):
+                    skipped_optimizers=None, skip_shape_inference=False, input_data=None, dynamic_input_shape=False):
         try:
             import onnx
             from onnxsim import simplify
         except:
             LOG.logE("You must install onnx and onnxsim package first if you want to convert pytorch to ncnn or tnn.", exit=True)
-        model_op, check_ok = simplify(self.config.onnx_model_dir, check_n=check_n, perform_optimization=perform_optimization, skip_fuse_bn=skip_fuse_bn,  skip_shape_inference=skip_shape_inference)
+        
+        try:
+            model_op, check_ok = simplify(self.config.onnx_model_dir, check_n=check_n, perform_optimization=perform_optimization, skip_fuse_bn=skip_fuse_bn,  skip_shape_inference=skip_shape_inference, \
+                                        input_shapes=input_shapes, skipped_optimizers=skipped_optimizers, input_data=input_data, dynamic_input_shape=dynamic_input_shape)
+        except RuntimeError as e:
+            LOG.logE("Simplify model faild. {}".format(e), exit=True)
+            
         onnx.save(model_op, self.config.onnx_model_dir)
         if not check_ok:
             LOG.logE("Maybe something wrong when simplify the model, we can't guarantee generate model is right.")
