@@ -30,8 +30,6 @@ class MnnCast(DeepvacCast):
         cmd = "{} -f ONNX --modelFile {} --MNNModel {}".format(self.config.onnx2mnn, self.config.onnx_model_dir, output_mnn_file)
         if self.config.save_static_model:
             cmd += " --saveStaticModel true"
-        else:
-            cmd += " --saveStaticModel false"
         rc, out_text, err_text = self.runCmd(cmd)
 
         if "" != err_text:
