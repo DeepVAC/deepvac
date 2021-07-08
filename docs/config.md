@@ -288,8 +288,9 @@ config.cast.TensorrtCast.onnx_model_dir = <your_onnx_model_dir_only4smoketest>
 config.cast.TensorrtCast.onnx_version = 9
 config.cast.TensorrtCast.onnx_input_names = ["input"]
 config.cast.TensorrtCast.onnx_output_names = ["output"]
-#当模型的支持动态输入的时候，需要设置，input和output需要和上面2行设置的name对应。
-config.cast.onnx_dynamic_ax = {
+#当模型支持动态输入的时候，需要设置以下参数，input和output需要和上面2行设置的name对应。
+#还需要配置图片的最小输入尺寸，最大输入尺寸和最优尺寸。
+config.cast.TensorrtCast.onnx_dynamic_ax = {
             'input': {
                 0: 'batch_size',
                 1: 'image_channel',
@@ -303,14 +304,13 @@ config.cast.onnx_dynamic_ax = {
                 3: 'output_width'
         }
     }
+config.cast.TensorrtCast.input_min_dims = (1, 3, 1, 1)
+config.cast.TensorrtCast.input_opt_dims = (1, 3, 640, 640)
+config.cast.TensorrtCast.input_max_dims = (1, 3, 2000, 2000)
 ```
 然后需要设置如下的配置：
 ```python
 config.cast.TensorrtCast.model_dir = <your_trt_model_dir_only4smoketest>
-# 需要配置图片的最小输入尺寸，最大输入尺寸和最优尺寸
-config.cast.TensorrtCast.input_min_dims = (1, 3, 1, 1)
-config.cast.TensorrtCast.input_opt_dims = (1, 3, 640, 640)
-config.cast.TensorrtCast.input_max_dims = (1, 3, 2000, 2000)
 
 ```
 注意：
