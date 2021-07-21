@@ -76,7 +76,9 @@ date: <测试日期>
 - config.cast.OnnxCast.onnx_model_dir（可选，需要ONNX时开启）
 - config.cast.NcnnCast.model_dir, config.cast.NcnnCast.onnx2ncnn（可选，需要NCNN时开启）
 - config.cast.CoremlCast.model_dir（可选，需要CoreML时开启）
-
+- config.cast.MnnCast.model_dir, config.cast.MnnCast.onnx2mnn（可选，需要MNN时开启）
+- config.cast.TnnCast.model_dir（可选，需要TNN时开启）
+- config.cast.TensorrtCast.model_dir（可选，需要TensorRT时开启）
 ## 部署方式
 所有的AI产品默认进行3种部署测试：
 - x86 + CUDA Linux
