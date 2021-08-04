@@ -16,7 +16,7 @@ class CoremlCast(DeepvacCast):
             LOG.logI("You are in coreml_input_type=image mod")
             if self.config.scale is None:
                 LOG.logE("You need to set config.cast.CoremlCast.scale in config.py, e.g. config.cast.CoremlCast.scale = 1.0 / (0.226 * 255.0)", exit=True)
-            
+
             if self.config.color_layout is None:
                 LOG.logE("You need to set config.cast.CoremlCast.color_layout in config.py, e.g. config.cast.CoremlCast.color_layout = 'BGR' ", exit=True)
 
@@ -56,9 +56,12 @@ class CoremlCast(DeepvacCast):
                         bias = [self.config.blue_bias, self.config.green_bias, self.config.red_bias])
         else:
             input = coremltools.TensorType(name='input', shape=tuple(self.trainer_config.sample.shape))
+        #classifier
+        if self.config.classifier_config is not None:
+            self.config.classifier_config = coremltools.ClassifierConfig(self.config.classifier_config)
         #convert
-        coreml_model = coremltools.convert(model=model, inputs=[input], 
-             classfier_config=self.config.classfier_config, minimum_deployment_target=self.config.minimum_deployment_target)
+        coreml_model = coremltools.convert(model=model, inputs=[input],
+             classifier_config=self.config.classifier_config, minimum_deployment_target=self.config.minimum_deployment_target)
 
         # Set feature descriptions (these show up as comments in XCode)
         coreml_model.input_description["input"] = "Deepvac Model Input"
