@@ -272,7 +272,7 @@ config.cast.CoremlCast.red_bias = -0.485 / 0.226
 #可以不设置
 config.cast.CoremlCast.minimum_deployment_target = coremltools.target.iOS13
 #如果类别多，使用代码初始化这个值
-config.cast.CoremlCast.classfier_config = ["cls1","cls2","cls3","cls4","cls5","cls6"]
+config.cast.CoremlCast.classifier_config = ["cls1","cls2","cls3","cls4","cls5","cls6"]
 ```
 注意：
 - 在train.py下，配置上面的参数后，Deepvac会在第一次迭代的时候，进行冒烟测试，也就是测试网络是否能够成功转换为CoreML。之后，在每次保存PyTorch模型的时候，会同时保存CoreML。
